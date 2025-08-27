@@ -1,0 +1,16 @@
+{
+    "native_lang": "한국어 (ko-KR)",
+    "learning_lang": "중국어 (cmn-CN)",
+    "project_name": "kor-chn",
+    "identifier": "kor-chn",
+    "speaker_config": {
+        "native_speaker": "ko-KR-Chirp3-HD-Achernar",
+        "learner_count": "4",
+        "learner_speakers": [
+            "cmn-CN-Chirp3-HD-Achernar",
+            "cmn-CN-Chirp3-HD-Achernar",
+            "cmn-CN-Chirp3-HD-Achernar",
+            "cmn-CN-Chirp3-HD-Achernar"
+        ]
+    }
+}

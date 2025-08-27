@@ -225,8 +225,11 @@ class App(customtkinter.CTk):
             self.tts_client = texttospeech.TextToSpeechClient()
             self.message_window.insert("end", "[SUCCESS] Google TTS client initialized.\n")
             self.tts_voices = self.tts_client.list_voices().voices
+            self.message_window.insert("end", f"[INFO] {len(self.tts_voices)}개의 TTS 화자를 로드했습니다.\n")
         except Exception as e:
             self.message_window.insert("end", f"[ERROR] TTS/Voice list initialization failed: {e}\n")
+            self.message_window.insert("end", "[INFO] Google Cloud TTS API 키가 설정되지 않았거나 인증에 문제가 있습니다.\n")
+            self.message_window.insert("end", "[INFO] Google Cloud Console에서 TTS API를 활성화하고 서비스 계정 키를 설정해주세요.\n")
 
         # Gemini는 요청 시점에 설정합니다(.env 또는 설정값 사용)
         try:
@@ -624,12 +627,23 @@ class App(customtkinter.CTk):
         _, native_lang_code = self.language_map.get(native_lang_key, ("", ""))
         _, learning_lang_code = self.language_map.get(learning_lang_key, ("", ""))
 
+        self.message_window.insert("end", f"[DEBUG] 원어 언어: {native_lang_key} -> {native_lang_code}\n")
+        self.message_window.insert("end", f"[DEBUG] 학습어 언어: {learning_lang_key} -> {learning_lang_code}\n")
+        self.message_window.insert("end", f"[DEBUG] 사용 가능한 TTS 화자 수: {len(self.tts_voices)}\n")
+
         native_voices = sorted([v.name for v in self.tts_voices if v.language_codes[0] == native_lang_code])
         self.learning_voices = sorted([v.name for v in self.tts_voices if v.language_codes[0] == learning_lang_code])
+
+        self.message_window.insert("end", f"[DEBUG] 원어 화자 수: {len(native_voices)}\n")
+        self.message_window.insert("end", f"[DEBUG] 학습어 화자 수: {len(self.learning_voices)}\n")
 
         self.native_speaker_dropdown.configure(values=native_voices if native_voices else ["No voices found"])
         if native_voices:
             self.native_speaker_dropdown.set(native_voices[0])
+            self.message_window.insert("end", f"[DEBUG] 원어 화자 설정: {native_voices[0]}\n")
+        else:
+            self.native_speaker_dropdown.set("No voices found")
+            self.message_window.insert("end", "[WARNING] 해당 언어의 원어 화자를 찾을 수 없습니다.\n")
 
         self.redraw_learner_speakers()
         if self.speaker_config_to_load:

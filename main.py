@@ -11,6 +11,7 @@ from google.api_core import exceptions
 from dotenv import load_dotenv, set_key
 import signal, atexit, time
 import re
+import threading
 
 class App(customtkinter.CTk):
     def __init__(self):
@@ -42,6 +43,12 @@ class App(customtkinter.CTk):
 
         # --- App State ---
         self.generated_scripts = {}
+        
+        # --- Real-time Audio State ---
+        self.is_playing_realtime = False
+        self.current_script_index = 0
+        self.audio_queue = []
+        self.playing_thread = None
 
         # --- Theme and Colors ---
         customtkinter.set_appearance_mode("dark")
@@ -597,7 +604,7 @@ class App(customtkinter.CTk):
         control_button_section.grid(row=3, column=0, padx=10, pady=10, sticky="sew")
         self.audio_gen_button = customtkinter.CTkButton(control_button_section, text="오디오 생성", state="disabled", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR)
         self.audio_gen_button.pack(side="left", padx=5, pady=5)
-        self.audio_listen_button = customtkinter.CTkButton(control_button_section, text="오디오 듣기", state="disabled", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR)
+        self.audio_listen_button = customtkinter.CTkButton(control_button_section, text="오디오 듣기", state="disabled", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR, command=self.start_realtime_audio)
         self.audio_listen_button.pack(side="left", padx=5, pady=5)
         other_buttons = ["썸네일 생성", "회화 비디오", "인트로 비디오", "엔딩 비디오", "대화 비디오", "정지", "종료"]
         for btn_text in other_buttons:
@@ -1480,6 +1487,199 @@ class App(customtkinter.CTk):
         btn_save.grid(row=0, column=0, padx=(0, 8), pady=4, sticky="w")
         btn_cancel = customtkinter.CTkButton(btns, text="취소", command=on_cancel)
         btn_cancel.grid(row=0, column=1, padx=(0, 8), pady=4, sticky="w")
+
+    # ---------- 실시간 오디오 듣기 기능 ----------
+    def start_realtime_audio(self):
+        """실시간 오디오 듣기 시작"""
+        if self.is_playing_realtime:
+            self.stop_realtime_audio()
+            return
+        
+        # 현재 선택된 스크립트 가져오기
+        selected_script_type = self.script_type_dropdown.get()
+        if not selected_script_type or selected_script_type == "스크립트 종류 선택":
+            self.message_window.insert("end", "[ERROR] 스크립트를 먼저 선택해주세요.\n")
+            return
+        
+        script_data = self.generated_scripts.get(selected_script_type)
+        if not script_data:
+            self.message_window.insert("end", "[ERROR] 선택된 스크립트에 데이터가 없습니다.\n")
+            return
+        
+        # 화자 설정 확인
+        if not self.native_speaker_dropdown.get() or not self.learner_speaker_widgets:
+            self.message_window.insert("end", "[ERROR] 화자 설정을 먼저 완료해주세요.\n")
+            return
+        
+        self.is_playing_realtime = True
+        self.current_script_index = 0
+        self.audio_listen_button.configure(text="정지", fg_color="#FF4444", hover_color="#CC3333")
+        
+        # 스크립트 파싱 및 오디오 큐 생성
+        self.parse_script_and_create_queue(script_data)
+        
+        # 재생 시작
+        self.playing_thread = threading.Thread(target=self.play_audio_queue, daemon=True)
+        self.playing_thread.start()
+        
+        self.message_window.insert("end", "[INFO] 실시간 오디오 듣기를 시작합니다.\n")
+    
+    def stop_realtime_audio(self):
+        """실시간 오디오 듣기 정지"""
+        self.is_playing_realtime = False
+        self.audio_listen_button.configure(text="오디오 듣기", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR)
+        pygame.mixer.music.stop()
+        self.message_window.insert("end", "[INFO] 실시간 오디오 듣기를 정지했습니다.\n")
+    
+    def parse_script_and_create_queue(self, script_data):
+        """스크립트를 파싱하여 오디오 큐 생성"""
+        self.audio_queue = []
+        
+        try:
+            # 스크립트 데이터가 JSON 형태인 경우 파싱
+            if isinstance(script_data, str):
+                try:
+                    script_data = json.loads(script_data)
+                except json.JSONDecodeError:
+                    # JSON이 아닌 경우 텍스트로 처리
+                    lines = script_data.strip().split('\n')
+                    for line in lines:
+                        if line.strip():
+                            self.audio_queue.append({
+                                'type': 'text',
+                                'content': line.strip(),
+                                'speaker': 'native'
+                            })
+                    return
+            
+            # 대화 스크립트 형식 처리
+            if isinstance(script_data, list):
+                for item in script_data:
+                    if isinstance(item, dict):
+                        # 대화 형식: {"speaker": "native", "text": "안녕하세요"}
+                        if 'speaker' in item and 'text' in item:
+                            self.audio_queue.append({
+                                'type': 'dialogue',
+                                'speaker': item['speaker'],
+                                'text': item['text']
+                            })
+                        # 테이블 형식: {"순번": 1, "원어": "안녕하세요", "학습어": "Hello", "읽기": "헬로"}
+                        elif '원어' in item and '학습어' in item:
+                            # 원어 화자
+                            self.audio_queue.append({
+                                'type': 'native',
+                                'text': item['원어'],
+                                'speaker': 'native'
+                            })
+                            # 학습어 화자들 (1초 무음 포함)
+                            self.audio_queue.append({
+                                'type': 'silence',
+                                'duration': 1.0
+                            })
+                            for i, learner_widget in enumerate(self.learner_speaker_widgets):
+                                self.audio_queue.append({
+                                    'type': 'learning',
+                                    'text': item['학습어'],
+                                    'speaker': f'learner_{i+1}',
+                                    'voice_name': learner_widget['dropdown'].get()
+                                })
+                                if i < len(self.learner_speaker_widgets) - 1:
+                                    self.audio_queue.append({
+                                        'type': 'silence',
+                                        'duration': 0.5
+                                    })
+            
+            self.message_window.insert("end", f"[INFO] {len(self.audio_queue)}개의 오디오 항목을 큐에 추가했습니다.\n")
+            
+        except Exception as e:
+            self.message_window.insert("end", f"[ERROR] 스크립트 파싱 중 오류: {e}\n")
+    
+    def play_audio_queue(self):
+        """오디오 큐를 순차적으로 재생"""
+        import threading
+        import time
+        
+        for i, audio_item in enumerate(self.audio_queue):
+            if not self.is_playing_realtime:
+                break
+            
+            try:
+                if audio_item['type'] == 'silence':
+                    # 무음 재생
+                    time.sleep(audio_item['duration'])
+                    continue
+                
+                elif audio_item['type'] in ['native', 'learning', 'dialogue']:
+                    # TTS 음성 생성 및 재생
+                    text = audio_item['text']
+                    speaker_type = audio_item['speaker']
+                    
+                    if speaker_type == 'native':
+                        voice_name = self.native_speaker_dropdown.get()
+                        lang_code = "-".join(voice_name.split('-')[:2])
+                    elif speaker_type.startswith('learner_'):
+                        voice_name = audio_item['voice_name']
+                        lang_code = "-".join(voice_name.split('-')[:2])
+                    else:
+                        # dialogue 타입의 경우 speaker 필드에서 화자 정보 추출
+                        voice_name = self.get_voice_for_speaker(audio_item['speaker'])
+                        lang_code = "-".join(voice_name.split('-')[:2])
+                    
+                    # TTS 음성 생성
+                    self.generate_and_play_tts(text, voice_name, lang_code)
+                    
+                    # 다음 항목까지 잠시 대기
+                    time.sleep(0.5)
+                
+            except Exception as e:
+                self.message_window.insert("end", f"[ERROR] 오디오 재생 중 오류: {e}\n")
+                continue
+        
+        # 재생 완료
+        if self.is_playing_realtime:
+            self.stop_realtime_audio()
+            self.message_window.insert("end", "[INFO] 실시간 오디오 듣기가 완료되었습니다.\n")
+    
+    def get_voice_for_speaker(self, speaker):
+        """화자 정보에 따른 음성 선택"""
+        if speaker == 'native' or speaker == '원어':
+            return self.native_speaker_dropdown.get()
+        elif speaker.startswith('learner') or speaker.startswith('학습어'):
+            # 학습어 화자 중 첫 번째 사용
+            if self.learner_speaker_widgets:
+                return self.learner_speaker_widgets[0]['dropdown'].get()
+        return self.native_speaker_dropdown.get()  # 기본값
+    
+    def generate_and_play_tts(self, text, voice_name, lang_code):
+        """TTS 음성 생성 및 재생"""
+        try:
+            synthesis_input = texttospeech.SynthesisInput(text=text)
+            voice = texttospeech.VoiceSelectionParams(language_code=lang_code, name=voice_name)
+            audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
+            
+            response = self.tts_client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
+            
+            # 임시 파일에 저장
+            temp_file = f"/tmp/captiongen_realtime_{int(time.time())}.mp3"
+            with open(temp_file, "wb") as out:
+                out.write(response.audio_content)
+            
+            # 재생
+            pygame.mixer.music.load(temp_file)
+            pygame.mixer.music.play()
+            
+            # 재생 완료까지 대기
+            while pygame.mixer.music.get_busy() and self.is_playing_realtime:
+                time.sleep(0.1)
+            
+            # 임시 파일 삭제
+            try:
+                os.remove(temp_file)
+            except:
+                pass
+                
+        except Exception as e:
+            self.message_window.insert("end", f"[ERROR] TTS 생성 실패: {e}\n")
 
 if __name__ == "__main__":
     app = App()

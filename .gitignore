@@ -1,0 +1,18 @@
+# Bytecode
+__pycache__/
+*.py[cod]
+
+# Envs
+.venv/
+.env
+
+# OS
+.DS_Store
+
+# Output
+output/**
+
+# Secrets
+credentials.json
+image_settings.json
+temp_preview.mp3

@@ -1,0 +1,34 @@
+# GUI 개발 가이드
+
+## CustomTkinter 사용
+- 다크 테마 기본 적용 (`customtkinter.set_appearance_mode("dark")`)
+- 색상 상수 정의:
+  - `BG_COLOR = "#1B1B1B"` (배경)
+  - `WIDGET_COLOR = "#404040"` (위젯)
+  - `BUTTON_COLOR = "#007ACC"` (버튼)
+  - `TEXT_COLOR = "#EAEAEA"` (텍스트)
+
+## 탭 구조
+- **데이터 생성 탭**: AI 데이터 생성 및 관리
+- **화자 선택 탭**: TTS 화자 설정 및 미리듣기
+- **이미지 설정 탭**: 썸네일 및 이미지 관련 설정
+
+## 위젯 배치
+- `pack()` 메서드 사용하여 위젯 배치
+- `padx`, `pady`로 적절한 여백 설정
+- `expand=True, fill="both"`로 반응형 레이아웃 구현
+
+## 사용자 경험
+- 로딩 인디케이터 표시
+- 실시간 미리듣기 기능
+- 직관적인 버튼 레이블링
+- 에러 상태 시각적 피드백
+
+## 반응형 디자인
+- 윈도우 크기 변경 시 위젯 자동 조정
+- 다양한 해상도 지원
+- 모바일 친화적 레이아웃 고려
+description:
+globs:
+alwaysApply: true
+---

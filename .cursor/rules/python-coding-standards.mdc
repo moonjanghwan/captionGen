@@ -1,0 +1,32 @@
+# Python 코딩 표준
+
+## 라이브러리 사용
+- **CustomTkinter**: GUI 인터페이스 구현
+- **Google Cloud TTS**: 음성 합성 API
+- **Pygame**: 오디오 재생 및 제어
+- **Pydub**: 오디오 파일 처리
+- **Google Generative AI**: AI 데이터 생성
+
+## 클래스 구조
+- `App` 클래스는 CustomTkinter.CTk를 상속받아 메인 애플리케이션 구현
+- 각 탭은 별도 메서드로 구현 (create_data_generation_tab, create_speaker_selection_tab 등)
+- 비동기 작업은 threading 사용
+
+## 네이밍 컨벤션
+- 클래스: PascalCase (예: App, SpeakerConfig)
+- 메서드/변수: snake_case (예: create_data_generation_tab, ai_settings)
+- 상수: UPPER_CASE (예: BG_COLOR, BUTTON_COLOR)
+
+## 파일 구조
+- 메인 로직은 [main.py](mdc:main.py)에 통합
+- 설정은 [config.json](mdc:config.json)에서 관리
+- 환경 변수는 .env 파일 사용
+
+## 에러 처리
+- API 호출 시 try-except 블록 사용
+- 사용자 친화적인 에러 메시지 표시
+- 로깅을 통한 디버깅 지원
+description:
+globs:
+alwaysApply: true
+---

@@ -1,0 +1,28 @@
+# CaptionGen 프로젝트 구조 가이드
+
+## 메인 진입점
+[main.py](mdc:main.py)는 애플리케이션의 메인 진입점입니다. CustomTkinter를 사용한 GUI 애플리케이션으로 다음 기능들을 포함합니다:
+- AI 기반 다국어 학습 데이터 자동 생성
+- Google Cloud Text-to-Speech API 연동
+- 다국어 화자 선택 및 미리듣기
+- 오디오 파일 생성 및 관리
+
+## 핵심 설정 파일
+- [config.json](mdc:config.json): 기본 언어 설정, 프로젝트 이름, 화자 설정
+- [AI Prompt.txt](mdc:AI Prompt.txt): AI 데이터 생성용 프롬프트 템플릿
+- [제작사양서.md](mdc:제작사양서.md): 프로젝트 전체 사양서
+- [요청사항.txt](mdc:요청사항.txt): 개발 요구사항
+
+## 출력 구조
+- `output/`: 생성된 모든 파일들이 저장되는 디렉토리
+- 각 프로젝트는 `output/{project_identifier}/` 형태로 구성
+- 생성 파일: 대화 스크립트, 오디오 파일, 자막, 썸네일 등
+
+## 환경 설정
+- `.env` 파일을 통해 API 키 관리 (Git에서 제외됨)
+- Google Cloud TTS API 키 필요
+- Gemini API 키 필요
+description:
+globs:
+alwaysApply: true
+---

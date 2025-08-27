@@ -1507,9 +1507,24 @@ class App(customtkinter.CTk):
             return
         
         # 화자 설정 확인
-        if not self.native_speaker_dropdown.get() or not self.learner_speaker_widgets:
-            self.message_window.insert("end", "[ERROR] 화자 설정을 먼저 완료해주세요.\n")
+        native_speaker = self.native_speaker_dropdown.get()
+        self.message_window.insert("end", f"[DEBUG] 원어 화자: {native_speaker}\n")
+        
+        if not native_speaker or native_speaker == "N/A" or native_speaker == "No voices found":
+            self.message_window.insert("end", "[ERROR] 원어 화자를 먼저 선택해주세요.\n")
             return
+        
+        if not self.learner_speaker_widgets:
+            self.message_window.insert("end", "[ERROR] 학습어 화자가 설정되지 않았습니다.\n")
+            return
+        
+        # 학습어 화자들이 모두 유효한지 확인
+        for i, widget in enumerate(self.learner_speaker_widgets):
+            learner_voice = widget['dropdown'].get()
+            self.message_window.insert("end", f"[DEBUG] 학습어 화자 {i+1}: {learner_voice}\n")
+            if not learner_voice or learner_voice == "N/A" or learner_voice == "No voices found":
+                self.message_window.insert("end", f"[ERROR] 학습어 화자 {i+1}을(를) 먼저 선택해주세요.\n")
+                return
         
         self.is_playing_realtime = True
         self.current_script_index = 0

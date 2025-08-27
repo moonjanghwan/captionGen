@@ -3,6 +3,10 @@
     "learning_lang": "중국어 (cmn-CN)",
     "project_name": "kor-chn",
     "identifier": "kor-chn",
+    "google_cloud": {
+        "credentials_path": "./credentials.json",
+        "project_id": "your-project-id"
+    },
     "speaker_config": {
         "native_speaker": "ko-KR-Chirp3-HD-Achernar",
         "learner_count": "4",

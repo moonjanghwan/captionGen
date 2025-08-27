@@ -203,6 +203,18 @@ class App(customtkinter.CTk):
                 self.update_project_fields()
         except (FileNotFoundError, json.JSONDecodeError):
             self.update_project_fields()
+    
+    def load_google_cloud_config(self):
+        """config.json에서 Google Cloud 설정을 로드합니다."""
+        try:
+            if os.path.exists("config.json"):
+                with open("config.json", "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                return config.get("google_cloud", {})
+            else:
+                return {}
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {}
 
     def update_project_fields(self, _=None):
         native_lang_key = self.native_lang_dropdown.get()
@@ -221,7 +233,20 @@ class App(customtkinter.CTk):
     def initialize_google_clients(self):
         self.tts_client = None
         self.gemini_model = None
+        
+        # config.json에서 Google Cloud 설정 로드
+        google_cloud_config = self.load_google_cloud_config()
+        
         try:
+            # Google Cloud 인증 설정
+            if google_cloud_config and google_cloud_config.get("credentials_path"):
+                credentials_path = google_cloud_config["credentials_path"]
+                if os.path.exists(credentials_path):
+                    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath(credentials_path)
+                    self.message_window.insert("end", f"[INFO] Google Cloud credentials loaded from: {credentials_path}\n")
+                else:
+                    self.message_window.insert("end", f"[WARNING] Credentials file not found: {credentials_path}\n")
+            
             self.tts_client = texttospeech.TextToSpeechClient()
             self.message_window.insert("end", "[SUCCESS] Google TTS client initialized.\n")
             self.tts_voices = self.tts_client.list_voices().voices
@@ -229,7 +254,7 @@ class App(customtkinter.CTk):
         except Exception as e:
             self.message_window.insert("end", f"[ERROR] TTS/Voice list initialization failed: {e}\n")
             self.message_window.insert("end", "[INFO] Google Cloud TTS API 키가 설정되지 않았거나 인증에 문제가 있습니다.\n")
-            self.message_window.insert("end", "[INFO] Google Cloud Console에서 TTS API를 활성화하고 서비스 계정 키를 설정해주세요.\n")
+            self.message_window.insert("end", "[INFO] config.json에서 credentials_path를 확인하고 유효한 서비스 계정 키 파일을 지정해주세요.\n")
 
         # Gemini는 요청 시점에 설정합니다(.env 또는 설정값 사용)
         try:

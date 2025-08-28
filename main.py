@@ -241,20 +241,74 @@ class App(customtkinter.CTk):
             # Google Cloud 인증 설정
             if google_cloud_config and google_cloud_config.get("credentials_path"):
                 credentials_path = google_cloud_config["credentials_path"]
+                self.message_window.insert("end", f"[DEBUG] Credentials path from config: {credentials_path}\n")
+                print(f"[DEBUG] Credentials path from config: {credentials_path}")
+                
                 if os.path.exists(credentials_path):
-                    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath(credentials_path)
-                    self.message_window.insert("end", f"[INFO] Google Cloud credentials loaded from: {credentials_path}\n")
+                    abs_path = os.path.abspath(credentials_path)
+                    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = abs_path
+                    self.message_window.insert("end", f"[SUCCESS] Google Cloud credentials loaded from: {abs_path}\n")
+                    print(f"[SUCCESS] Google Cloud credentials loaded from: {abs_path}")
+                    
+                    # credentials 파일 내용 확인
+                    try:
+                        with open(credentials_path, 'r') as f:
+                            cred_data = json.load(f)
+                        project_id = cred_data.get('project_id', 'Not found')
+                        client_email = cred_data.get('client_email', 'Not found')
+                        self.message_window.insert("end", f"[DEBUG] Credentials file - Project ID: {project_id}\n")
+                        self.message_window.insert("end", f"[DEBUG] Credentials file - Client Email: {client_email}\n")
+                        print(f"[DEBUG] Credentials file - Project ID: {project_id}")
+                        print(f"[DEBUG] Credentials file - Client Email: {client_email}")
+                    except Exception as cred_e:
+                        self.message_window.insert("end", f"[WARNING] Failed to read credentials file: {cred_e}\n")
+                        print(f"[WARNING] Failed to read credentials file: {cred_e}")
                 else:
-                    self.message_window.insert("end", f"[WARNING] Credentials file not found: {credentials_path}\n")
+                    self.message_window.insert("end", f"[ERROR] Credentials file not found: {credentials_path}\n")
+                    print(f"[ERROR] Credentials file not found: {credentials_path}")
+                    return
+            else:
+                self.message_window.insert("end", "[WARNING] No credentials_path found in config.json\n")
+                print("[WARNING] No credentials_path found in config.json")
+            
+            # TTS 클라이언트 초기화
+            self.message_window.insert("end", "[INFO] Initializing Google TTS client...\n")
+            print("[INFO] Initializing Google TTS client...")
             
             self.tts_client = texttospeech.TextToSpeechClient()
             self.message_window.insert("end", "[SUCCESS] Google TTS client initialized.\n")
+            print("[SUCCESS] Google TTS client initialized.")
+            
+            # TTS 화자 목록 로드
+            self.message_window.insert("end", "[INFO] Loading TTS voices...\n")
+            print("[INFO] Loading TTS voices...")
+            
             self.tts_voices = self.tts_client.list_voices().voices
-            self.message_window.insert("end", f"[INFO] {len(self.tts_voices)}개의 TTS 화자를 로드했습니다.\n")
+            self.message_window.insert("end", f"[SUCCESS] {len(self.tts_voices)}개의 TTS 화자를 로드했습니다.\n")
+            print(f"[SUCCESS] {len(self.tts_voices)}개의 TTS 화자를 로드했습니다.")
+            
+            # 지원 언어 확인
+            supported_languages = set()
+            for voice in self.tts_voices:
+                for lang_code in voice.language_codes:
+                    supported_languages.add(lang_code)
+            
+            self.message_window.insert("end", f"[DEBUG] Supported languages: {sorted(list(supported_languages))}\n")
+            print(f"[DEBUG] Supported languages: {sorted(list(supported_languages))}")
+            
         except Exception as e:
-            self.message_window.insert("end", f"[ERROR] TTS/Voice list initialization failed: {e}\n")
+            error_msg = f"[ERROR] TTS/Voice list initialization failed: {e}"
+            self.message_window.insert("end", error_msg + "\n")
+            print(error_msg)
+            
+            # 상세한 에러 정보
+            import traceback
+            traceback_msg = f"[ERROR] Full traceback:\n{traceback.format_exc()}"
+            print(traceback_msg)
+            
             self.message_window.insert("end", "[INFO] Google Cloud TTS API 키가 설정되지 않았거나 인증에 문제가 있습니다.\n")
             self.message_window.insert("end", "[INFO] config.json에서 credentials_path를 확인하고 유효한 서비스 계정 키 파일을 지정해주세요.\n")
+            self.message_window.insert("end", "[INFO] Google Cloud Console에서 TTS API가 활성화되었는지 확인해주세요.\n")
 
         # Gemini는 요청 시점에 설정합니다(.env 또는 설정값 사용)
         try:
@@ -644,7 +698,9 @@ class App(customtkinter.CTk):
 
     def update_speaker_lists(self):
         if not self.tts_client:
-            self.message_window.insert("end", "[ERROR] TTS client not available for voice listing.\n")
+            error_msg = "[ERROR] TTS client not available for voice listing."
+            self.message_window.insert("end", error_msg + "\n")
+            print(error_msg)
             return
 
         native_lang_key = self.native_lang_dropdown.get()
@@ -652,23 +708,49 @@ class App(customtkinter.CTk):
         _, native_lang_code = self.language_map.get(native_lang_key, ("", ""))
         _, learning_lang_code = self.language_map.get(learning_lang_key, ("", ""))
 
-        self.message_window.insert("end", f"[DEBUG] 원어 언어: {native_lang_key} -> {native_lang_code}\n")
-        self.message_window.insert("end", f"[DEBUG] 학습어 언어: {learning_lang_key} -> {learning_lang_code}\n")
-        self.message_window.insert("end", f"[DEBUG] 사용 가능한 TTS 화자 수: {len(self.tts_voices)}\n")
+        debug_msg1 = f"[DEBUG] 원어 언어: {native_lang_key} -> {native_lang_code}"
+        debug_msg2 = f"[DEBUG] 학습어 언어: {learning_lang_key} -> {learning_lang_code}"
+        debug_msg3 = f"[DEBUG] 사용 가능한 TTS 화자 수: {len(self.tts_voices)}"
+        
+        self.message_window.insert("end", debug_msg1 + "\n")
+        self.message_window.insert("end", debug_msg2 + "\n")
+        self.message_window.insert("end", debug_msg3 + "\n")
+        print(debug_msg1)
+        print(debug_msg2)
+        print(debug_msg3)
 
         native_voices = sorted([v.name for v in self.tts_voices if v.language_codes[0] == native_lang_code])
         self.learning_voices = sorted([v.name for v in self.tts_voices if v.language_codes[0] == learning_lang_code])
 
-        self.message_window.insert("end", f"[DEBUG] 원어 화자 수: {len(native_voices)}\n")
-        self.message_window.insert("end", f"[DEBUG] 학습어 화자 수: {len(self.learning_voices)}\n")
+        debug_msg4 = f"[DEBUG] 원어 화자 수: {len(native_voices)}"
+        debug_msg5 = f"[DEBUG] 학습어 화자 수: {len(self.learning_voices)}"
+        
+        self.message_window.insert("end", debug_msg4 + "\n")
+        self.message_window.insert("end", debug_msg5 + "\n")
+        print(debug_msg4)
+        print(debug_msg5)
+
+        if native_voices:
+            debug_msg6 = f"[DEBUG] 원어 화자 목록: {native_voices[:5]}{'...' if len(native_voices) > 5 else ''}"
+            self.message_window.insert("end", debug_msg6 + "\n")
+            print(debug_msg6)
+        
+        if self.learning_voices:
+            debug_msg7 = f"[DEBUG] 학습어 화자 목록: {self.learning_voices[:5]}{'...' if len(self.learning_voices) > 5 else ''}"
+            self.message_window.insert("end", debug_msg7 + "\n")
+            print(debug_msg7)
 
         self.native_speaker_dropdown.configure(values=native_voices if native_voices else ["No voices found"])
         if native_voices:
             self.native_speaker_dropdown.set(native_voices[0])
-            self.message_window.insert("end", f"[DEBUG] 원어 화자 설정: {native_voices[0]}\n")
+            success_msg = f"[SUCCESS] 원어 화자 설정: {native_voices[0]}"
+            self.message_window.insert("end", success_msg + "\n")
+            print(success_msg)
         else:
             self.native_speaker_dropdown.set("No voices found")
-            self.message_window.insert("end", "[WARNING] 해당 언어의 원어 화자를 찾을 수 없습니다.\n")
+            warning_msg = "[WARNING] 해당 언어의 원어 화자를 찾을 수 없습니다."
+            self.message_window.insert("end", warning_msg + "\n")
+            print(warning_msg)
 
         self.redraw_learner_speakers()
         if self.speaker_config_to_load:
@@ -1547,22 +1629,32 @@ class App(customtkinter.CTk):
         
         # 화자 설정 확인
         native_speaker = self.native_speaker_dropdown.get()
-        self.message_window.insert("end", f"[DEBUG] 원어 화자: {native_speaker}\n")
+        debug_msg = f"[DEBUG] 원어 화자: {native_speaker}"
+        self.message_window.insert("end", debug_msg + "\n")
+        print(debug_msg)
         
         if not native_speaker or native_speaker == "N/A" or native_speaker == "No voices found":
-            self.message_window.insert("end", "[ERROR] 원어 화자를 먼저 선택해주세요.\n")
+            error_msg = "[ERROR] 원어 화자를 먼저 선택해주세요."
+            self.message_window.insert("end", error_msg + "\n")
+            print(error_msg)
             return
         
         if not self.learner_speaker_widgets:
-            self.message_window.insert("end", "[ERROR] 학습어 화자가 설정되지 않았습니다.\n")
+            error_msg = "[ERROR] 학습어 화자가 설정되지 않았습니다."
+            self.message_window.insert("end", error_msg + "\n")
+            print(error_msg)
             return
         
         # 학습어 화자들이 모두 유효한지 확인
         for i, widget in enumerate(self.learner_speaker_widgets):
             learner_voice = widget['dropdown'].get()
-            self.message_window.insert("end", f"[DEBUG] 학습어 화자 {i+1}: {learner_voice}\n")
+            debug_msg = f"[DEBUG] 학습어 화자 {i+1}: {learner_voice}"
+            self.message_window.insert("end", debug_msg + "\n")
+            print(debug_msg)
             if not learner_voice or learner_voice == "N/A" or learner_voice == "No voices found":
-                self.message_window.insert("end", f"[ERROR] 학습어 화자 {i+1}을(를) 먼저 선택해주세요.\n")
+                error_msg = f"[ERROR] 학습어 화자 {i+1}을(를) 먼저 선택해주세요."
+                self.message_window.insert("end", error_msg + "\n")
+                print(error_msg)
                 return
         
         self.is_playing_realtime = True

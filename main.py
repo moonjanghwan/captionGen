@@ -1730,15 +1730,36 @@ class App(customtkinter.CTk):
                 try:
                     script_data = json.loads(script_data)
                 except json.JSONDecodeError:
-                    # JSON이 아닌 경우 텍스트로 처리
-                    lines = script_data.strip().split('\n')
+                    # JSON이 아닌 경우: CSV(회화 스크립트) 또는 일반 텍스트 처리
+                    lines = [ln for ln in script_data.strip().split('\n') if ln.strip()]
+                    if not lines:
+                        return
+                    header = lines[0]
+                    # 회화 CSV 형식: 순번,원어,학습어,읽기
+                    if ('순번' in header and '원어' in header) or ('원어' in header and '학습어' in header):
+                        for row in lines[1:]:
+                            cols = [c.strip() for c in row.split(',')]
+                            if len(cols) < 3:
+                                continue
+                            native_text = cols[1]
+                            learning_text = cols[2]
+                            if native_text:
+                                self.audio_queue.append({'type': 'native', 'text': native_text, 'speaker': 'native'})
+                            # 화자간 1초 무음
+                            self.audio_queue.append({'type': 'silence', 'duration': 1.0})
+                            for i, learner_widget in enumerate(self.learner_speaker_widgets):
+                                self.audio_queue.append({
+                                    'type': 'learning',
+                                    'text': learning_text,
+                                    'speaker': f'learner_{i+1}',
+                                    'voice_name': learner_widget['dropdown'].get()
+                                })
+                                if i < len(self.learner_speaker_widgets) - 1:
+                                    self.audio_queue.append({'type': 'silence', 'duration': 0.5})
+                        return
+                    # 일반 텍스트: 각 줄을 원어 화자로 재생
                     for line in lines:
-                        if line.strip():
-                            self.audio_queue.append({
-                                'type': 'text',
-                                'content': line.strip(),
-                                'speaker': 'native'
-                            })
+                        self.audio_queue.append({'type': 'native', 'text': line.strip(), 'speaker': 'native'})
                     return
             
             # 대화 스크립트 형식 처리

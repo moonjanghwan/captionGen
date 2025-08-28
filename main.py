@@ -731,9 +731,14 @@ class App(customtkinter.CTk):
         self.audio_gen_button.pack(side="left", padx=5, pady=5)
         self.audio_listen_button = customtkinter.CTkButton(control_button_section, text="오디오 듣기", state="disabled", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR, command=self.start_realtime_audio)
         self.audio_listen_button.pack(side="left", padx=5, pady=5)
-        other_buttons = ["썸네일 생성", "회화 비디오", "인트로 비디오", "엔딩 비디오", "대화 비디오", "정지", "종료"]
-        for btn_text in other_buttons:
-            customtkinter.CTkButton(control_button_section, text=btn_text, fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
+        # 기타 버튼들
+        customtkinter.CTkButton(control_button_section, text="썸네일 생성", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
+        customtkinter.CTkButton(control_button_section, text="회화 비디오", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
+        customtkinter.CTkButton(control_button_section, text="인트로 비디오", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
+        customtkinter.CTkButton(control_button_section, text="엔딩 비디오", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
+        customtkinter.CTkButton(control_button_section, text="대화 비디오", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
+        customtkinter.CTkButton(control_button_section, text="정지", command=self.stop_all_operations, fg_color="#DD3333", hover_color="#BB2222", text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
+        customtkinter.CTkButton(control_button_section, text="종료", command=self.on_closing, fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
 
     def on_tab_change(self):
         if self.tab_view.get() == "화자 선택":
@@ -1719,6 +1724,26 @@ class App(customtkinter.CTk):
         self.audio_listen_button.configure(text="오디오 듣기", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR)
         pygame.mixer.music.stop()
         self.message_window.insert("end", "[INFO] 실시간 오디오 듣기를 정지했습니다.\n")
+
+    def stop_all_operations(self):
+        """사양서: 오디오/비디오 생성, TTS 미리듣기 등 모든 백그라운드 작업 강제 중단"""
+        try:
+            # 실시간 듣기 중단
+            self.is_playing_realtime = False
+            # pygame 오디오 정지
+            try:
+                pygame.mixer.music.stop()
+            except Exception:
+                pass
+            # 버튼 상태 복구
+            try:
+                self.audio_listen_button.configure(text="오디오 듣기", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR)
+            except Exception:
+                pass
+            # 향후 비디오/작업 스레드가 있다면 여기서도 중단 플래그 처리
+            self.message_window.insert("end", "[INFO] 모든 백그라운드 작업을 강제 중단했습니다.\n")
+        except Exception as e:
+            self.message_window.insert("end", f"[ERROR] 작업 중단 중 오류: {e}\n")
     
     def parse_script_and_create_queue(self, script_data):
         """스크립트를 파싱하여 오디오 큐 생성"""

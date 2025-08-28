@@ -11,7 +11,6 @@ from google.api_core import exceptions
 from dotenv import load_dotenv, set_key
 import signal, atexit, time
 import re
-import html
 import threading
 import io
 try:
@@ -55,7 +54,6 @@ class App(customtkinter.CTk):
         self.current_script_index = 0
         self.audio_queue = []
         self.playing_thread = None
-        self.ssml_counter = 0
 
         # --- Theme and Colors ---
         customtkinter.set_appearance_mode("dark")
@@ -176,36 +174,25 @@ class App(customtkinter.CTk):
         self.destroy()
 
     def save_config(self):
-        # 프로젝트별 speaker.json만 저장
         learner_speakers = [row['dropdown'].get() for row in self.learner_speaker_widgets]
-        project_name = self.project_name_entry.get()
-        identifier = self.identifier_entry.get()
-        if not project_name or not identifier:
-            self.message_window.insert("end", "[ERROR] 프로젝트명과 식별자를 먼저 설정해주세요.\n")
-            print("[ERROR] 프로젝트명과 식별자를 먼저 설정해주세요.")
-            return
-
-        speaker_config_path = os.path.join("output", project_name, identifier, "speaker.json")
-        os.makedirs(os.path.dirname(speaker_config_path), exist_ok=True)
-
-        speaker_config = {
-            "native_speaker": self.native_speaker_dropdown.get(),
-            "learner_count": self.learner_count_dropdown.get(),
-            "learner_speakers": learner_speakers,
+        config = {
+            "native_lang": self.native_lang_dropdown.get(),
+            "learning_lang": self.learning_lang_dropdown.get(),
+            "project_name": self.project_name_entry.get(),
+            "identifier": self.identifier_entry.get(),
+            "speaker_config": {
+                "native_speaker": self.native_speaker_dropdown.get(),
+                "learner_count": self.learner_count_dropdown.get(),
+                "learner_speakers": learner_speakers
+            }
         }
         try:
-            with open(speaker_config_path, "w", encoding="utf-8") as f:
-                json.dump(speaker_config, f, ensure_ascii=False, indent=4)
-            msg = f"[SUCCESS] 화자 설정이 저장되었습니다: {speaker_config_path}"
-            self.message_window.insert("end", msg + "\n")
-            print(msg)
+            with open("config.json", "w", encoding="utf-8") as f:
+                json.dump(config, f, ensure_ascii=False, indent=4)
         except Exception as e:
-            err = f"[ERROR] 화자 설정 저장 실패: {e}"
-            self.message_window.insert("end", err + "\n")
-            print(err)
+            print(f"Error saving config: {e}")
 
     def load_config(self):
-        # 기본 언어/프로젝트 식별자만 config.json에서 로드하고, 화자설정은 speaker.json에서만 로드
         try:
             if os.path.exists("config.json"):
                 with open("config.json", "r", encoding="utf-8") as f:
@@ -216,43 +203,11 @@ class App(customtkinter.CTk):
                 self.project_name_entry.insert(0, config.get("project_name", ""))
                 self.identifier_entry.delete(0, "end")
                 self.identifier_entry.insert(0, config.get("identifier", ""))
+                self.speaker_config_to_load = config.get("speaker_config")
             else:
                 self.update_project_fields()
-            # 프로젝트별 speaker.json 로드
-            self.load_speaker_config()
         except (FileNotFoundError, json.JSONDecodeError):
             self.update_project_fields()
-            self.load_speaker_config()
-
-    def load_speaker_config(self):
-        """프로젝트별 speaker.json만을 사용하여 화자 설정을 로드한다."""
-        try:
-            project_name = self.project_name_entry.get()
-            identifier = self.identifier_entry.get()
-            if not project_name or not identifier:
-                return
-            speaker_config_path = os.path.join("output", project_name, identifier, "speaker.json")
-            if not os.path.exists(speaker_config_path):
-                self.message_window.insert("end", f"[DEBUG] 프로젝트별 화자 설정 파일이 없습니다: {speaker_config_path}\n")
-                return
-            with open(speaker_config_path, "r", encoding="utf-8") as f:
-                speaker_config = json.load(f)
-            # 탭 전환 시 적용되도록 대기 적용 변수에 넣고 리스트 갱신
-            self.speaker_config_to_load = speaker_config
-            self.message_window.insert("end", f"[SUCCESS] 프로젝트별 화자 설정을 로드했습니다: {speaker_config_path}\n")
-            # 즉시 드롭다운에 반영
-            try:
-                self.native_speaker_dropdown.set(speaker_config.get("native_speaker", ""))
-                self.learner_count_dropdown.set(speaker_config.get("learner_count", "4"))
-                self.redraw_learner_speakers()
-                saved = speaker_config.get("learner_speakers", [])
-                for i, widget_row in enumerate(self.learner_speaker_widgets):
-                    if i < len(saved):
-                        widget_row['dropdown'].set(saved[i])
-            except Exception:
-                pass
-        except Exception as e:
-            self.message_window.insert("end", f"[ERROR] speaker.json 로드 실패: {e}\n")
     
     def load_google_cloud_config(self):
         """config.json에서 Google Cloud 설정을 로드합니다."""
@@ -693,9 +648,8 @@ class App(customtkinter.CTk):
         self.level_dropdown.grid(row=1, column=5, padx=5, pady=5, sticky="w")
 
         customtkinter.CTkLabel(data_section, text="데이터 개수:").grid(row=1, column=6, padx=(20, 5), pady=5, sticky="w")
-        self.count_entry = customtkinter.CTkEntry(data_section, width=150, fg_color=self.WIDGET_COLOR, text_color=self.TEXT_COLOR, border_color=self.BG_COLOR)
-        self.count_entry.insert(0, "5")
-        self.count_entry.grid(row=1, column=7, padx=5, pady=5, sticky="w")
+        self.count_dropdown = customtkinter.CTkOptionMenu(data_section, width=150, values=["10", "20", "30"], fg_color=self.WIDGET_COLOR, text_color=self.TEXT_COLOR, dropdown_fg_color=self.WIDGET_COLOR)
+        self.count_dropdown.grid(row=1, column=7, padx=5, pady=5, sticky="w")
 
         customtkinter.CTkLabel(data_section, text="AI 서비스:").grid(row=2, column=0, padx=(0, 5), pady=5, sticky="w")
         self.ai_service_dropdown = customtkinter.CTkOptionMenu(data_section, width=180, values=["Gemini", "GPT-4"], fg_color=self.WIDGET_COLOR, text_color=self.TEXT_COLOR, dropdown_fg_color=self.WIDGET_COLOR)
@@ -735,19 +689,13 @@ class App(customtkinter.CTk):
 
         control_button_section = customtkinter.CTkFrame(tab, fg_color="transparent")
         control_button_section.grid(row=3, column=0, padx=10, pady=10, sticky="sew")
-        self.audio_gen_button = customtkinter.CTkButton(control_button_section, text="오디오 생성", state="disabled", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR)
+        self.audio_gen_button = customtkinter.CTkButton(control_button_section, text="오디오 생성", state="disabled", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR, command=self.generate_master_audio)
         self.audio_gen_button.pack(side="left", padx=5, pady=5)
         self.audio_listen_button = customtkinter.CTkButton(control_button_section, text="오디오 듣기", state="disabled", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR, command=self.start_realtime_audio)
         self.audio_listen_button.pack(side="left", padx=5, pady=5)
-        # 기타 버튼들
-        customtkinter.CTkButton(control_button_section, text="썸네일 생성", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
-        customtkinter.CTkButton(control_button_section, text="회화 비디오", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
-        customtkinter.CTkButton(control_button_section, text="인트로 비디오", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
-        customtkinter.CTkButton(control_button_section, text="엔딩 비디오", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
-        customtkinter.CTkButton(control_button_section, text="대화 비디오", command=self.render_conversation_video, fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
-        customtkinter.CTkButton(control_button_section, text="자막(ASS) 내보내기", command=self.export_ass_captions, fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
-        customtkinter.CTkButton(control_button_section, text="정지", command=self.stop_all_operations, fg_color="#DD3333", hover_color="#BB2222", text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
-        customtkinter.CTkButton(control_button_section, text="종료", command=self.on_closing, fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
+        other_buttons = ["썸네일 생성", "회화 비디오", "인트로 비디오", "엔딩 비디오", "대화 비디오", "정지", "종료"]
+        for btn_text in other_buttons:
+            customtkinter.CTkButton(control_button_section, text=btn_text, fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
 
     def on_tab_change(self):
         if self.tab_view.get() == "화자 선택":
@@ -870,13 +818,7 @@ class App(customtkinter.CTk):
         }
         text_to_speak = preview_text_map.get(lang_code, "This is a voice preview.")
 
-        # SSML 구성 및 저장
-        ssml_str = f"<speak><p>{html.escape(text_to_speak)}</p></speak>"
-        try:
-            self._save_ssml(ssml_str, prefix="preview")
-        except Exception:
-            pass
-        synthesis_input = texttospeech.SynthesisInput(ssml=ssml_str)
+        synthesis_input = texttospeech.SynthesisInput(text=text_to_speak)
         voice = texttospeech.VoiceSelectionParams(language_code=lang_code, name=voice_name)
         audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
 
@@ -1467,7 +1409,7 @@ class App(customtkinter.CTk):
             "learning_locale": learning_locale,
             "topic": self.topic_entry.get() if self.topic_entry.get() else self.topic_dropdown.get(),
             "level": self.level_dropdown.get(),
-            "count": (self.count_entry.get().strip() or "5"),
+            "count": self.count_dropdown.get(),
             "gemini_model": gem.get("model", ""),
             "gemini_locale": gem.get("locale", ""),
         }
@@ -1739,26 +1681,6 @@ class App(customtkinter.CTk):
         self.audio_listen_button.configure(text="오디오 듣기", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR)
         pygame.mixer.music.stop()
         self.message_window.insert("end", "[INFO] 실시간 오디오 듣기를 정지했습니다.\n")
-
-    def stop_all_operations(self):
-        """사양서: 오디오/비디오 생성, TTS 미리듣기 등 모든 백그라운드 작업 강제 중단"""
-        try:
-            # 실시간 듣기 중단
-            self.is_playing_realtime = False
-            # pygame 오디오 정지
-            try:
-                pygame.mixer.music.stop()
-            except Exception:
-                pass
-            # 버튼 상태 복구
-            try:
-                self.audio_listen_button.configure(text="오디오 듣기", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR)
-            except Exception:
-                pass
-            # 향후 비디오/작업 스레드가 있다면 여기서도 중단 플래그 처리
-            self.message_window.insert("end", "[INFO] 모든 백그라운드 작업을 강제 중단했습니다.\n")
-        except Exception as e:
-            self.message_window.insert("end", f"[ERROR] 작업 중단 중 오류: {e}\n")
     
     def parse_script_and_create_queue(self, script_data):
         """스크립트를 파싱하여 오디오 큐 생성"""
@@ -1770,36 +1692,15 @@ class App(customtkinter.CTk):
                 try:
                     script_data = json.loads(script_data)
                 except json.JSONDecodeError:
-                    # JSON이 아닌 경우: CSV(회화 스크립트) 또는 일반 텍스트 처리
-                    lines = [ln for ln in script_data.strip().split('\n') if ln.strip()]
-                    if not lines:
-                        return
-                    header = lines[0]
-                    # 회화 CSV 형식: 순번,원어,학습어,읽기
-                    if ('순번' in header and '원어' in header) or ('원어' in header and '학습어' in header):
-                        for row in lines[1:]:
-                            cols = [c.strip() for c in row.split(',')]
-                            if len(cols) < 3:
-                                continue
-                            native_text = cols[1]
-                            learning_text = cols[2]
-                            if native_text:
-                                self.audio_queue.append({'type': 'native', 'text': native_text, 'speaker': 'native'})
-                            # 화자간 1초 무음
-                            self.audio_queue.append({'type': 'silence', 'duration': 1.0})
-                            for i, learner_widget in enumerate(self.learner_speaker_widgets):
-                                self.audio_queue.append({
-                                    'type': 'learning',
-                                    'text': learning_text,
-                                    'speaker': f'learner_{i+1}',
-                                    'voice_name': learner_widget['dropdown'].get()
-                                })
-                                if i < len(self.learner_speaker_widgets) - 1:
-                                    self.audio_queue.append({'type': 'silence', 'duration': 0.5})
-                        return
-                    # 일반 텍스트: 각 줄을 원어 화자로 재생
+                    # JSON이 아닌 경우 텍스트로 처리
+                    lines = script_data.strip().split('\n')
                     for line in lines:
-                        self.audio_queue.append({'type': 'native', 'text': line.strip(), 'speaker': 'native'})
+                        if line.strip():
+                            self.audio_queue.append({
+                                'type': 'text',
+                                'content': line.strip(),
+                                'speaker': 'native'
+                            })
                     return
             
             # 대화 스크립트 형식 처리
@@ -1860,7 +1761,7 @@ class App(customtkinter.CTk):
                     continue
                 
                 elif audio_item['type'] in ['native', 'learning', 'dialogue']:
-                    # TTS 음성 생성 및 재생 + 파일명 규칙 기반 저장
+                    # TTS 음성 생성 및 재생
                     text = audio_item['text']
                     speaker_type = audio_item['speaker']
                     
@@ -1903,27 +1804,14 @@ class App(customtkinter.CTk):
     def generate_and_play_tts(self, text, voice_name, lang_code):
         """TTS 음성 생성 및 재생"""
         try:
-            # SSML 구성 및 저장
-            ssml_str = f"<speak><p>{html.escape(text)}</p></speak>"
-            try:
-                self._save_ssml(ssml_str, prefix="speak")
-            except Exception:
-                pass
-            synthesis_input = texttospeech.SynthesisInput(ssml=ssml_str)
+            synthesis_input = texttospeech.SynthesisInput(text=text)
             voice = texttospeech.VoiceSelectionParams(language_code=lang_code, name=voice_name)
             audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
             
             response = self.tts_client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
             
             # 임시 파일에 저장
-            # 미리듣기는 master와 충돌하지 않도록 preview 파일로 저장
-            base_name = "conversation"
-            conv_path = os.path.join(self._get_output_dir(), "conversation.txt")
-            try:
-                base_name = os.path.splitext(os.path.basename(conv_path))[0] or "conversation"
-            except Exception:
-                pass
-            temp_file = os.path.join(self._get_output_dir(), f"{base_name}_preview.mp3")
+            temp_file = f"/tmp/captiongen_realtime_{int(time.time())}.mp3"
             with open(temp_file, "wb") as out:
                 out.write(response.audio_content)
             
@@ -1935,328 +1823,158 @@ class App(customtkinter.CTk):
             while pygame.mixer.music.get_busy() and self.is_playing_realtime:
                 time.sleep(0.1)
             
-            # 유지(사용자가 미리듣기 파일로 활용)
+            # 임시 파일 삭제
+            try:
+                os.remove(temp_file)
+            except:
+                pass
                 
         except Exception as e:
             self.message_window.insert("end", f"[ERROR] TTS 생성 실패: {e}\n")
 
-    # ---------- Master Audio Build (Single MP3) ----------
-    def build_master_audio(self):
+    # ---------- 마스터 오디오 생성 ----------
+    def generate_master_audio(self):
         try:
-            output_dir = self._get_output_dir()
-            os.makedirs(output_dir, exist_ok=True)
-            # 회화 CSV 로드
-            conv_path = os.path.join(output_dir, "conversation.txt")
+            if not self.tts_client:
+                self.message_window.insert("end", "[ERROR] TTS client not initialized.\n")
+                return
+            # 회화 스크립트 확보
             csv_text = None
-            if os.path.exists(conv_path):
-                with open(conv_path, "r", encoding="utf-8") as f:
-                    csv_text = f.read()
-            if csv_text is None:
-                val = self.generated_scripts.get("회화 스크립트") if self.generated_scripts else None
-                if isinstance(val, str):
-                    csv_text = val
-            if not csv_text:
-                self.message_window.insert("end", "[ERROR] 회화 스크립트가 없어 오디오를 만들 수 없습니다.\n")
-                return None
+            file_text = self._read_script_from_file("회화 스크립트")
+            if file_text:
+                csv_text = file_text
+            elif isinstance(self.generated_scripts.get("회화 스크립트"), str):
+                csv_text = self.generated_scripts.get("회화 스크립트")
+            if not csv_text or not csv_text.strip():
+                self.message_window.insert("end", "[ERROR] 회화 스크립트 CSV가 없습니다. 먼저 데이터를 생성/읽기 해주세요.\n")
+                return
 
-            # 세그먼트 구성
-            segments = []
-            lines = [ln for ln in csv_text.strip().split('\n') if ln.strip()]
-            if len(lines) <= 1:
-                self.message_window.insert("end", "[ERROR] 회화 CSV 형식이 올바르지 않습니다.\n")
-                return None
-            for row in lines[1:]:
-                cols = [c.strip() for c in row.split(',')]
-                if len(cols) < 3:
-                    continue
-                native_text = cols[1]
-                learning_text = cols[2]
-                if native_text:
-                    segments.append({"speaker": "native", "text": native_text})
-                segments.append({"speaker": "sil", "duration": 1000})
-                for i, w in enumerate(self.learner_speaker_widgets):
-                    segments.append({"speaker": f"learner_{i+1}", "text": learning_text, "voice_name": w['dropdown'].get()})
-                    if i < len(self.learner_speaker_widgets) - 1:
-                        segments.append({"speaker": "sil", "duration": 500})
-
-            if AudioSegment is None:
-                self.message_window.insert("end", "[ERROR] pydub가 필요합니다. pip install pydub 설치 후 다시 시도하세요.\n")
-                return None
-
-            master = AudioSegment.silent(duration=0)
-            native_voice = self.native_speaker_dropdown.get()
-
-            for item in segments:
-                if item.get("speaker") == "sil":
-                    master += AudioSegment.silent(duration=int(item.get("duration", 0)))
-                    continue
-                vname = native_voice if not item["speaker"].startswith("learner_") else (item.get("voice_name") or native_voice)
-                lang_code = "-".join(str(vname).split('-')[:2])
-                ssml_str = f"<speak><p>{html.escape(item.get('text',''))}</p></speak>"
-                synthesis_input = texttospeech.SynthesisInput(ssml=ssml_str)
-                voice = texttospeech.VoiceSelectionParams(language_code=lang_code, name=vname)
-                audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
-                resp = self.tts_client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
-                seg = AudioSegment.from_file(io.BytesIO(resp.audio_content), format="mp3")
-                master += seg
-
-            base_name = os.path.splitext(os.path.basename(conv_path))[0] if os.path.exists(conv_path) else (self.identifier_entry.get() or "conversation")
-            out_path = os.path.join(output_dir, f"{base_name}.mp3")
-            master.export(out_path, format="mp3", bitrate="192k")
-            self.message_window.insert("end", f"[SUCCESS] Master 오디오 생성: {out_path}\n")
-            return out_path
-        except Exception as e:
-            self.message_window.insert("end", f"[ERROR] Master 오디오 생성 실패: {e}\n")
-            return None
-
-    # ---------- Hardware Detection ----------
-    def _detect_hw_encoder(self):
-        import platform, shutil, subprocess
-        enc = {"codec": "libx264", "flags": ["-preset", "medium", "-crf", "18"]}
-        try:
-            system = platform.system().lower()
-            ffmpeg = shutil.which("ffmpeg")
-            if not ffmpeg:
-                return enc
-            # macOS: h264_videotoolbox
-            if system == "darwin":
-                # 간단 체크: 도움말에 존재하면 사용
-                out = subprocess.run([ffmpeg, "-hide_banner", "-encoders"], capture_output=True, text=True)
-                if "h264_videotoolbox" in out.stdout:
-                    enc = {"codec": "h264_videotoolbox", "flags": ["-b:v", "6M"]}
-                    return enc
-            # NVIDIA: h264_nvenc
-            if shutil.which("nvidia-smi"):
-                out = subprocess.run([ffmpeg, "-hide_banner", "-encoders"], capture_output=True, text=True)
-                if "h264_nvenc" in out.stdout:
-                    enc = {"codec": "h264_nvenc", "flags": ["-b:v", "6M", "-preset", "p5"]}
-                    return enc
-        except Exception:
-            pass
-        return enc
-
-    def _save_ssml(self, ssml_str: str, prefix: str = "ssml") -> None:
-        """디버깅용 SSML 저장 (output/{proj}/{id}/ssml/{prefix}_{counter}.ssml)"""
-        try:
-            outdir = os.path.join(self._get_output_dir(), "ssml")
-            os.makedirs(outdir, exist_ok=True)
-            self.ssml_counter += 1
-            ident = self.identifier_entry.get() or "output"
-            path = os.path.join(outdir, f"{prefix}_{ident}_{self.ssml_counter:04d}.ssml")
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(ssml_str)
-            # 로그 간단 표기
+            # CSV 파싱
+            import csv as _csv
+            rows = []
             try:
-                self.message_window.insert("end", f"[DEBUG] SSML 저장: {path}\n")
-            except Exception:
-                pass
-        except Exception:
-            pass
-
-    # ---------- 캡션(ASS) 내보내기 ----------
-    def export_ass_captions(self):
-        try:
-            output_dir = self._get_output_dir()
-            os.makedirs(output_dir, exist_ok=True)
-
-            # 1) 스크립트 로드: 회화 CSV가 있으면 우선 사용
-            conv_path = os.path.join(output_dir, "conversation.txt")
-            csv_text = None
-            if os.path.exists(conv_path):
-                with open(conv_path, "r", encoding="utf-8") as f:
-                    csv_text = f.read()
-            if csv_text is None:
-                # 메모리에서 시도
-                val = self.generated_scripts.get("회화 스크립트") if self.generated_scripts else None
-                if isinstance(val, str):
-                    csv_text = val
-            if not csv_text:
-                self.message_window.insert("end", "[ERROR] 회화 스크립트가 없습니다. 먼저 데이터를 생성/읽기 하세요.\n")
+                f = io.StringIO(csv_text)
+                reader = _csv.DictReader(f)
+                for r in reader:
+                    rows.append(r)
+            except Exception as e:
+                self.message_window.insert("end", f"[ERROR] CSV 파싱 실패: {e}\n")
+                return
+            if not rows:
+                self.message_window.insert("end", "[ERROR] 회화 스크립트에 유효한 행이 없습니다.\n")
                 return
 
-            # 2) 세그먼트 구성 및 길이(ms) 계산
-            segments = []
-            lines = [ln for ln in csv_text.strip().split('\n') if ln.strip()]
-            if len(lines) <= 1:
-                self.message_window.insert("end", "[ERROR] 회화 CSV 헤더 또는 본문이 비어있습니다.\n")
+            # 화자 보정/확보
+            native_voice = self.native_speaker_dropdown.get()
+            if not native_voice or native_voice in ("N/A", "No voices found"):
+                self.update_speaker_lists()
+                native_voice = self.native_speaker_dropdown.get()
+            learner_voices = []
+            if not self.learner_speaker_widgets:
+                self.redraw_learner_speakers()
+            for w in self.learner_speaker_widgets:
+                v = w['dropdown'].get()
+                if v and v not in ("N/A", "No voices found"):
+                    learner_voices.append(v)
+            if not native_voice or not learner_voices:
+                self.message_window.insert("end", "[ERROR] 화자 설정이 완료되지 않았습니다. 화자 탭에서 설정 후 다시 시도하세요.\n")
                 return
-            header = lines[0]
-            for row in lines[1:]:
-                cols = [c.strip() for c in row.split(',')]
-                if len(cols) < 3:
-                    continue
-                native_text = cols[1]
-                learning_text = cols[2]
-                if native_text:
-                    segments.append({"speaker": "native", "text": native_text})
-                # 화자 간 무음 1.0s
-                segments.append({"speaker": "sil", "duration": 1000})
-                for i, w in enumerate(self.learner_speaker_widgets):
-                    segments.append({"speaker": f"learner_{i+1}", "text": learning_text, "voice_name": w['dropdown'].get()})
-                    if i < len(self.learner_speaker_widgets) - 1:
-                        segments.append({"speaker": "sil", "duration": 500})
 
-            # 길이 산출을 위한 헬퍼
-            def synth_len_ms(text: str, voice_name: str) -> int:
+            # 합성 헬퍼
+            def synth_to_segment(text: str, voice_name: str) -> "AudioSegment|None":
                 try:
                     lang_code = "-".join(voice_name.split('-')[:2])
-                    synthesis_input = texttospeech.SynthesisInput(text=text)
+                    synth_in = texttospeech.SynthesisInput(text=text)
                     voice = texttospeech.VoiceSelectionParams(language_code=lang_code, name=voice_name)
-                    audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
-                    resp = self.tts_client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
+                    audio_cfg = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
+                    resp = self.tts_client.synthesize_speech(input=synth_in, voice=voice, audio_config=audio_cfg)
                     if AudioSegment is None:
-                        # 대체 추정: 12 chars/sec
-                        return max(400, int(len(text) / 12 * 1000))
-                    data = io.BytesIO(resp.audio_content)
-                    seg = AudioSegment.from_file(data, format="mp3")
-                    return int(seg.duration_seconds * 1000)
-                except Exception:
-                    return max(400, int(len(text) / 12 * 1000))
+                        # pydub 없음 -> 바이트 반환
+                        return resp.audio_content
+                    return AudioSegment.from_file(io.BytesIO(resp.audio_content), format="mp3")
+                except Exception as e:
+                    self.message_window.insert("end", f"[ERROR] 합성 실패({voice_name}): {e}\n")
+                    return None
 
-            timeline = []
-            t = 0
-            # 음성 이름 캐시
-            native_voice = self.native_speaker_dropdown.get()
-            for item in segments:
-                if item.get("speaker") == "sil":
-                    dur = int(item.get("duration", 0))
-                    timeline.append({"start": t, "end": t + dur, "speaker": "sil", "text": ""})
-                    t += dur
-                else:
-                    if item["speaker"].startswith("learner_"):
-                        vname = item.get("voice_name") or native_voice
-                    else:
-                        vname = native_voice
-                    dur = synth_len_ms(item.get("text", ""), vname)
-                    timeline.append({"start": t, "end": t + dur, "speaker": item["speaker"], "text": item.get("text", "")})
-                    t += dur
+            # 빌드
+            project_name = self.project_name_entry.get().strip()
+            identifier = self.identifier_entry.get().strip()
+            output_dir = os.path.join("output", project_name, identifier)
+            os.makedirs(output_dir, exist_ok=True)
+            out_path = os.path.join(output_dir, f"{identifier}.mp3")
 
-            # 3) 스타일 구성 (이미지 설정 탭 "스크립트 설정" 이용)
-            cfg = self._collect_image_settings_config()
-            text_rows = (cfg.get("text_tabs", {}).get("스크립트 설정") or []) if isinstance(cfg, dict) else []
-            def find_row(key: str):
-                for r in text_rows:
-                    if str(r.get("행", "")).strip() == key:
-                        return r
-                return {}
-            def to_ass_color(val: str, default: str = "&H00FFFFFF") -> str:
-                if not isinstance(val, str):
-                    return default
-                v = val.strip()
-                if v.startswith("#H"):
-                    return "&H" + v[2:]
-                if v.startswith("&H"):
-                    return v
-                # hex like #RRGGBB
-                if v.startswith("#") and len(v) == 7:
-                    rr = v[1:3]; gg = v[3:5]; bb = v[5:7]
-                    return f"&H00{bb}{gg}{rr}"
-                return default
+            if AudioSegment is not None:
+                # pydub 경로
+                master = AudioSegment.silent(duration=0)
+                silence_between = AudioSegment.silent(duration=1000) # 1초 무음
+                for r in rows:
+                    native_text = (r.get("원어") or r.get("native") or r.get("Native") or "").strip()
+                    learning_text = (r.get("학습어") or r.get("learning") or r.get("Learning") or "").strip()
+                    if native_text:
+                        seg = synth_to_segment(native_text, native_voice)
+                        if isinstance(seg, AudioSegment):
+                            master += seg + silence_between
+                    for i, lv in enumerate(learner_voices):
+                        if learning_text:
+                            seg = synth_to_segment(learning_text, lv)
+                            if isinstance(seg, AudioSegment):
+                                master += seg
+                                # 학습어 화자 간에도 1초 무음 추가
+                                master += silence_between
+                    # 다음 행 사이 여유
+                    master += silence_between
+                try:
+                    master.export(out_path, format="mp3")
+                    self.message_window.insert("end", f"[SUCCESS] 마스터 오디오 저장: {out_path}\n")
+                except Exception as e:
+                    self.message_window.insert("end", f"[ERROR] MP3 저장 실패: {e}\n")
+                return
 
-            native_row = find_row("원어")
-            lrows = [find_row(f"학습어{i}") for i in range(1, 5)]
-            # 해상도
-            res = cfg.get("resolution", "1920x1080") if isinstance(cfg, dict) else "1920x1080"
+            # pydub이 없을 때: ffmpeg concat 폴백
+            import shutil, tempfile
+            if shutil.which("ffmpeg") is None:
+                self.message_window.insert("end", "[ERROR] pydub/ffmpeg 미설치로 오디오 병합이 불가합니다. 'brew install ffmpeg' 후 다시 시도하세요.\n")
+                return
+            tempdir = tempfile.mkdtemp(prefix="captiongen_audio_")
+            parts = []
+            silence_mp3 = os.path.join(tempdir, "silence1s.mp3")
             try:
-                res_w, res_h = [int(x) for x in res.lower().replace("x", " ").split()[:2]]
-            except Exception:
-                res_w, res_h = 1920, 1080
-
-            def style_line(name: str, row: dict, align: int, margin_v: int):
-                font = str(row.get("폰트(pt)", "Noto Sans")).strip() or "Noto Sans"
-                size = int(row.get("크기(px)", 64) or 64)
-                color = to_ass_color(row.get("색상", "#H00FFFFFF"))
-                outline = 2.5
-                return f"Style: {name},{font},{size},{color},&H000000FF,&H64000000,0,0,1,{outline},0,{align},80,80,{margin_v},1"
-
-            styles = [
-                style_line("Native", native_row, 8, 120),
-            ]
-            for idx, r in enumerate(lrows, start=1):
-                styles.append(style_line(f"Learner{idx}", r, 2, 90))
-
-            # 4) ASS 파일 생성
-            def ms_to_ass(tms: int) -> str:
-                s, ms = divmod(int(tms), 1000)
-                h, s = divmod(s, 3600)
-                m, s = divmod(s, 60)
-                return f"{h:d}:{m:02d}:{s:02d}.{int(ms/10):02d}"
-
-            events = []
-            for seg in timeline:
-                if seg["speaker"] == "sil":
-                    continue
-                style = "Native" if seg["speaker"] == "native" else f"Learner{seg['speaker'].split('_')[-1]}"
-                dur_cs = max(1, int((seg["end"] - seg["start"]) / 10))
-                text = seg["text"].replace("{", "(").replace("}", ")")
-                events.append(
-                    f"Dialogue: 0,{ms_to_ass(seg['start'])},{ms_to_ass(seg['end'])},{style},,0,0,0,,{{\\kf{dur_cs}}}{text}"
-                )
-
-            # 파일명 규칙: conversation.txt의 파일명을 기반으로 .ass 생성
-            base_name = "conversation"
-            try:
-                base_name = os.path.splitext(os.path.basename(conv_path))[0]
-                if not base_name:
-                    base_name = "conversation"
-            except Exception:
-                base_name = "conversation"
-            ass_path = os.path.join(output_dir, f"{base_name}.ass")
-            with open(ass_path, "w", encoding="utf-8") as f:
-                f.write("[Script Info]\n")
-                f.write("ScriptType: v4.00+\n")
-                f.write(f"PlayResX: {res_w}\nPlayResY: {res_h}\n")
-                f.write("ScaledBorderAndShadow: yes\n\n")
-                f.write("[V4+ Styles]\n")
-                f.write("Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\n")
-                for s in styles:
-                    f.write(s + "\n")
-                f.write("\n[Events]\n")
-                f.write("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
-                for ev in events:
-                    f.write(ev + "\n")
-
-            self.message_window.insert("end", f"[SUCCESS] ASS 자막 내보내기 완료: {ass_path}\n")
-        except Exception as e:
-            self.message_window.insert("end", f"[ERROR] ASS 내보내기 실패: {e}\n")
-
-    def render_conversation_video(self):
-        try:
-            # ffmpeg 하드섭 렌더(사용자 환경에 ffmpeg 필요)
-            output_dir = self._get_output_dir()
-            base_name = "conversation"
-            conv_path = os.path.join(output_dir, "conversation.txt")
-            try:
-                base_name = os.path.splitext(os.path.basename(conv_path))[0] or "conversation"
+                # 1초 무음 생성
+                os.system(f"ffmpeg -f lavfi -i anullsrc=r=44100:cl=mono -t 1 -q:a 9 -acodec libmp3lame '{silence_mp3}' -y >/dev/null 2>&1")
             except Exception:
                 pass
-            ass_path = os.path.join(output_dir, f"{base_name}.ass")
-            audio_path = os.path.join(output_dir, f"{base_name}.mp3")
-            video_out = os.path.join(output_dir, f"{base_name}.mp4")
-            if not os.path.exists(ass_path):
-                self.message_window.insert("end", "[INFO] ASS가 없어 먼저 내보냅니다...\n")
-                self.export_ass_captions()
-            if not os.path.exists(audio_path):
-                self.message_window.insert("end", "[INFO] Master 오디오가 없어 먼저 생성합니다...\n")
-                audio_path = self.build_master_audio() or audio_path
-            # 단색 배경(검정) 1920x1080 30fps로 기본 렌더. 추후 템플릿 확장
-            w, h, fps = 1920, 1080, 30
-            # 하드웨어 인코더 자동 선택
-            enc = self._detect_hw_encoder()
-            vcodec = enc["codec"]
-            vflags = " ".join(enc.get("flags", []))
-            # color 소스 + 자막 + 오디오 합성
-            cmd = (
-                f"ffmpeg -y -f lavfi -i color=c=black:s={w}x{h}:r={fps} "
-                f"-i \"{audio_path}\" -vf subtitles=\"{ass_path}\" -shortest "
-                f"-c:v {vcodec} {vflags} -pix_fmt yuv420p -movflags +faststart "
-                f"-c:a aac -b:a 192k \"{video_out}\" | cat"
-            )
-            import subprocess
-            subprocess.run(cmd, shell=True, check=False)
-            self.message_window.insert("end", f"[SUCCESS] 비디오 렌더 완료: {video_out}\n")
+            for idx, r in enumerate(rows):
+                native_text = (r.get("원어") or r.get("native") or r.get("Native") or "").strip()
+                learning_text = (r.get("학습어") or r.get("learning") or r.get("Learning") or "").strip()
+                if native_text:
+                    seg = synth_to_segment(native_text, native_voice)
+                    seg_path = os.path.join(tempdir, f"seg_{idx}_n.mp3")
+                    with open(seg_path, "wb") as f:
+                        f.write(seg if isinstance(seg, (bytes, bytearray)) else b"")
+                    parts.append(seg_path)
+                    parts.append(silence_mp3)
+                for i, lv in enumerate(learner_voices):
+                    if learning_text:
+                        seg = synth_to_segment(learning_text, lv)
+                        seg_path = os.path.join(tempdir, f"seg_{idx}_l{i}.mp3")
+                        with open(seg_path, "wb") as f:
+                            f.write(seg if isinstance(seg, (bytes, bytearray)) else b"")
+                        parts.append(seg_path)
+                        # 학습어 화자 간에도 1초 무음 추가
+                        parts.append(silence_mp3)
+                parts.append(silence_mp3)
+            # concat 리스트 작성
+            list_file = os.path.join(tempdir, "list.txt")
+            with open(list_file, "w") as lf:
+                for p in parts:
+                    lf.write(f"file '{p}'\n")
+            os.system(f"ffmpeg -f concat -safe 0 -i '{list_file}' -c copy '{out_path}' -y >/dev/null 2>&1")
+            if os.path.exists(out_path):
+                self.message_window.insert("end", f"[SUCCESS] 마스터 오디오 저장: {out_path}\n")
+            else:
+                self.message_window.insert("end", "[ERROR] ffmpeg 병합 실패\n")
         except Exception as e:
-            self.message_window.insert("end", f"[ERROR] 비디오 렌더 실패: {e}\n")
+            self.message_window.insert("end", f"[ERROR] 오디오 생성 실패: {e}\n")
 
 if __name__ == "__main__":
     app = App()

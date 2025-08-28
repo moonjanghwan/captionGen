@@ -12,6 +12,11 @@ from dotenv import load_dotenv, set_key
 import signal, atexit, time
 import re
 import threading
+import io
+try:
+    from pydub import AudioSegment
+except Exception:
+    AudioSegment = None
 
 class App(customtkinter.CTk):
     def __init__(self):
@@ -737,6 +742,7 @@ class App(customtkinter.CTk):
         customtkinter.CTkButton(control_button_section, text="인트로 비디오", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
         customtkinter.CTkButton(control_button_section, text="엔딩 비디오", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
         customtkinter.CTkButton(control_button_section, text="대화 비디오", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
+        customtkinter.CTkButton(control_button_section, text="자막(ASS) 내보내기", command=self.export_ass_captions, fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
         customtkinter.CTkButton(control_button_section, text="정지", command=self.stop_all_operations, fg_color="#DD3333", hover_color="#BB2222", text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
         customtkinter.CTkButton(control_button_section, text="종료", command=self.on_closing, fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
 
@@ -1915,6 +1921,165 @@ class App(customtkinter.CTk):
                 
         except Exception as e:
             self.message_window.insert("end", f"[ERROR] TTS 생성 실패: {e}\n")
+
+    # ---------- 캡션(ASS) 내보내기 ----------
+    def export_ass_captions(self):
+        try:
+            output_dir = self._get_output_dir()
+            os.makedirs(output_dir, exist_ok=True)
+
+            # 1) 스크립트 로드: 회화 CSV가 있으면 우선 사용
+            conv_path = os.path.join(output_dir, "conversation.txt")
+            csv_text = None
+            if os.path.exists(conv_path):
+                with open(conv_path, "r", encoding="utf-8") as f:
+                    csv_text = f.read()
+            if csv_text is None:
+                # 메모리에서 시도
+                val = self.generated_scripts.get("회화 스크립트") if self.generated_scripts else None
+                if isinstance(val, str):
+                    csv_text = val
+            if not csv_text:
+                self.message_window.insert("end", "[ERROR] 회화 스크립트가 없습니다. 먼저 데이터를 생성/읽기 하세요.\n")
+                return
+
+            # 2) 세그먼트 구성 및 길이(ms) 계산
+            segments = []
+            lines = [ln for ln in csv_text.strip().split('\n') if ln.strip()]
+            if len(lines) <= 1:
+                self.message_window.insert("end", "[ERROR] 회화 CSV 헤더 또는 본문이 비어있습니다.\n")
+                return
+            header = lines[0]
+            for row in lines[1:]:
+                cols = [c.strip() for c in row.split(',')]
+                if len(cols) < 3:
+                    continue
+                native_text = cols[1]
+                learning_text = cols[2]
+                if native_text:
+                    segments.append({"speaker": "native", "text": native_text})
+                # 화자 간 무음 1.0s
+                segments.append({"speaker": "sil", "duration": 1000})
+                for i, w in enumerate(self.learner_speaker_widgets):
+                    segments.append({"speaker": f"learner_{i+1}", "text": learning_text, "voice_name": w['dropdown'].get()})
+                    if i < len(self.learner_speaker_widgets) - 1:
+                        segments.append({"speaker": "sil", "duration": 500})
+
+            # 길이 산출을 위한 헬퍼
+            def synth_len_ms(text: str, voice_name: str) -> int:
+                try:
+                    lang_code = "-".join(voice_name.split('-')[:2])
+                    synthesis_input = texttospeech.SynthesisInput(text=text)
+                    voice = texttospeech.VoiceSelectionParams(language_code=lang_code, name=voice_name)
+                    audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
+                    resp = self.tts_client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
+                    if AudioSegment is None:
+                        # 대체 추정: 12 chars/sec
+                        return max(400, int(len(text) / 12 * 1000))
+                    data = io.BytesIO(resp.audio_content)
+                    seg = AudioSegment.from_file(data, format="mp3")
+                    return int(seg.duration_seconds * 1000)
+                except Exception:
+                    return max(400, int(len(text) / 12 * 1000))
+
+            timeline = []
+            t = 0
+            # 음성 이름 캐시
+            native_voice = self.native_speaker_dropdown.get()
+            for item in segments:
+                if item.get("speaker") == "sil":
+                    dur = int(item.get("duration", 0))
+                    timeline.append({"start": t, "end": t + dur, "speaker": "sil", "text": ""})
+                    t += dur
+                else:
+                    if item["speaker"].startswith("learner_"):
+                        vname = item.get("voice_name") or native_voice
+                    else:
+                        vname = native_voice
+                    dur = synth_len_ms(item.get("text", ""), vname)
+                    timeline.append({"start": t, "end": t + dur, "speaker": item["speaker"], "text": item.get("text", "")})
+                    t += dur
+
+            # 3) 스타일 구성 (이미지 설정 탭 "스크립트 설정" 이용)
+            cfg = self._collect_image_settings_config()
+            text_rows = (cfg.get("text_tabs", {}).get("스크립트 설정") or []) if isinstance(cfg, dict) else []
+            def find_row(key: str):
+                for r in text_rows:
+                    if str(r.get("행", "")).strip() == key:
+                        return r
+                return {}
+            def to_ass_color(val: str, default: str = "&H00FFFFFF") -> str:
+                if not isinstance(val, str):
+                    return default
+                v = val.strip()
+                if v.startswith("#H"):
+                    return "&H" + v[2:]
+                if v.startswith("&H"):
+                    return v
+                # hex like #RRGGBB
+                if v.startswith("#") and len(v) == 7:
+                    rr = v[1:3]; gg = v[3:5]; bb = v[5:7]
+                    return f"&H00{bb}{gg}{rr}"
+                return default
+
+            native_row = find_row("원어")
+            lrows = [find_row(f"학습어{i}") for i in range(1, 5)]
+            # 해상도
+            res = cfg.get("resolution", "1920x1080") if isinstance(cfg, dict) else "1920x1080"
+            try:
+                res_w, res_h = [int(x) for x in res.lower().replace("x", " ").split()[:2]]
+            except Exception:
+                res_w, res_h = 1920, 1080
+
+            def style_line(name: str, row: dict, align: int, margin_v: int):
+                font = str(row.get("폰트(pt)", "Noto Sans")).strip() or "Noto Sans"
+                size = int(row.get("크기(px)", 64) or 64)
+                color = to_ass_color(row.get("색상", "#H00FFFFFF"))
+                outline = 2.5
+                return f"Style: {name},{font},{size},{color},&H000000FF,&H64000000,0,0,1,{outline},0,{align},80,80,{margin_v},1"
+
+            styles = [
+                style_line("Native", native_row, 8, 120),
+            ]
+            for idx, r in enumerate(lrows, start=1):
+                styles.append(style_line(f"Learner{idx}", r, 2, 90))
+
+            # 4) ASS 파일 생성
+            def ms_to_ass(tms: int) -> str:
+                s, ms = divmod(int(tms), 1000)
+                h, s = divmod(s, 3600)
+                m, s = divmod(s, 60)
+                return f"{h:d}:{m:02d}:{s:02d}.{int(ms/10):02d}"
+
+            events = []
+            for seg in timeline:
+                if seg["speaker"] == "sil":
+                    continue
+                style = "Native" if seg["speaker"] == "native" else f"Learner{seg['speaker'].split('_')[-1]}"
+                dur_cs = max(1, int((seg["end"] - seg["start"]) / 10))
+                text = seg["text"].replace("{", "(").replace("}", ")")
+                events.append(
+                    f"Dialogue: 0,{ms_to_ass(seg['start'])},{ms_to_ass(seg['end'])},{style},,0,0,0,,{{\\kf{dur_cs}}}{text}"
+                )
+
+            ass_path = os.path.join(output_dir, "captions.ass")
+            with open(ass_path, "w", encoding="utf-8") as f:
+                f.write("[Script Info]\n")
+                f.write("ScriptType: v4.00+\n")
+                f.write(f"PlayResX: {res_w}\nPlayResY: {res_h}\n")
+                f.write("ScaledBorderAndShadow: yes\n\n")
+                f.write("[V4+ Styles]\n")
+                f.write("Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\n")
+                for s in styles:
+                    f.write(s + "\n")
+                f.write("\n[Events]\n")
+                f.write("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
+                for ev in events:
+                    f.write(ev + "\n")
+
+            self.message_window.insert("end", f"[SUCCESS] ASS 자막 내보내기 완료: {ass_path}\n")
+        except Exception as e:
+            self.message_window.insert("end", f"[ERROR] ASS 내보내기 실패: {e}\n")
 
 if __name__ == "__main__":
     app = App()

@@ -11,6 +11,7 @@ from google.api_core import exceptions
 from dotenv import load_dotenv, set_key
 import signal, atexit, time
 import re
+import html
 import threading
 import io
 try:
@@ -54,6 +55,7 @@ class App(customtkinter.CTk):
         self.current_script_index = 0
         self.audio_queue = []
         self.playing_thread = None
+        self.ssml_counter = 0
 
         # --- Theme and Colors ---
         customtkinter.set_appearance_mode("dark")
@@ -691,8 +693,9 @@ class App(customtkinter.CTk):
         self.level_dropdown.grid(row=1, column=5, padx=5, pady=5, sticky="w")
 
         customtkinter.CTkLabel(data_section, text="데이터 개수:").grid(row=1, column=6, padx=(20, 5), pady=5, sticky="w")
-        self.count_dropdown = customtkinter.CTkOptionMenu(data_section, width=150, values=["10", "20", "30"], fg_color=self.WIDGET_COLOR, text_color=self.TEXT_COLOR, dropdown_fg_color=self.WIDGET_COLOR)
-        self.count_dropdown.grid(row=1, column=7, padx=5, pady=5, sticky="w")
+        self.count_entry = customtkinter.CTkEntry(data_section, width=150, fg_color=self.WIDGET_COLOR, text_color=self.TEXT_COLOR, border_color=self.BG_COLOR)
+        self.count_entry.insert(0, "5")
+        self.count_entry.grid(row=1, column=7, padx=5, pady=5, sticky="w")
 
         customtkinter.CTkLabel(data_section, text="AI 서비스:").grid(row=2, column=0, padx=(0, 5), pady=5, sticky="w")
         self.ai_service_dropdown = customtkinter.CTkOptionMenu(data_section, width=180, values=["Gemini", "GPT-4"], fg_color=self.WIDGET_COLOR, text_color=self.TEXT_COLOR, dropdown_fg_color=self.WIDGET_COLOR)
@@ -741,7 +744,7 @@ class App(customtkinter.CTk):
         customtkinter.CTkButton(control_button_section, text="회화 비디오", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
         customtkinter.CTkButton(control_button_section, text="인트로 비디오", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
         customtkinter.CTkButton(control_button_section, text="엔딩 비디오", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
-        customtkinter.CTkButton(control_button_section, text="대화 비디오", fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
+        customtkinter.CTkButton(control_button_section, text="대화 비디오", command=self.render_conversation_video, fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
         customtkinter.CTkButton(control_button_section, text="자막(ASS) 내보내기", command=self.export_ass_captions, fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
         customtkinter.CTkButton(control_button_section, text="정지", command=self.stop_all_operations, fg_color="#DD3333", hover_color="#BB2222", text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
         customtkinter.CTkButton(control_button_section, text="종료", command=self.on_closing, fg_color=self.BUTTON_COLOR, hover_color=self.BUTTON_HOVER_COLOR, text_color=self.BUTTON_TEXT_COLOR).pack(side="left", padx=5, pady=5)
@@ -867,7 +870,13 @@ class App(customtkinter.CTk):
         }
         text_to_speak = preview_text_map.get(lang_code, "This is a voice preview.")
 
-        synthesis_input = texttospeech.SynthesisInput(text=text_to_speak)
+        # SSML 구성 및 저장
+        ssml_str = f"<speak><p>{html.escape(text_to_speak)}</p></speak>"
+        try:
+            self._save_ssml(ssml_str, prefix="preview")
+        except Exception:
+            pass
+        synthesis_input = texttospeech.SynthesisInput(ssml=ssml_str)
         voice = texttospeech.VoiceSelectionParams(language_code=lang_code, name=voice_name)
         audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
 
@@ -1458,7 +1467,7 @@ class App(customtkinter.CTk):
             "learning_locale": learning_locale,
             "topic": self.topic_entry.get() if self.topic_entry.get() else self.topic_dropdown.get(),
             "level": self.level_dropdown.get(),
-            "count": self.count_dropdown.get(),
+            "count": (self.count_entry.get().strip() or "5"),
             "gemini_model": gem.get("model", ""),
             "gemini_locale": gem.get("locale", ""),
         }
@@ -1851,7 +1860,7 @@ class App(customtkinter.CTk):
                     continue
                 
                 elif audio_item['type'] in ['native', 'learning', 'dialogue']:
-                    # TTS 음성 생성 및 재생
+                    # TTS 음성 생성 및 재생 + 파일명 규칙 기반 저장
                     text = audio_item['text']
                     speaker_type = audio_item['speaker']
                     
@@ -1894,14 +1903,27 @@ class App(customtkinter.CTk):
     def generate_and_play_tts(self, text, voice_name, lang_code):
         """TTS 음성 생성 및 재생"""
         try:
-            synthesis_input = texttospeech.SynthesisInput(text=text)
+            # SSML 구성 및 저장
+            ssml_str = f"<speak><p>{html.escape(text)}</p></speak>"
+            try:
+                self._save_ssml(ssml_str, prefix="speak")
+            except Exception:
+                pass
+            synthesis_input = texttospeech.SynthesisInput(ssml=ssml_str)
             voice = texttospeech.VoiceSelectionParams(language_code=lang_code, name=voice_name)
             audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
             
             response = self.tts_client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
             
             # 임시 파일에 저장
-            temp_file = f"/tmp/captiongen_realtime_{int(time.time())}.mp3"
+            # 미리듣기는 master와 충돌하지 않도록 preview 파일로 저장
+            base_name = "conversation"
+            conv_path = os.path.join(self._get_output_dir(), "conversation.txt")
+            try:
+                base_name = os.path.splitext(os.path.basename(conv_path))[0] or "conversation"
+            except Exception:
+                pass
+            temp_file = os.path.join(self._get_output_dir(), f"{base_name}_preview.mp3")
             with open(temp_file, "wb") as out:
                 out.write(response.audio_content)
             
@@ -1913,14 +1935,123 @@ class App(customtkinter.CTk):
             while pygame.mixer.music.get_busy() and self.is_playing_realtime:
                 time.sleep(0.1)
             
-            # 임시 파일 삭제
-            try:
-                os.remove(temp_file)
-            except:
-                pass
+            # 유지(사용자가 미리듣기 파일로 활용)
                 
         except Exception as e:
             self.message_window.insert("end", f"[ERROR] TTS 생성 실패: {e}\n")
+
+    # ---------- Master Audio Build (Single MP3) ----------
+    def build_master_audio(self):
+        try:
+            output_dir = self._get_output_dir()
+            os.makedirs(output_dir, exist_ok=True)
+            # 회화 CSV 로드
+            conv_path = os.path.join(output_dir, "conversation.txt")
+            csv_text = None
+            if os.path.exists(conv_path):
+                with open(conv_path, "r", encoding="utf-8") as f:
+                    csv_text = f.read()
+            if csv_text is None:
+                val = self.generated_scripts.get("회화 스크립트") if self.generated_scripts else None
+                if isinstance(val, str):
+                    csv_text = val
+            if not csv_text:
+                self.message_window.insert("end", "[ERROR] 회화 스크립트가 없어 오디오를 만들 수 없습니다.\n")
+                return None
+
+            # 세그먼트 구성
+            segments = []
+            lines = [ln for ln in csv_text.strip().split('\n') if ln.strip()]
+            if len(lines) <= 1:
+                self.message_window.insert("end", "[ERROR] 회화 CSV 형식이 올바르지 않습니다.\n")
+                return None
+            for row in lines[1:]:
+                cols = [c.strip() for c in row.split(',')]
+                if len(cols) < 3:
+                    continue
+                native_text = cols[1]
+                learning_text = cols[2]
+                if native_text:
+                    segments.append({"speaker": "native", "text": native_text})
+                segments.append({"speaker": "sil", "duration": 1000})
+                for i, w in enumerate(self.learner_speaker_widgets):
+                    segments.append({"speaker": f"learner_{i+1}", "text": learning_text, "voice_name": w['dropdown'].get()})
+                    if i < len(self.learner_speaker_widgets) - 1:
+                        segments.append({"speaker": "sil", "duration": 500})
+
+            if AudioSegment is None:
+                self.message_window.insert("end", "[ERROR] pydub가 필요합니다. pip install pydub 설치 후 다시 시도하세요.\n")
+                return None
+
+            master = AudioSegment.silent(duration=0)
+            native_voice = self.native_speaker_dropdown.get()
+
+            for item in segments:
+                if item.get("speaker") == "sil":
+                    master += AudioSegment.silent(duration=int(item.get("duration", 0)))
+                    continue
+                vname = native_voice if not item["speaker"].startswith("learner_") else (item.get("voice_name") or native_voice)
+                lang_code = "-".join(str(vname).split('-')[:2])
+                ssml_str = f"<speak><p>{html.escape(item.get('text',''))}</p></speak>"
+                synthesis_input = texttospeech.SynthesisInput(ssml=ssml_str)
+                voice = texttospeech.VoiceSelectionParams(language_code=lang_code, name=vname)
+                audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
+                resp = self.tts_client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
+                seg = AudioSegment.from_file(io.BytesIO(resp.audio_content), format="mp3")
+                master += seg
+
+            base_name = os.path.splitext(os.path.basename(conv_path))[0] if os.path.exists(conv_path) else (self.identifier_entry.get() or "conversation")
+            out_path = os.path.join(output_dir, f"{base_name}.mp3")
+            master.export(out_path, format="mp3", bitrate="192k")
+            self.message_window.insert("end", f"[SUCCESS] Master 오디오 생성: {out_path}\n")
+            return out_path
+        except Exception as e:
+            self.message_window.insert("end", f"[ERROR] Master 오디오 생성 실패: {e}\n")
+            return None
+
+    # ---------- Hardware Detection ----------
+    def _detect_hw_encoder(self):
+        import platform, shutil, subprocess
+        enc = {"codec": "libx264", "flags": ["-preset", "medium", "-crf", "18"]}
+        try:
+            system = platform.system().lower()
+            ffmpeg = shutil.which("ffmpeg")
+            if not ffmpeg:
+                return enc
+            # macOS: h264_videotoolbox
+            if system == "darwin":
+                # 간단 체크: 도움말에 존재하면 사용
+                out = subprocess.run([ffmpeg, "-hide_banner", "-encoders"], capture_output=True, text=True)
+                if "h264_videotoolbox" in out.stdout:
+                    enc = {"codec": "h264_videotoolbox", "flags": ["-b:v", "6M"]}
+                    return enc
+            # NVIDIA: h264_nvenc
+            if shutil.which("nvidia-smi"):
+                out = subprocess.run([ffmpeg, "-hide_banner", "-encoders"], capture_output=True, text=True)
+                if "h264_nvenc" in out.stdout:
+                    enc = {"codec": "h264_nvenc", "flags": ["-b:v", "6M", "-preset", "p5"]}
+                    return enc
+        except Exception:
+            pass
+        return enc
+
+    def _save_ssml(self, ssml_str: str, prefix: str = "ssml") -> None:
+        """디버깅용 SSML 저장 (output/{proj}/{id}/ssml/{prefix}_{counter}.ssml)"""
+        try:
+            outdir = os.path.join(self._get_output_dir(), "ssml")
+            os.makedirs(outdir, exist_ok=True)
+            self.ssml_counter += 1
+            ident = self.identifier_entry.get() or "output"
+            path = os.path.join(outdir, f"{prefix}_{ident}_{self.ssml_counter:04d}.ssml")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(ssml_str)
+            # 로그 간단 표기
+            try:
+                self.message_window.insert("end", f"[DEBUG] SSML 저장: {path}\n")
+            except Exception:
+                pass
+        except Exception:
+            pass
 
     # ---------- 캡션(ASS) 내보내기 ----------
     def export_ass_captions(self):
@@ -2062,7 +2193,15 @@ class App(customtkinter.CTk):
                     f"Dialogue: 0,{ms_to_ass(seg['start'])},{ms_to_ass(seg['end'])},{style},,0,0,0,,{{\\kf{dur_cs}}}{text}"
                 )
 
-            ass_path = os.path.join(output_dir, "captions.ass")
+            # 파일명 규칙: conversation.txt의 파일명을 기반으로 .ass 생성
+            base_name = "conversation"
+            try:
+                base_name = os.path.splitext(os.path.basename(conv_path))[0]
+                if not base_name:
+                    base_name = "conversation"
+            except Exception:
+                base_name = "conversation"
+            ass_path = os.path.join(output_dir, f"{base_name}.ass")
             with open(ass_path, "w", encoding="utf-8") as f:
                 f.write("[Script Info]\n")
                 f.write("ScriptType: v4.00+\n")
@@ -2080,6 +2219,44 @@ class App(customtkinter.CTk):
             self.message_window.insert("end", f"[SUCCESS] ASS 자막 내보내기 완료: {ass_path}\n")
         except Exception as e:
             self.message_window.insert("end", f"[ERROR] ASS 내보내기 실패: {e}\n")
+
+    def render_conversation_video(self):
+        try:
+            # ffmpeg 하드섭 렌더(사용자 환경에 ffmpeg 필요)
+            output_dir = self._get_output_dir()
+            base_name = "conversation"
+            conv_path = os.path.join(output_dir, "conversation.txt")
+            try:
+                base_name = os.path.splitext(os.path.basename(conv_path))[0] or "conversation"
+            except Exception:
+                pass
+            ass_path = os.path.join(output_dir, f"{base_name}.ass")
+            audio_path = os.path.join(output_dir, f"{base_name}.mp3")
+            video_out = os.path.join(output_dir, f"{base_name}.mp4")
+            if not os.path.exists(ass_path):
+                self.message_window.insert("end", "[INFO] ASS가 없어 먼저 내보냅니다...\n")
+                self.export_ass_captions()
+            if not os.path.exists(audio_path):
+                self.message_window.insert("end", "[INFO] Master 오디오가 없어 먼저 생성합니다...\n")
+                audio_path = self.build_master_audio() or audio_path
+            # 단색 배경(검정) 1920x1080 30fps로 기본 렌더. 추후 템플릿 확장
+            w, h, fps = 1920, 1080, 30
+            # 하드웨어 인코더 자동 선택
+            enc = self._detect_hw_encoder()
+            vcodec = enc["codec"]
+            vflags = " ".join(enc.get("flags", []))
+            # color 소스 + 자막 + 오디오 합성
+            cmd = (
+                f"ffmpeg -y -f lavfi -i color=c=black:s={w}x{h}:r={fps} "
+                f"-i \"{audio_path}\" -vf subtitles=\"{ass_path}\" -shortest "
+                f"-c:v {vcodec} {vflags} -pix_fmt yuv420p -movflags +faststart "
+                f"-c:a aac -b:a 192k \"{video_out}\" | cat"
+            )
+            import subprocess
+            subprocess.run(cmd, shell=True, check=False)
+            self.message_window.insert("end", f"[SUCCESS] 비디오 렌더 완료: {video_out}\n")
+        except Exception as e:
+            self.message_window.insert("end", f"[ERROR] 비디오 렌더 실패: {e}\n")
 
 if __name__ == "__main__":
     app = App()

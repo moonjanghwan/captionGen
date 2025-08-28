@@ -170,25 +170,42 @@ class App(customtkinter.CTk):
 
     def save_config(self):
         learner_speakers = [row['dropdown'].get() for row in self.learner_speaker_widgets]
-        config = {
-            "native_lang": self.native_lang_dropdown.get(),
-            "learning_lang": self.learning_lang_dropdown.get(),
-            "project_name": self.project_name_entry.get(),
-            "identifier": self.identifier_entry.get(),
-            "speaker_config": {
-                "native_speaker": self.native_speaker_dropdown.get(),
-                "learner_count": self.learner_count_dropdown.get(),
-                "learner_speakers": learner_speakers
-            }
+        
+        # 프로젝트 정보 가져오기
+        project_name = self.project_name_entry.get()
+        identifier = self.identifier_entry.get()
+        
+        if not project_name or not identifier:
+            self.message_window.insert("end", "[ERROR] 프로젝트명과 식별자를 먼저 설정해주세요.\n")
+            print("[ERROR] 프로젝트명과 식별자를 먼저 설정해주세요.")
+            return
+        
+        # speaker.json 저장 경로 생성
+        speaker_config_path = os.path.join("output", project_name, identifier, "speaker.json")
+        os.makedirs(os.path.dirname(speaker_config_path), exist_ok=True)
+        
+        speaker_config = {
+            "native_speaker": self.native_speaker_dropdown.get(),
+            "learner_count": self.learner_count_dropdown.get(),
+            "learner_speakers": learner_speakers
         }
+        
         try:
-            with open("config.json", "w", encoding="utf-8") as f:
-                json.dump(config, f, ensure_ascii=False, indent=4)
+            with open(speaker_config_path, "w", encoding="utf-8") as f:
+                json.dump(speaker_config, f, ensure_ascii=False, indent=4)
+            
+            success_msg = f"[SUCCESS] 화자 설정이 저장되었습니다: {speaker_config_path}"
+            self.message_window.insert("end", success_msg + "\n")
+            print(success_msg)
+            
         except Exception as e:
-            print(f"Error saving config: {e}")
+            error_msg = f"[ERROR] 화자 설정 저장 실패: {e}"
+            self.message_window.insert("end", error_msg + "\n")
+            print(error_msg)
 
     def load_config(self):
         try:
+            # 기본 config.json에서 언어 및 프로젝트 설정 로드
             if os.path.exists("config.json"):
                 with open("config.json", "r", encoding="utf-8") as f:
                     config = json.load(f)
@@ -198,11 +215,52 @@ class App(customtkinter.CTk):
                 self.project_name_entry.insert(0, config.get("project_name", ""))
                 self.identifier_entry.delete(0, "end")
                 self.identifier_entry.insert(0, config.get("identifier", ""))
-                self.speaker_config_to_load = config.get("speaker_config")
             else:
                 self.update_project_fields()
-        except (FileNotFoundError, json.JSONDecodeError):
+            
+            # 프로젝트별 speaker.json 파일 로드
+            self.load_speaker_config()
+            
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            error_msg = f"[WARNING] config.json 로드 실패: {e}"
+            self.message_window.insert("end", error_msg + "\n")
+            print(error_msg)
             self.update_project_fields()
+    
+    def load_speaker_config(self):
+        """프로젝트별 speaker.json 파일을 로드합니다."""
+        try:
+            project_name = self.project_name_entry.get()
+            identifier = self.identifier_entry.get()
+            
+            if not project_name or not identifier:
+                debug_msg = "[DEBUG] 프로젝트명 또는 식별자가 설정되지 않아 speaker 설정을 로드할 수 없습니다."
+                self.message_window.insert("end", debug_msg + "\n")
+                print(debug_msg)
+                return
+            
+            speaker_config_path = os.path.join("output", project_name, identifier, "speaker.json")
+            
+            if os.path.exists(speaker_config_path):
+                with open(speaker_config_path, "r", encoding="utf-8") as f:
+                    speaker_config = json.load(f)
+                
+                success_msg = f"[SUCCESS] 프로젝트별 화자 설정을 로드했습니다: {speaker_config_path}"
+                self.message_window.insert("end", success_msg + "\n")
+                print(success_msg)
+                
+                # 화자 설정 적용 (UI 업데이트 후)
+                self.speaker_config_to_load = speaker_config
+                
+            else:
+                debug_msg = f"[DEBUG] 프로젝트별 화자 설정 파일이 없습니다: {speaker_config_path}"
+                self.message_window.insert("end", debug_msg + "\n")
+                print(debug_msg)
+                
+        except Exception as e:
+            error_msg = f"[ERROR] 프로젝트별 화자 설정 로드 실패: {e}"
+            self.message_window.insert("end", error_msg + "\n")
+            print(error_msg)
     
     def load_google_cloud_config(self):
         """config.json에서 Google Cloud 설정을 로드합니다."""
@@ -216,6 +274,11 @@ class App(customtkinter.CTk):
         except (FileNotFoundError, json.JSONDecodeError):
             return {}
 
+    def on_project_change(self, event=None):
+        """프로젝트명 또는 식별자가 변경될 때 호출됩니다."""
+        # 디바운싱을 위해 약간의 지연 후 실행
+        self.after(500, self.load_speaker_config)
+    
     def update_project_fields(self, _=None):
         native_lang_key = self.native_lang_dropdown.get()
         learning_lang_key = self.learning_lang_dropdown.get()
@@ -229,6 +292,9 @@ class App(customtkinter.CTk):
         self.project_name_entry.insert(0, project_string)
         self.identifier_entry.delete(0, "end")
         self.identifier_entry.insert(0, project_string)
+        
+        # 프로젝트 변경 후 speaker 설정 로드
+        self.after(100, self.load_speaker_config)
 
     def initialize_google_clients(self):
         self.tts_client = None
@@ -625,10 +691,12 @@ class App(customtkinter.CTk):
         customtkinter.CTkLabel(data_section, text="프로젝트명:").grid(row=0, column=4, padx=(20, 5), pady=5, sticky="w")
         self.project_name_entry = customtkinter.CTkEntry(data_section, width=150, fg_color=self.WIDGET_COLOR, text_color=self.TEXT_COLOR, border_color=self.BG_COLOR)
         self.project_name_entry.grid(row=0, column=5, padx=5, pady=5, sticky="w")
+        self.project_name_entry.bind("<KeyRelease>", self.on_project_change)
 
         customtkinter.CTkLabel(data_section, text="식별자:").grid(row=0, column=6, padx=(20, 5), pady=5, sticky="w")
         self.identifier_entry = customtkinter.CTkEntry(data_section, width=150, fg_color=self.WIDGET_COLOR, text_color=self.TEXT_COLOR, border_color=self.BG_COLOR)
         self.identifier_entry.grid(row=0, column=7, padx=5, pady=5, sticky="w")
+        self.identifier_entry.bind("<KeyRelease>", self.on_project_change)
 
         customtkinter.CTkLabel(data_section, text="학습 주제:").grid(row=1, column=0, padx=(0, 5), pady=5, sticky="w")
         self.topic_dropdown = customtkinter.CTkOptionMenu(data_section, width=180, values=["일상", "비즈니스"], fg_color=self.WIDGET_COLOR, text_color=self.TEXT_COLOR, dropdown_fg_color=self.WIDGET_COLOR)

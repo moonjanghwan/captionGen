@@ -1,0 +1,109 @@
+AI 영상 자동화 프로그램 - 개발 To-Do 리스트
+이 문서는 project_file_structure.md에 정의된 구조를 기반으로 실제 프로그램을 개발하기 위한 단계별 작업 목록입니다.
+
+Phase 1: 기반 설정 및 환경 구축 (Foundation & Setup)
+    [ ] 프로젝트 구조 생성: project_file_structure.md에 명시된 모든 폴더와 빈 파이썬 파일(__init__.py 포함) 생성하기.
+
+    [ ] 가상 환경 설정: Python 가상 환경을 생성하고 활성화하기 (python -m venv venv).
+
+    [ ] 라이브러리 설치: requirements.txt 파일을 만들고 필요한 라이브러리 목록 (customtkinter, google-cloud-texttospeech, pydub, Pillow)을 추가 후 설치 (pip install -r requirements.txt).
+
+    [ ] FFmpeg 설치: 시스템에 FFmpeg를 설치하고 환경 변수에 경로 추가하기 (이 프로그램의 핵심 의존성).
+
+    [ ] API 인증 설정: Google Cloud TTS/Gemini API 사용을 위한 인증(JSON 키 파일) 설정 및 config.py에 경로 관리 로직 추가.
+
+    [ ] config.py 초기화: 기본 출력 경로, 에셋 경로 등 주요 설정 변수 정의.
+
+Phase 2: 핵심 백엔드 모듈 개발 (Core Backend Logic)
+    UI 없이 각 모듈의 기능이 독립적으로 동작하는 것을 목표로 합니다.
+
+    [ ] manifest_manager.py 개발:
+
+    [ ] 스크립트 파일(CSV, MD)을 입력받아 timeline_manifest.json 형식으로 변환하는 함수 구현.
+
+    [ ] audio_generator.py 개발:
+
+    [ ] Google TTS API를 호출하여 텍스트를 MP3로 변환하는 기본 함수 구현.
+
+    [ ] (핵심) SSML <mark> 태그를 동적으로 삽입하여 TTS를 요청하고, 결과물에서 타임스탬프(segments.json)를 추출하는 기능 구현.
+
+    [ ] pydub을 사용하여 오디오 클립 사이에 지정된 길이의 무음(silence)을 추가하는 함수 구현.
+
+    [ ] image_generator.py 개발:
+
+    [ ] gemini.md 스타일 파일을 읽고 파싱하는 함수 구현.
+
+    [ ] Pillow를 사용하여 투명 배경(RGBA)의 이미지 캔버스를 생성하는 함수 구현.
+
+    [ ] (핵심) '스마트 줄바꿈' 로직 구현: 주어진 너비를 초과하는 텍스트를 단어 단위로 자동 줄바꿈.
+
+    [ ] 텍스트에 gemini.md의 스타일(폰트, 색상, 그림자, 외곽선)을 적용하여 이미지에 렌더링하고 PNG 파일로 저장하는 기능 구현.
+
+    [ ] video_renderer.py 개발:
+
+    [ ] subprocess 모듈을 사용하여 FFmpeg 명령어를 실행하는 래퍼(wrapper) 함수 구현.
+
+    [ ] (핵심) segments.json을 기반으로 각 자막 PNG가 정확한 시간에 나타나고 사라지도록 하는 FFmpeg overlay 필터 문자열을 동적으로 생성하는 기능 구현.
+
+Phase 3: UI 구현 (GUI Implementation)
+    백엔드 로직 연결 없이, 제작 사양서에 명시된 화면 구성과 위젯 배치에 집중합니다.
+
+    [ ] src/ui/main_window.py:
+
+    [ ] customtkinter를 사용하여 메인 윈도우 생성, 테마 및 크기 설정.
+
+    [ ] '데이터 생성', '화자 선택', '이미지 설정' 탭 구조 생성.
+
+    [ ] src/ui/data_tab_view.py:
+
+    [ ] 드롭박스, 입력창, 버튼, 스크립트 창, 메시지 창 등 모든 위젯 배치.
+
+    [ ] src/ui/speaker_tab_view.py:
+
+    [ ] 원어/학습어 화자 선택 드롭박스 및 미리듣기 버튼 배치.
+
+    [ ] '화자 수' 선택에 따라 학습어 화자 UI가 동적으로 추가/제거되는 로직 구현.
+
+    [ ] src/ui/image_tab_view.py:
+
+    [ ] 공통 설정, 텍스트 설정 등 하위 탭 구조 구현.
+
+    [ ] 각 설정에 맞는 라디오 버튼, 입력창, 드롭박스 등 모든 위젯 배치.
+
+Phase 4: 컨트롤러 및 UI-백엔드 연동 (Integration)
+UI의 버튼 클릭과 같은 이벤트를 실제 백엔드 기능과 연결합니다.
+
+    [ ] controller.py 기본 구조 작성: 각 UI 이벤트에 대응하는 핸들러 함수(예: on_generate_audio_click)들을 정의.
+
+    [ ] AI 데이터 생성 연동:
+
+    [ ] 'AI 데이터 생성' 버튼 클릭 시, UI에서 입력값을 가져와 AI 프롬프트를 생성.
+
+    [ ] Gemini API를 호출하고, 결과를 파싱하여 스크립트 창에 표시하는 기능 연동.
+
+    [ ] 비디오 제작 파이프라인 연동:
+
+    [ ] '인트로 비디오 생성' 등 제작 버튼 클릭 시, controller가 manifest_manager → audio_generator → image_generator → video_renderer 순서로 각 모듈을 호출하도록 연동.
+
+    [ ] (핵심) 스레딩(Threading) 적용:
+
+    [ ] 오디오/비디오 생성과 같이 시간이 오래 걸리는 작업을 별도의 스레드에서 실행하여 UI가 멈추지 않도록 구현.
+
+    [ ] '정지' 버튼 클릭 시, 실행 중인 작업 스레드를 강제 종료하는 로직 구현.
+
+    [ ] 상태 업데이트 연동: 백엔드 모듈의 작업 진행 상황(예: "오디오 파일 생성 중...")을 UI의 메시지 창에 실시간으로 표시하는 기능 구현.
+
+Phase 5: 기능 고도화 및 최종 작업 (Refinement & Finalization)
+    [ ] 설정 저장/불러오기 기능 구현:
+
+    [ ] '화자 선택' 및 '이미지 설정' 탭의 모든 UI 상태를 JSON 파일로 저장하고 불러오는 기능 완성.
+
+    [ ] 예외 처리 및 안정화:
+
+    [ ] 파일이 없거나, API 키가 유효하지 않거나, FFmpeg 실행에 실패하는 등 예상 가능한 모든 오류에 대한 예외 처리 로직 추가.
+
+    [ ] 사용자 문서 작성:
+
+    [ ] README.md 파일에 프로그램 설치 방법, FFmpeg 설치 가이드, API 키 설정 방법 등 상세한 사용자 가이드 작성.
+
+    [ ] (선택) 실행 파일 패키징: PyInstaller 등의 라이브러리를 사용하여 프로젝트를 단일 실행 파일(.exe, .app)로 패키징.

@@ -1,0 +1,63 @@
+AI 영상 콘텐츠 자동화 프로그램 - 프로젝트 파일 구조
+이 문서는 '유튜브 영상 자동화 파이프라인'을 기반으로 한 전체 프로젝트의 폴더 및 파일 구조를 정의합니다. 각 파일과 폴더는 파이프라인의 특정 단계를 수행하는 역할을 맡습니다.
+
+AI_Video_Generator/
+│
+├── src/                          # 파이썬 소스 코드가 위치하는 디렉토리
+│   │
+│   ├── ui/                       # UI 관련 모듈이 위치하는 디렉토리
+│   │   ├── main_window.py        # 메인 GUI 창, 탭 등 전체적인 레이아웃 구성
+│   │   ├── data_tab_view.py      # '데이터 생성' 탭의 UI 요소 및 레이아웃
+│   │   ├── speaker_tab_view.py   # '화자 선택' 탭의 UI 요소 및 레이아웃
+│   │   └── image_tab_view.py     # '이미지 설정' 탭의 UI 요소 및 레이아웃
+│   │
+│   ├── main.py                   # GUI 실행 및 전체 애플리케이션의 시작점
+│   ├── controller.py             # UI의 이벤트와 백엔드 모듈을 연결하는 컨트롤러
+│   ├── manifest_manager.py       # [1단계] timeline_manifest.json 생성 및 관리 모듈
+│   ├── audio_generator.py        # [2단계] TTS 오디오 및 타임스탬프 생성 모듈
+│   ├── image_generator.py        # [3단계] 자막 PNG 이미지 생성 모듈
+│   ├── video_renderer.py         # [4단계] 최종 비디오 렌더링 모듈 (FFmpeg 호출)
+│   └── config.py                 # API 키, 기본 경로 등 전역 설정 관리
+│
+├── assets/                       # 제작에 필요한 원본 리소스
+│   ├── bg_intro.mp4              # 인트로, 엔딩 등에 사용될 배경 비디오
+│   ├── bg_cafe.jpg               # 대화 장면에 사용될 배경 이미지
+│   └── fonts/                    # 자막 렌더링에 사용할 폰트 파일
+│       └── NotoSansKR-Bold.otf
+│
+├── output/                       # 모든 결과물이 저장되는 메인 출력 디렉토리
+│   │
+│   └── kor-chn-lesson2/          # {project_id} 이름으로 생성된 프로젝트 폴더 예시
+│       │
+│       ├── timeline_manifest.json    # [1단계 산출물] 이 프로젝트의 모든 제작 정보를 담은 설계도
+│       │
+│       ├── audio/                      # [2단계 산출물]
+│       │   ├── kor-chn-lesson2_intro_master.mp3
+│       │   ├── kor-chn-lesson2_intro_segments.json   # 'intro' 씬의 타임스탬프
+│       │   ├── kor-chn-lesson2_dialogue_master.mp3
+│       │   └── kor-chn-lesson2_dialogue_segments.json  # 'dialogue' 씬의 타임스탬프
+│       │
+│       ├── captions/                   # [3단계 산출물]
+│       │   ├── kor-chn-lesson2_intro_01_subtitle_0.png
+│       │   ├── kor-chn-lesson2_intro_01_subtitle_1.png
+│       │   └── ... (씬과 문장별로 생성된 자막 이미지 시퀀스)
+│       │
+│       └── video/                      # [4단계 산출물]
+│           ├── kor-chn-lesson2_intro.mp4
+│           ├── kor-chn-lesson2_dialogue.mp4
+│           ├── kor-chn-lesson2_ending.mp4
+│           └── kor-chn-lesson2_full_lesson.mp4  # 최종 합본 비디오
+│
+└── gemini.md                     # 자막 스타일(폰트, 색상, 크기 등)을 정의하는 설정 파일
+
+
+구조 설명
+src/: 실제 프로그램의 로직을 담당하는 파이썬 코드들이 모여 있습니다.
+
+src/ui/: [신규] 애플리케이션의 모든 UI 코드를 별도로 관리하는 패키지입니다. 각 탭을 개별 파일로 분리하여 UI 코드의 복잡도를 낮춥니다.
+
+assets/: 사용자가 직접 준비해야 하는 배경 영상, 이미지, 폰트와 같은 원본 파일들을 저장하는 곳입니다.
+
+output/: 프로그램 실행의 모든 결과물이 이곳에 저장됩니다. 각 프로젝트는 고유한 ID(kor-chn-lesson2)를 가진 폴더로 관리되며, 그 안에 파이프라인 단계별 산출물이 audio, captions, video 폴더에 체계적으로 정리됩니다.
+
+gemini.md: 자막의 디자인을 코드와 분리하여 쉽게 수정할 수 있도록 도와주는 중요한 스타일 설정 파일입니다.

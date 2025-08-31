@@ -1,18 +1,14 @@
-# Bytecode
-__pycache__/
-*.py[cod]
-
-# Envs
+# 가상 환경 폴더
 .venv/
+
+# API 키 및 민감 정보 파일
 .env
-
-# OS
-.DS_Store
-
-# Output
-output/**
-
-# Secrets
 credentials.json
-image_settings.json
-temp_preview.mp3
+
+# 파이썬 캐시 파일
+__pycache__/
+*.pyc
+
+# IDE/에디터 설정 파일
+.vscode/
+.idea/

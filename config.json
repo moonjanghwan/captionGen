@@ -1,11 +1,4 @@
 {
-    "native_lang": "한국어 (ko-KR)",
-    "learning_lang": "중국어 (cmn-CN)",
-    "project_name": "kor-chn",
-    "identifier": "kor-chn",
-    "speaker_config": {
-        "native_speaker": "N/A",
-        "learner_count": "4",
-        "learner_speakers": []
-    }
+    "last_native_lang": "한국어",
+    "last_learning_lang": "중국어"
 }

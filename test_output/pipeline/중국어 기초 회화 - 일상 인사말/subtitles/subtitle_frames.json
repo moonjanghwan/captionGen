@@ -1,0 +1,147 @@
+{
+  "total_frames": 10,
+  "resolution": "1920x1080",
+  "output_directory": "test_output/pipeline/중국어 기초 회화 - 일상 인사말/subtitles",
+  "frames": [
+    {
+      "frame_number": 0,
+      "start_time": 0.0,
+      "end_time": 3.0,
+      "duration": 3.0,
+      "scene_id": "conversation_01",
+      "screen_type": "screen1",
+      "content": [
+        "1",
+        "안녕하세요!"
+      ],
+      "output_path": "test_output/pipeline/중국어 기초 회화 - 일상 인사말/subtitles/conversation_01_screen1_0000.png"
+    },
+    {
+      "frame_number": 1,
+      "start_time": 0.03333333333333333,
+      "end_time": 11.033333333333333,
+      "duration": 11.0,
+      "scene_id": "conversation_01",
+      "screen_type": "screen2",
+      "content": [
+        "1",
+        "안녕하세요!",
+        "你好！",
+        "니하오!"
+      ],
+      "output_path": "test_output/pipeline/중국어 기초 회화 - 일상 인사말/subtitles/conversation_01_screen2_0001.png"
+    },
+    {
+      "frame_number": 2,
+      "start_time": 0.06666666666666667,
+      "end_time": 3.066666666666667,
+      "duration": 3.0,
+      "scene_id": "conversation_02",
+      "screen_type": "screen1",
+      "content": [
+        "2",
+        "고맙습니다!"
+      ],
+      "output_path": "test_output/pipeline/중국어 기초 회화 - 일상 인사말/subtitles/conversation_02_screen1_0002.png"
+    },
+    {
+      "frame_number": 3,
+      "start_time": 0.1,
+      "end_time": 11.1,
+      "duration": 11.0,
+      "scene_id": "conversation_02",
+      "screen_type": "screen2",
+      "content": [
+        "2",
+        "고맙습니다!",
+        "谢谢！",
+        "씨에씨에!"
+      ],
+      "output_path": "test_output/pipeline/중국어 기초 회화 - 일상 인사말/subtitles/conversation_02_screen2_0003.png"
+    },
+    {
+      "frame_number": 4,
+      "start_time": 0.13333333333333333,
+      "end_time": 3.1333333333333333,
+      "duration": 3.0,
+      "scene_id": "conversation_03",
+      "screen_type": "screen1",
+      "content": [
+        "3",
+        "천만에요!"
+      ],
+      "output_path": "test_output/pipeline/중국어 기초 회화 - 일상 인사말/subtitles/conversation_03_screen1_0004.png"
+    },
+    {
+      "frame_number": 5,
+      "start_time": 0.16666666666666666,
+      "end_time": 11.166666666666666,
+      "duration": 11.0,
+      "scene_id": "conversation_03",
+      "screen_type": "screen2",
+      "content": [
+        "3",
+        "천만에요!",
+        "不客气！",
+        "부커치!"
+      ],
+      "output_path": "test_output/pipeline/중국어 기초 회화 - 일상 인사말/subtitles/conversation_03_screen2_0005.png"
+    },
+    {
+      "frame_number": 6,
+      "start_time": 0.2,
+      "end_time": 3.2,
+      "duration": 3.0,
+      "scene_id": "conversation_04",
+      "screen_type": "screen1",
+      "content": [
+        "4",
+        "죄송합니다."
+      ],
+      "output_path": "test_output/pipeline/중국어 기초 회화 - 일상 인사말/subtitles/conversation_04_screen1_0006.png"
+    },
+    {
+      "frame_number": 7,
+      "start_time": 0.23333333333333334,
+      "end_time": 11.233333333333333,
+      "duration": 11.0,
+      "scene_id": "conversation_04",
+      "screen_type": "screen2",
+      "content": [
+        "4",
+        "죄송합니다.",
+        "对不起。",
+        "뚜이부치."
+      ],
+      "output_path": "test_output/pipeline/중국어 기초 회화 - 일상 인사말/subtitles/conversation_04_screen2_0007.png"
+    },
+    {
+      "frame_number": 8,
+      "start_time": 0.26666666666666666,
+      "end_time": 3.2666666666666666,
+      "duration": 3.0,
+      "scene_id": "conversation_05",
+      "screen_type": "screen1",
+      "content": [
+        "5",
+        "괜찮습니다."
+      ],
+      "output_path": "test_output/pipeline/중국어 기초 회화 - 일상 인사말/subtitles/conversation_05_screen1_0008.png"
+    },
+    {
+      "frame_number": 9,
+      "start_time": 0.3,
+      "end_time": 11.3,
+      "duration": 11.0,
+      "scene_id": "conversation_05",
+      "screen_type": "screen2",
+      "content": [
+        "5",
+        "괜찮습니다.",
+        "没关系。",
+        "메이꽌시."
+      ],
+      "output_path": "test_output/pipeline/중국어 기초 회화 - 일상 인사말/subtitles/conversation_05_screen2_0009.png"
+    }
+  ]
+}

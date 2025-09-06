@@ -1531,26 +1531,99 @@ class ImageTabView(ctk.CTkFrame):
             combined_wav = concat_wav(audio_segments)
             out_wav = os.path.join(out_dir, f"{identifier}_dialog.wav")
             write_wav(combined_wav, out_wav)
-            # 6) concat 리스트 작성 후 ffmpeg로 비디오 생성 + 오디오 mux
+            # 6) 배경 이미지 준비 및 비디오 생성
+            # 배경 이미지/색상으로 base 비디오 생성
+            bg_kind = (self.bg_type_var.get() or "").strip()
+            bg_value = (self.w_bg_value.get() or "").strip()
+            
+            # 해상도 추출
+            resolution = self._get_current_resolution()
+            width, height = map(int, resolution.split('x'))
+            
+            # 배경 base 비디오 생성
+            base_video_path = os.path.join(out_dir, f"{identifier}_base.mp4")
+            if bg_kind == "색상" and bg_value:
+                # 색상 배경으로 1초 비디오 생성
+                cmd_base = [
+                    'ffmpeg', '-y', '-loglevel', 'error',
+                    '-f', 'lavfi',
+                    '-i', f'color=c={bg_value}:s={width}x{height}:d=1',
+                    '-pix_fmt', 'yuv420p',
+                    base_video_path
+                ]
+            elif bg_kind == "이미지" and bg_value and os.path.isfile(bg_value):
+                # 이미지 배경으로 1초 비디오 생성
+                cmd_base = [
+                    'ffmpeg', '-y', '-loglevel', 'error',
+                    '-loop', '1',
+                    '-i', bg_value,
+                    '-t', '1',
+                    '-vf', f'scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2',
+                    '-pix_fmt', 'yuv420p',
+                    base_video_path
+                ]
+            elif bg_kind == "동영상" and bg_value and os.path.isfile(bg_value):
+                # 동영상 배경으로 1초 비디오 생성 (첫 프레임 사용)
+                cmd_base = [
+                    'ffmpeg', '-y', '-loglevel', 'error',
+                    '-i', bg_value,
+                    '-ss', '0',
+                    '-t', '1',
+                    '-vf', f'scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2',
+                    '-pix_fmt', 'yuv420p',
+                    base_video_path
+                ]
+            else:
+                # 기본 검은색 배경
+                cmd_base = [
+                    'ffmpeg', '-y', '-loglevel', 'error',
+                    '-f', 'lavfi',
+                    '-i', f'color=c=black:s={width}x{height}:d=1',
+                    '-pix_fmt', 'yuv420p',
+                    base_video_path
+                ]
+            
+            subprocess.run(cmd_base, check=True)
+            
+            # 7) 각 프레임을 배경 위에 overlay하여 최종 비디오 생성
+            temp_videos = []
+            for idx, (png_path, duration) in enumerate(a_b_frames):
+                temp_video = os.path.join(out_dir, f"{identifier}_temp_{idx:03d}.mp4")
+                temp_videos.append(temp_video)
+                
+                # PNG를 배경 위에 overlay하여 비디오 생성
+                cmd_overlay = [
+                    'ffmpeg', '-y', '-loglevel', 'error',
+                    '-i', base_video_path,
+                    '-i', png_path,
+                    '-filter_complex', f'[0:v][1:v]overlay=0:0:shortest=1',
+                    '-t', str(duration),
+                    '-pix_fmt', 'yuv420p',
+                    temp_video
+                ]
+                subprocess.run(cmd_overlay, check=True)
+            
+            # 8) concat 리스트 작성 후 최종 비디오 생성
             with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.txt') as listf:
-                for fpath, dur in a_b_frames:
-                    listf.write(f"file '{fpath}'\n")
-                    listf.write(f"duration {max(0.1, dur):.3f}\n")
-                # concat demuxer가 마지막 duration을 무시하는 문제 보정: 마지막 프레임을 한 번 더 기록
-                if a_b_frames:
-                    last_path = a_b_frames[-1][0]
-                    listf.write(f"file '{last_path}'\n")
+                for temp_video in temp_videos:
+                    listf.write(f"file '{temp_video}'\n")
                 list_path = listf.name
-            cmd = [
-                'ffmpeg','-y','-loglevel','error',
-                '-f','concat','-safe','0','-i', list_path,
+            
+            cmd_final = [
+                'ffmpeg', '-y', '-loglevel', 'error',
+                '-f', 'concat', '-safe', '0', '-i', list_path,
                 '-i', out_wav,
-                '-pix_fmt','yuv420p',
+                '-pix_fmt', 'yuv420p',
                 '-shortest',
                 out_mp4
             ]
-            subprocess.run(cmd, check=True)
+            subprocess.run(cmd_final, check=True)
+            
+            # 임시 파일들 정리
             os.remove(list_path)
+            os.remove(base_video_path)
+            for temp_video in temp_videos:
+                os.remove(temp_video)
             self._log_json(f'[비디오] 생성 완료: {out_mp4}')
         except Exception as e:
             self._log_json(f'[비디오 오류] {e}')
@@ -1561,6 +1634,23 @@ class ImageTabView(ctk.CTkFrame):
             self.json_viewer.see('end')
         except Exception:
             pass
+
+    def _get_current_resolution(self):
+        """현재 선택된 해상도를 반환합니다."""
+        try:
+            # 현재 활성화된 텍스트 설정 탭에서 해상도 가져오기
+            current_tab = self.tab_view.get()
+            if current_tab in self.text_tabs:
+                tab = self.text_tabs[current_tab]
+                if hasattr(tab, '_controls') and "해상도" in tab._controls:
+                    resolution = tab._controls["해상도"].get()
+                    if resolution and 'x' in resolution:
+                        return resolution
+        except Exception:
+            pass
+        
+        # 기본값 반환
+        return "1920x1080"
 
 class TextSettingsTab(ctk.CTkFrame):
     def __init__(self, parent, default_data):

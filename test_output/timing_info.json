@@ -1,0 +1,23 @@
+{
+  "total_duration": 0.0,
+  "segments": [
+    {
+      "name": "scene_1_screen1_start_to_scene_1_screen1_end",
+      "start_time": 0.0915,
+      "end_time": 0.1495,
+      "duration": 0.057999999999999996,
+      "type": "screen1",
+      "scene_id": "1",
+      "content": "www.w3.org/2001/10/synthesis\" xml:lang=\"ko-KR\"> 안녕하세요!</proso"
+    },
+    {
+      "name": "scene_1_screen2_start_to_scene_1_screen2_end",
+      "start_time": 0.193,
+      "end_time": 0.5,
+      "duration": 0.307,
+      "type": "screen2",
+      "scene_id": "1",
+      "content": "<prosody r"
+    }
+  ]
+}

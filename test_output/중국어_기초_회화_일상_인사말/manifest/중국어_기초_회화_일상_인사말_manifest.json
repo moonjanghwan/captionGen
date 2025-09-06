@@ -1,0 +1,43 @@
+{
+  "project_name": "중국어_기초_회화_일상_인사말",
+  "resolution": "1920x1080",
+  "default_background": "#000000",
+  "scenes": [
+    {
+      "id": "intro_01",
+      "type": "intro",
+      "sequence": 1,
+      "full_script": "안녕하세요! 중국어 학습의 문을 열어보겠습니다. 오늘은 '일상생활에서 자주 사용하는 인사말'을 배워보겠습니다."
+    },
+    {
+      "id": "conversation_02",
+      "type": "conversation",
+      "sequence": 2,
+      "native_script": "안녕하세요!",
+      "learning_script": "你好！",
+      "reading_script": "니하오!"
+    },
+    {
+      "id": "conversation_03",
+      "type": "conversation",
+      "sequence": 3,
+      "native_script": "고맙습니다!",
+      "learning_script": "谢谢！",
+      "reading_script": "씨에씨에!"
+    },
+    {
+      "id": "conversation_04",
+      "type": "conversation",
+      "sequence": 4,
+      "native_script": "천만에요!",
+      "learning_script": "不客气！",
+      "reading_script": "부커치!"
+    },
+    {
+      "id": "ending_05",
+      "type": "ending",
+      "sequence": 5,
+      "full_script": "오늘도 열심히 공부하셨습니다. 다음에 또 만나요!"
+    }
+  ]
+}

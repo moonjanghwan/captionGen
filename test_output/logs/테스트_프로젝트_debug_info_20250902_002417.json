@@ -1,0 +1,215 @@
+{
+  "project_name": "테스트_프로젝트",
+  "timestamp": "20250902_002417",
+  "progress_summary": {
+    "project_name": "테스트_프로젝트",
+    "total_steps": 5,
+    "completed_steps": 5,
+    "failed_steps": 0,
+    "running_steps": 0,
+    "pending_steps": 0,
+    "progress_percent": 100.0,
+    "total_duration": 1.8245470523834229,
+    "current_step": null,
+    "status": "completed"
+  },
+  "progress_steps": [
+    {
+      "step_name": "1단계: 초기화",
+      "step_number": 1,
+      "total_steps": 5,
+      "status": "completed",
+      "start_time": 1756740255.633836,
+      "end_time": 1756740256.1389172,
+      "duration": 0.5050811767578125,
+      "message": "초기화 완료",
+      "details": {}
+    },
+    {
+      "step_name": "2단계: 데이터 로드",
+      "step_number": 2,
+      "total_steps": 5,
+      "status": "completed",
+      "start_time": 1756740256.1390238,
+      "end_time": 1756740256.745146,
+      "duration": 0.6061222553253174,
+      "message": "데이터 로드 완료",
+      "details": {}
+    },
+    {
+      "step_name": "3단계: 처리",
+      "step_number": 3,
+      "total_steps": 5,
+      "status": "completed",
+      "start_time": 1756740256.745395,
+      "end_time": 1756740257.14655,
+      "duration": 0.4011549949645996,
+      "message": "처리 완료",
+      "details": {}
+    },
+    {
+      "step_name": "4단계: 검증",
+      "step_number": 4,
+      "total_steps": 5,
+      "status": "completed",
+      "start_time": 1756740257.14709,
+      "end_time": 1756740257.3525782,
+      "duration": 0.2054882049560547,
+      "message": "검증 완료",
+      "details": {}
+    },
+    {
+      "step_name": "5단계: 완료",
+      "step_number": 5,
+      "total_steps": 5,
+      "status": "completed",
+      "start_time": 1756740257.352767,
+      "end_time": 1756740257.456008,
+      "duration": 0.103240966796875,
+      "message": "모든 단계 완료!",
+      "details": {}
+    }
+  ],
+  "logs": [
+    {
+      "timestamp": "2025-09-02 00:24:15",
+      "level": "INFO",
+      "message": "단계 시작: 1단계: 초기화",
+      "details": {
+        "step_number": 1,
+        "total_steps": 5,
+        "status": "running"
+      }
+    },
+    {
+      "timestamp": "2025-09-02 00:24:16",
+      "level": "INFO",
+      "message": "단계 완료: 1단계: 초기화",
+      "details": {
+        "step_number": 1,
+        "total_steps": 5,
+        "status": "completed",
+        "duration": 0.5050811767578125,
+        "details": {}
+      }
+    },
+    {
+      "timestamp": "2025-09-02 00:24:16",
+      "level": "INFO",
+      "message": "단계 시작: 2단계: 데이터 로드",
+      "details": {
+        "step_number": 2,
+        "total_steps": 5,
+        "status": "running"
+      }
+    },
+    {
+      "timestamp": "2025-09-02 00:24:16",
+      "level": "INFO",
+      "message": "단계 완료: 2단계: 데이터 로드",
+      "details": {
+        "step_number": 2,
+        "total_steps": 5,
+        "status": "completed",
+        "duration": 0.6061222553253174,
+        "details": {}
+      }
+    },
+    {
+      "timestamp": "2025-09-02 00:24:16",
+      "level": "INFO",
+      "message": "단계 시작: 3단계: 처리",
+      "details": {
+        "step_number": 3,
+        "total_steps": 5,
+        "status": "running"
+      }
+    },
+    {
+      "timestamp": "2025-09-02 00:24:17",
+      "level": "INFO",
+      "message": "단계 완료: 3단계: 처리",
+      "details": {
+        "step_number": 3,
+        "total_steps": 5,
+        "status": "completed",
+        "duration": 0.4011549949645996,
+        "details": {}
+      }
+    },
+    {
+      "timestamp": "2025-09-02 00:24:17",
+      "level": "INFO",
+      "message": "단계 시작: 4단계: 검증",
+      "details": {
+        "step_number": 4,
+        "total_steps": 5,
+        "status": "running"
+      }
+    },
+    {
+      "timestamp": "2025-09-02 00:24:17",
+      "level": "INFO",
+      "message": "단계 완료: 4단계: 검증",
+      "details": {
+        "step_number": 4,
+        "total_steps": 5,
+        "status": "completed",
+        "duration": 0.2054882049560547,
+        "details": {}
+      }
+    },
+    {
+      "timestamp": "2025-09-02 00:24:17",
+      "level": "INFO",
+      "message": "단계 시작: 5단계: 완료",
+      "details": {
+        "step_number": 5,
+        "total_steps": 5,
+        "status": "running"
+      }
+    },
+    {
+      "timestamp": "2025-09-02 00:24:17",
+      "level": "INFO",
+      "message": "단계 완료: 5단계: 완료",
+      "details": {
+        "step_number": 5,
+        "total_steps": 5,
+        "status": "completed",
+        "duration": 0.103240966796875,
+        "details": {}
+      }
+    },
+    {
+      "timestamp": "2025-09-02 00:24:17",
+      "level": "INFO",
+      "message": "테스트 정보 메시지",
+      "details": {}
+    },
+    {
+      "timestamp": "2025-09-02 00:24:17",
+      "level": "WARNING",
+      "message": "테스트 경고 메시지",
+      "details": {}
+    },
+    {
+      "timestamp": "2025-09-02 00:24:17",
+      "level": "ERROR",
+      "message": "테스트 에러 메시지",
+      "details": {}
+    },
+    {
+      "timestamp": "2025-09-02 00:24:17",
+      "level": "DEBUG",
+      "message": "테스트 디버그 메시지",
+      "details": {}
+    },
+    {
+      "timestamp": "2025-09-02 00:24:17",
+      "level": "INFO",
+      "message": "실행 로그 저장 완료: test_output/logs/테스트_프로젝트_execution_log_20250902_002417.txt",
+      "details": {}
+    }
+  ]
+}

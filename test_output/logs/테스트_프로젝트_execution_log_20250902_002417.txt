@@ -1,0 +1,112 @@
+프로젝트: 테스트_프로젝트
+실행 시작: 2025-09-02 00:24:15
+실행 종료: 2025-09-02 00:24:17
+총 소요시간: 1.82초
+
+=== 진행 단계 요약 ===
+project_name: 테스트_프로젝트
+total_steps: 5
+completed_steps: 5
+failed_steps: 0
+running_steps: 0
+pending_steps: 0
+progress_percent: 100.0
+total_duration: 1.8238883018493652
+current_step: None
+status: completed
+
+=== 상세 진행 단계 ===
+[1/5] 1단계: 초기화
+  상태: completed
+  메시지: 초기화 완료
+  소요시간: 0.51초
+
+[2/5] 2단계: 데이터 로드
+  상태: completed
+  메시지: 데이터 로드 완료
+  소요시간: 0.61초
+
+[3/5] 3단계: 처리
+  상태: completed
+  메시지: 처리 완료
+  소요시간: 0.40초
+
+[4/5] 4단계: 검증
+  상태: completed
+  메시지: 검증 완료
+  소요시간: 0.21초
+
+[5/5] 5단계: 완료
+  상태: completed
+  메시지: 모든 단계 완료!
+  소요시간: 0.10초
+
+=== 실행 로그 ===
+[2025-09-02 00:24:15] INFO: 단계 시작: 1단계: 초기화
+  step_number: 1
+  total_steps: 5
+  status: running
+
+[2025-09-02 00:24:16] INFO: 단계 완료: 1단계: 초기화
+  step_number: 1
+  total_steps: 5
+  status: completed
+  duration: 0.5050811767578125
+  details: {}
+
+[2025-09-02 00:24:16] INFO: 단계 시작: 2단계: 데이터 로드
+  step_number: 2
+  total_steps: 5
+  status: running
+
+[2025-09-02 00:24:16] INFO: 단계 완료: 2단계: 데이터 로드
+  step_number: 2
+  total_steps: 5
+  status: completed
+  duration: 0.6061222553253174
+  details: {}
+
+[2025-09-02 00:24:16] INFO: 단계 시작: 3단계: 처리
+  step_number: 3
+  total_steps: 5
+  status: running
+
+[2025-09-02 00:24:17] INFO: 단계 완료: 3단계: 처리
+  step_number: 3
+  total_steps: 5
+  status: completed
+  duration: 0.4011549949645996
+  details: {}
+
+[2025-09-02 00:24:17] INFO: 단계 시작: 4단계: 검증
+  step_number: 4
+  total_steps: 5
+  status: running
+
+[2025-09-02 00:24:17] INFO: 단계 완료: 4단계: 검증
+  step_number: 4
+  total_steps: 5
+  status: completed
+  duration: 0.2054882049560547
+  details: {}
+
+[2025-09-02 00:24:17] INFO: 단계 시작: 5단계: 완료
+  step_number: 5
+  total_steps: 5
+  status: running
+
+[2025-09-02 00:24:17] INFO: 단계 완료: 5단계: 완료
+  step_number: 5
+  total_steps: 5
+  status: completed
+  duration: 0.103240966796875
+  details: {}
+
+[2025-09-02 00:24:17] INFO: 테스트 정보 메시지
+
+[2025-09-02 00:24:17] WARNING: 테스트 경고 메시지
+
+[2025-09-02 00:24:17] ERROR: 테스트 에러 메시지
+
+[2025-09-02 00:24:17] DEBUG: 테스트 디버그 메시지
+

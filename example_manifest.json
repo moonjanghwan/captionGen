@@ -1,0 +1,79 @@
+{
+  "project_name": "중국어 기초 회화 Ep.1",
+  "resolution": "1920x1080",
+  "default_background": "assets/background/pawel-czerwinski-IeRofQlthaY-unsplash.jpg",
+  "scenes": [
+    {
+      "id": "intro_01",
+      "type": "intro",
+      "full_script": "안녕하세요! 중국어 학습의 문을 열어보겠습니다. 오늘은 '일상생활에서 자주 사용하는 기본 표현'을 배워보겠습니다. 어렵게만 느껴졌던 중국어, 지금부터 눈과 귀를 열고 함께 배워봅시다. 자, 그럼 바로 시작해볼까요?"
+    },
+    {
+      "id": "conversation_01",
+      "type": "conversation",
+      "sequence": 1,
+      "native_script": "Hello, how are you?",
+      "learning_script": "你好！你好吗？",
+      "reading_script": "니 하오! 니 하오 마?"
+    },
+    {
+      "id": "conversation_02",
+      "type": "conversation",
+      "sequence": 2,
+      "native_script": "Thank you very much.",
+      "learning_script": "非常感谢。",
+      "reading_script": "페이창 간셰."
+    },
+    {
+      "id": "conversation_03",
+      "type": "conversation",
+      "sequence": 3,
+      "native_script": "How much is this?",
+      "learning_script": "这个多少钱？",
+      "reading_script": "쩌거 뚜오샤오 치엔?"
+    },
+    {
+      "id": "conversation_04",
+      "type": "conversation",
+      "sequence": 4,
+      "native_script": "Excuse me, I'm sorry.",
+      "learning_script": "对不起，不好意思。",
+      "reading_script": "뙤이부치, 뿌 하오 이쓰."
+    },
+    {
+      "id": "conversation_05",
+      "type": "conversation",
+      "sequence": 5,
+      "native_script": "Goodbye, see you later.",
+      "learning_script": "再见，下次见。",
+      "reading_script": "짜이찌엔, 샤츠 찌엔."
+    },
+    {
+      "id": "dialogue_01",
+      "type": "dialogue",
+      "script": [
+        {
+          "speaker": "A",
+          "text": "어디서 만날까요?"
+        },
+        {
+          "speaker": "B", 
+          "text": "역 앞에서 만나요."
+        },
+        {
+          "speaker": "A",
+          "text": "몇 시에요?"
+        },
+        {
+          "speaker": "B",
+          "text": "3시에요."
+        }
+      ]
+    },
+    {
+      "id": "ending_01",
+      "type": "ending",
+      "full_script": "오늘 중국어 기초 회화 수업은 여기까지입니다. 배운 표현들을 자주 연습해보시고, 다음 시간에는 더 다양한 상황에서 사용할 수 있는 표현들을 함께 배워보겠습니다. 수고하셨습니다! 再见！"
+    }
+  ]
+}

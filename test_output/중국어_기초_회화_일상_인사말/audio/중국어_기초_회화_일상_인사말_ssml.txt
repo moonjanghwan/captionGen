@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ko-KR">
+<?xml version="1.0" encoding="UTF-8"?>
+<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ko-KR">
+<voice name="ko-KR-Standard-A">
+<mark name="intro_01_start"/>
+<prosody rate="medium" pitch="medium">안녕하세요! 중국어 학습의 문을 열어보겠습니다. 오늘은 '일상생활에서 자주 사용하는 인사말'을 배워보겠습니다.</prosody>
+<mark name="intro_01_end"/>
+</voice>
+</speak>
+<break time="1s"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ko-KR">
+<voice name="ko-KR-Standard-A">
+<mark name="scene_2_screen1_start"/>
+<prosody rate="medium" pitch="medium">안녕하세요!</prosody>
+<mark name="scene_2_screen1_end"/>
+</voice>
+<break time="1s"/>
+<mark name="scene_2_screen2_start"/>
+<voice name="cmn-CN-Standard-A">
+<prosody rate="medium" pitch="medium">你好！</prosody>
+</voice>
+<break time="1s"/>
+<voice name="cmn-CN-Standard-B">
+<prosody rate="medium" pitch="medium">你好！</prosody>
+</voice>
+<break time="1s"/>
+<voice name="cmn-CN-Standard-C">
+<prosody rate="medium" pitch="medium">你好！</prosody>
+</voice>
+<break time="1s"/>
+<voice name="cmn-CN-Standard-D">
+<prosody rate="medium" pitch="medium">你好！</prosody>
+</voice>
+<mark name="scene_2_screen2_end"/>
+</speak>
+<break time="1s"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ko-KR">
+<voice name="ko-KR-Standard-A">
+<mark name="scene_3_screen1_start"/>
+<prosody rate="medium" pitch="medium">고맙습니다!</prosody>
+<mark name="scene_3_screen1_end"/>
+</voice>
+<break time="1s"/>
+<mark name="scene_3_screen2_start"/>
+<voice name="cmn-CN-Standard-A">
+<prosody rate="medium" pitch="medium">谢谢！</prosody>
+</voice>
+<break time="1s"/>
+<voice name="cmn-CN-Standard-B">
+<prosody rate="medium" pitch="medium">谢谢！</prosody>
+</voice>
+<break time="1s"/>
+<voice name="cmn-CN-Standard-C">
+<prosody rate="medium" pitch="medium">谢谢！</prosody>
+</voice>
+<break time="1s"/>
+<voice name="cmn-CN-Standard-D">
+<prosody rate="medium" pitch="medium">谢谢！</prosody>
+</voice>
+<mark name="scene_3_screen2_end"/>
+</speak>
+<break time="1s"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ko-KR">
+<voice name="ko-KR-Standard-A">
+<mark name="scene_4_screen1_start"/>
+<prosody rate="medium" pitch="medium">천만에요!</prosody>
+<mark name="scene_4_screen1_end"/>
+</voice>
+<break time="1s"/>
+<mark name="scene_4_screen2_start"/>
+<voice name="cmn-CN-Standard-A">
+<prosody rate="medium" pitch="medium">不客气！</prosody>
+</voice>
+<break time="1s"/>
+<voice name="cmn-CN-Standard-B">
+<prosody rate="medium" pitch="medium">不客气！</prosody>
+</voice>
+<break time="1s"/>
+<voice name="cmn-CN-Standard-C">
+<prosody rate="medium" pitch="medium">不客气！</prosody>
+</voice>
+<break time="1s"/>
+<voice name="cmn-CN-Standard-D">
+<prosody rate="medium" pitch="medium">不客气！</prosody>
+</voice>
+<mark name="scene_4_screen2_end"/>
+</speak>
+<break time="1s"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ko-KR">
+<voice name="ko-KR-Standard-A">
+<mark name="ending_05_start"/>
+<prosody rate="medium" pitch="medium">오늘도 열심히 공부하셨습니다. 다음에 또 만나요!</prosody>
+<mark name="ending_05_end"/>
+</voice>
+</speak>
+</speak>

@@ -1,0 +1,42 @@
+{
+  "project_name": "중국어_학습_대화",
+  "resolution": "1920x1080",
+  "default_background": "#000000",
+  "scenes": [
+    {
+      "id": "dialogue_01",
+      "type": "dialogue",
+      "sequence": 1,
+      "native_script": "안녕하세요!",
+      "learning_script": "你好！"
+    },
+    {
+      "id": "dialogue_02",
+      "type": "dialogue",
+      "sequence": 2,
+      "native_script": "감사합니다.",
+      "learning_script": "谢谢。"
+    },
+    {
+      "id": "dialogue_03",
+      "type": "dialogue",
+      "sequence": 3,
+      "native_script": "이거 얼마예요?",
+      "learning_script": "这个多少钱？"
+    },
+    {
+      "id": "dialogue_04",
+      "type": "dialogue",
+      "sequence": 4,
+      "native_script": "죄송합니다 / 실례합니다.",
+      "learning_script": "对不起 / 不好意思。"
+    },
+    {
+      "id": "dialogue_05",
+      "type": "dialogue",
+      "sequence": 5,
+      "native_script": "안녕히 계세요.",
+      "learning_script": "再见。"
+    }
+  ]
+}

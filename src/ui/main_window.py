@@ -3,6 +3,7 @@ from src import config
 from src.ui.data_tab_view import DataTabView
 from src.ui.speaker_tab_view import SpeakerTabView
 from src.ui.image_tab_view import ImageTabView
+from src.ui.pipeline_tab_view import PipelineTabView
 from src import api_services
 import threading
 import json
@@ -46,6 +47,9 @@ class MainWindow(ctk.CTk):
 
         self.image_button = ctk.CTkButton(self.menu_frame, text="이미지 설정", command=lambda: self._show_page("image"), **button_kwargs)
         self.image_button.pack(side="left", padx=10, pady=10)
+        
+        self.pipeline_button = ctk.CTkButton(self.menu_frame, text="🚀 파이프라인", command=lambda: self._show_page("pipeline"), **button_kwargs)
+        self.pipeline_button.pack(side="left", padx=10, pady=10)
 
         # 텍스트 설정 버튼 제거 (이미지 설정 탭에 통합)
 
@@ -63,6 +67,7 @@ class MainWindow(ctk.CTk):
         self.data_page = DataTabView(self.main_frame, on_language_change=self._update_speaker_tab, root=self)
         self.speaker_page = SpeakerTabView(self.main_frame, root=self)
         self.image_page = ImageTabView(self.main_frame)
+        self.pipeline_page = PipelineTabView(self.main_frame, root=self)
         # MainWindow 참조를 런타임 주입 (구버전 시그니처 호환)
         try:
             self.image_page.root = self
@@ -73,6 +78,7 @@ class MainWindow(ctk.CTk):
         self.pages["data"] = self.data_page
         self.pages["speaker"] = self.speaker_page
         self.pages["image"] = self.image_page
+        self.pages["pipeline"] = self.pipeline_page
         
         
         

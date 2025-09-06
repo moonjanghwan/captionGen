@@ -1,0 +1,115 @@
+{
+  "total_frames": 8,
+  "resolution": "1920x1080",
+  "output_directory": "test_output/중국어_기초_회화_일상_인사말/subtitles",
+  "frames": [
+    {
+      "frame_number": 0,
+      "start_time": 0.0,
+      "end_time": 16.800000000000008,
+      "duration": 16.800000000000008,
+      "scene_id": "intro_01",
+      "screen_type": "intro",
+      "content": [
+        "안녕하세요! 중국어 학습의 문을 열어보겠습니다. 오늘은 '일상생활에서 자주 사용하는 인사말'을 배워보겠습니다."
+      ],
+      "output_path": "test_output/중국어_기초_회화_일상_인사말/subtitles/intro_01_0000.png"
+    },
+    {
+      "frame_number": 1,
+      "start_time": 0.03333333333333333,
+      "end_time": 3.033333333333333,
+      "duration": 3.0,
+      "scene_id": "conversation_02",
+      "screen_type": "screen1",
+      "content": [
+        "2",
+        "안녕하세요!"
+      ],
+      "output_path": "test_output/중국어_기초_회화_일상_인사말/subtitles/conversation_02_screen1_0001.png"
+    },
+    {
+      "frame_number": 2,
+      "start_time": 0.06666666666666667,
+      "end_time": 11.066666666666666,
+      "duration": 11.0,
+      "scene_id": "conversation_02",
+      "screen_type": "screen2",
+      "content": [
+        "2",
+        "안녕하세요!",
+        "你好！",
+        "니하오!"
+      ],
+      "output_path": "test_output/중국어_기초_회화_일상_인사말/subtitles/conversation_02_screen2_0002.png"
+    },
+    {
+      "frame_number": 3,
+      "start_time": 0.1,
+      "end_time": 3.1,
+      "duration": 3.0,
+      "scene_id": "conversation_03",
+      "screen_type": "screen1",
+      "content": [
+        "3",
+        "고맙습니다!"
+      ],
+      "output_path": "test_output/중국어_기초_회화_일상_인사말/subtitles/conversation_03_screen1_0003.png"
+    },
+    {
+      "frame_number": 4,
+      "start_time": 0.13333333333333333,
+      "end_time": 11.133333333333333,
+      "duration": 11.0,
+      "scene_id": "conversation_03",
+      "screen_type": "screen2",
+      "content": [
+        "3",
+        "고맙습니다!",
+        "谢谢！",
+        "씨에씨에!"
+      ],
+      "output_path": "test_output/중국어_기초_회화_일상_인사말/subtitles/conversation_03_screen2_0004.png"
+    },
+    {
+      "frame_number": 5,
+      "start_time": 0.16666666666666666,
+      "end_time": 3.1666666666666665,
+      "duration": 3.0,
+      "scene_id": "conversation_04",
+      "screen_type": "screen1",
+      "content": [
+        "4",
+        "천만에요!"
+      ],
+      "output_path": "test_output/중국어_기초_회화_일상_인사말/subtitles/conversation_04_screen1_0005.png"
+    },
+    {
+      "frame_number": 6,
+      "start_time": 0.2,
+      "end_time": 11.2,
+      "duration": 11.0,
+      "scene_id": "conversation_04",
+      "screen_type": "screen2",
+      "content": [
+        "4",
+        "천만에요!",
+        "不客气！",
+        "부커치!"
+      ],
+      "output_path": "test_output/중국어_기초_회화_일상_인사말/subtitles/conversation_04_screen2_0006.png"
+    },
+    {
+      "frame_number": 7,
+      "start_time": 0.23333333333333334,
+      "end_time": 7.633333333333331,
+      "duration": 7.399999999999999,
+      "scene_id": "ending_05",
+      "screen_type": "ending",
+      "content": [
+        "오늘도 열심히 공부하셨습니다. 다음에 또 만나요!"
+      ],
+      "output_path": "test_output/중국어_기초_회화_일상_인사말/subtitles/ending_05_0007.png"
+    }
+  ]
+}

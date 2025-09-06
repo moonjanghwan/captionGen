@@ -12,3 +12,6 @@ __pycache__/
 # IDE/에디터 설정 파일
 .vscode/
 .idea/
+
+./output/
+./assets/

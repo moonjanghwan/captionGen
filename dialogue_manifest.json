@@ -1,0 +1,47 @@
+{
+  "project_name": "중국어 기초 회화 - 일상 인사말",
+  "resolution": "1920x1080",
+  "default_background": "#000000",
+  "scenes": [
+    {
+      "id": "conversation_01",
+      "type": "conversation",
+      "sequence": 1,
+      "native_script": "안녕하세요!",
+      "learning_script": "你好！",
+      "reading_script": "니하오!"
+    },
+    {
+      "id": "conversation_02",
+      "type": "conversation",
+      "sequence": 2,
+      "native_script": "고맙습니다!",
+      "learning_script": "谢谢！",
+      "reading_script": "씨에씨에!"
+    },
+    {
+      "id": "conversation_03",
+      "type": "conversation",
+      "sequence": 3,
+      "native_script": "천만에요!",
+      "learning_script": "不客气！",
+      "reading_script": "부커치!"
+    },
+    {
+      "id": "conversation_04",
+      "type": "conversation",
+      "sequence": 4,
+      "native_script": "죄송합니다.",
+      "learning_script": "对不起。",
+      "reading_script": "뚜이부치."
+    },
+    {
+      "id": "conversation_05",
+      "type": "conversation",
+      "sequence": 5,
+      "native_script": "괜찮습니다.",
+      "learning_script": "没关系。",
+      "reading_script": "메이꽌시."
+    }
+  ]
+}

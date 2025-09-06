@@ -6,8 +6,8 @@
       "color": "#000000",
       "alpha": "0.2",
       "margin": "2",
-      "type": "색상",
-      "value": "#00A0A0"
+      "type": "이미지",
+      "value": "/Users/janghwanmoon/Projects/captionGen/assets/background/pawel-czerwinski-IeRofQlthaY-unsplash.jpg"
     },
     "shadow": {
       "enabled": true,

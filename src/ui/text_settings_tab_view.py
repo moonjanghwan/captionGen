@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from src import config
 import tkinter as tk
+from src.ui.ui_utils import create_labeled_widget
 
 FONTS = ["KoPubWorldDotum", "KoPubWorldBatang", "Noto Sans KR"]
 
@@ -63,10 +64,34 @@ class TextSettingsTabView(ctk.CTkFrame):
 		container.grid_columnconfigure(0, weight=1)
 		row = ctk.CTkFrame(container, fg_color="transparent")
 		row.pack(fill="x", padx=10, pady=(10, 5))
+
 		# 텍스트 행수/화면비율/해상도 (기본값 포함)
-		self._add_labeled_combo(row, "텍스트 행수", [str(i) for i in range(1, 11)], default=DEFAULTS[tab_name]["텍스트 행수"], width_chars=6)
-		self._add_labeled_combo(row, "화면비율", ["16:9", "9:16", "1:1"], default="16:9", width_chars=10)
-		self._add_labeled_combo(row, "해상도", ["1920x1080", "1080x1920", "1080x1080"], default="1920x1080", width_chars=15)
+		widget_params = {
+			"values": [str(i) for i in range(1, 11)],
+			"fg_color": config.COLOR_THEME["widget"],
+			"text_color": config.COLOR_THEME["text"]
+		}
+		frame, combo = create_labeled_widget(row, "텍스트 행수", 6, "combo", widget_params)
+		combo.set(DEFAULTS[tab_name]["텍스트 행수"])
+		frame.pack(side="left", padx=(0, 8))
+
+		widget_params = {
+			"values": ["16:9", "9:16", "1:1"],
+			"fg_color": config.COLOR_THEME["widget"],
+			"text_color": config.COLOR_THEME["text"]
+		}
+		frame, combo = create_labeled_widget(row, "화면비율", 10, "combo", widget_params)
+		combo.set("16:9")
+		frame.pack(side="left", padx=(0, 8))
+
+		widget_params = {
+			"values": ["1920x1080", "1080x1920", "1080x1080"],
+			"fg_color": config.COLOR_THEME["widget"],
+			"text_color": config.COLOR_THEME["text"]
+		}
+		frame, combo = create_labeled_widget(row, "해상도", 15, "combo", widget_params)
+		combo.set("1920x1080")
+		frame.pack(side="left", padx=(0, 8))
 
 		grid = ctk.CTkFrame(container, fg_color=config.COLOR_THEME["widget"])
 		grid.pack(fill="x", padx=10, pady=(5, 10))
@@ -84,55 +109,29 @@ class TextSettingsTabView(ctk.CTkFrame):
 			rowf = ctk.CTkFrame(grid, fg_color="transparent")
 			rowf.pack(fill="x", padx=10, pady=2)
 			# 행 텍스트
-			self._add_entry(rowf, width_chars=6, center=True, default=values[0])
+			_, entry = create_labeled_widget(rowf, "", 6, "entry", {"justify": "center"})
+			entry.insert(0, values[0])
 			# x, y, w, 크기(pt)
-			self._add_entry(rowf, width_chars=6, center=True, default=values[1])
-			self._add_entry(rowf, width_chars=6, center=True, default=values[2])
-			self._add_entry(rowf, width_chars=6, center=True, default=values[3])
-			self._add_entry(rowf, width_chars=6, center=True, default=values[4])
+			_, entry = create_labeled_widget(rowf, "", 6, "entry", {"justify": "center"})
+			entry.insert(0, values[1])
+			_, entry = create_labeled_widget(rowf, "", 6, "entry", {"justify": "center"})
+			entry.insert(0, values[2])
+			_, entry = create_labeled_widget(rowf, "", 6, "entry", {"justify": "center"})
+			entry.insert(0, values[3])
+			_, entry = create_labeled_widget(rowf, "", 6, "entry", {"justify": "center"})
+			entry.insert(0, values[4])
 			# 폰트(pt)
-			self._add_combo(rowf, FONTS, width_chars=30, center=True, default=values[5])
+			_, combo = create_labeled_widget(rowf, "", 30, "combo", {"values": FONTS, "justify": "center"})
+			combo.set(values[5])
 			# 색상
-			self._add_entry(rowf, width_chars=10, center=True, default=values[6])
+			_, entry = create_labeled_widget(rowf, "", 10, "entry", {"justify": "center"})
+			entry.insert(0, values[6])
 			# 굵기
-			self._add_combo(rowf, ["Light", "Medium", "Bold"], width_chars=8, center=True, default=values[7])
+			_, combo = create_labeled_widget(rowf, "", 8, "combo", {"values": ["Light", "Medium", "Bold"], "justify": "center"})
+			combo.set(values[7])
 			# 좌우 정렬
-			self._add_combo(rowf, ["Left", "Center", "Right"], width_chars=10, center=True, default=values[8])
+			_, combo = create_labeled_widget(rowf, "", 10, "combo", {"values": ["Left", "Center", "Right"], "justify": "center"})
+			combo.set(values[8])
 			# 상하 정렬
-			self._add_combo(rowf, ["Top", "Middle", "Bottom"], width_chars=10, center=True, default=values[9])
-
-	def _add_labeled_combo(self, parent, label, values, default=None, width_chars=8):
-		frame = ctk.CTkFrame(parent, fg_color="transparent")
-		frame.pack(side="left", padx=(0, 8))
-		ctk.CTkLabel(frame, text=label).pack(side="left", padx=(0, 4))
-		combo = ctk.CTkComboBox(frame, values=values, width=width_chars*9,
-						fg_color=config.COLOR_THEME["widget"], text_color=config.COLOR_THEME["text"])
-		combo.pack(side="left")
-		if default:
-			combo.set(default)
-		return combo
-
-	def _add_entry(self, parent, width_chars=8, center=False, default=""):
-		entry = ctk.CTkEntry(parent, width=width_chars*9, fg_color=config.COLOR_THEME["widget"], text_color=config.COLOR_THEME["text"])
-		entry.pack(side="left")
-		if default:
-			entry.insert(0, default)
-		if center:
-			try:
-				entry.configure(justify="center")
-			except Exception:
-				pass
-		return entry
-
-	def _add_combo(self, parent, values, width_chars=8, center=False, default=None):
-		combo = ctk.CTkComboBox(parent, values=values, width=width_chars*9,
-						fg_color=config.COLOR_THEME["widget"], text_color=config.COLOR_THEME["text"])
-		combo.pack(side="left")
-		if default:
-			combo.set(default)
-		if center:
-			try:
-				combo.configure(justify="center")
-			except Exception:
-				pass
-		return combo
+			_, combo = create_labeled_widget(rowf, "", 10, "combo", {"values": ["Top", "Middle", "Bottom"], "justify": "center"})
+			combo.set(values[9])

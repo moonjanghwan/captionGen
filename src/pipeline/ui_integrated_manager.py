@@ -15,7 +15,7 @@ from .utils.progress_logger import ProgressLogger
 from .manifest import ManifestParser
 from .audio import AudioGenerator, SSMLBuilder
 from .subtitle import SubtitleGenerator
-from .ffmpeg import FFmpegRenderer, RenderConfig
+from .ffmpeg import FFmpegRenderer
 
 
 @dataclass

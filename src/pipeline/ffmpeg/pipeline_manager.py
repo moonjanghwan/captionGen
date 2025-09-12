@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from ..manifest import ManifestParser
 from ..audio import AudioGenerator, SSMLBuilder
 from ..subtitle import SubtitleGenerator
-from .renderer import FFmpegRenderer, RenderConfig
+from .renderer import FFmpegRenderer
 
 
 @dataclass

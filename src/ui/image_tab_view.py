@@ -6,6 +6,8 @@ import json
 import glob
 from tkinter import filedialog
 from src.ui.ui_utils import create_labeled_widget
+from src.pipeline.subtitle.generator import SubtitleGenerator # Import SubtitleGenerator
+from PIL import Image, ImageDraw, ImageFont, ImageColor, ImageFilter # Keep PIL imports for _make_base_canvas and other direct uses
 
 
 
@@ -49,7 +51,30 @@ class ImageTabView(ctk.CTkFrame):
         except Exception:
             pass
 
-    def _make_base_canvas(self, width: int, height: int):
+        # Font map for TextRenderer
+        self.font_map = {
+            "Noto Sans KR": os.path.expanduser("~/Library/Fonts/NotoSansKR-Regular.otf"),
+            "KoPubWorld돋움체": os.path.expanduser("~/Library/Fonts/KoPubWorld Dotum Medium.ttf"),
+            "KoPubWorld바탕체": os.path.expanduser("~/Library/Fonts/KoPubWorld Batang Medium.ttf")
+        }
+
+    def _get_subtitle_generator(self) -> SubtitleGenerator:
+        """Helper to get an instance of SubtitleGenerator with current settings."""
+        if not getattr(self, 'root', None) or not getattr(self.root, 'data_page', None):
+            self._log_json("[오류] SubtitleGenerator 초기화 실패: root 또는 data_page를 찾을 수 없습니다.")
+            raise RuntimeError("Root or data_page not found.")
+        
+        project_name = self.root.data_page.project_name_var.get()
+        identifier = self.root.data_page.identifier_var.get()
+        
+        all_settings = self.get_all_settings()
+        
+        # Pass the font map to TextRenderer settings
+        all_settings["fonts"] = self.font_map
+
+        return SubtitleGenerator(settings=all_settings, identifier=identifier, log_callback=self._log_json)
+
+        def _make_base_canvas(self, width: int, height: int):
         try:
             kind = (self.bg_type_var.get() or "").strip()
             value = (self.w_bg_value.get() or "").strip()
@@ -469,228 +494,71 @@ class ImageTabView(ctk.CTkFrame):
             if not getattr(self, 'root', None):
                 print("[미리보기] root 미연결 - 종료")
                 return
+            
             project_name = self.root.data_page.project_name_var.get()
             identifier = self.root.data_page.identifier_var.get()
             out_dir = os.path.join(config.OUTPUT_PATH, project_name, identifier)
-            print(f"[미리보기] project={project_name}, identifier={identifier}")
-            print(f"[미리보기] out_dir={out_dir}")
             os.makedirs(out_dir, exist_ok=True)
+            
             data = getattr(self.root.data_page, 'generated_data', None) or {}
             dialogue_csv = (data.get('fullVideoScript') or {}).get('dialogueCsv') or data.get('dialogueCsv')
+            
             if not dialogue_csv:
                 self._log_json('[미리보기] dialogueCsv가 없습니다. 데이터 생성/읽기를 먼저 수행하세요.')
                 print('[미리보기] dialogueCsv 없음 - 종료')
                 return
-            from PIL import Image, ImageDraw, ImageFont, ImageColor
-            lines = [row for row in dialogue_csv.splitlines() if row.strip()][1:]
-            print(f"[미리보기] CSV 라인 수(헤더 제외)={len(lines)}")
+
+            subtitle_generator = self._get_subtitle_generator()
+            
+            # Generate conversation frames
             dialog_dir = os.path.join(out_dir, 'dialog')
             os.makedirs(dialog_dir, exist_ok=True)
-            width, height = 1920, 1080
-            try:
-                font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial Unicode.ttf", 64)
-            except Exception:
-                font = ImageFont.load_default()
-            # 회화 설정: 현재 UI 값을 사용
-            try:
-                conv_cfg = (self.text_tabs.get("회화 설정").get_settings() if hasattr(self, 'text_tabs') and self.text_tabs.get("회화 설정") else (self.default_text_configs or {}).get("회화 설정", {}))
-            except Exception:
-                conv_cfg = (self.default_text_configs or {}).get("회화 설정", {})
-            rows_cfg = conv_cfg.get("rows", [])
-            row_map = {str(r.get("행", "")): r for r in rows_cfg}
-            print("[미리보기] 회화 설정 로우 구성:")
-            for k in ["순번","원어","학습어","읽기"]:
-                cfg = row_map.get(k, {})
-                print(f"  - {k}: x={cfg.get('x')} y={cfg.get('y')} w={cfg.get('w')} size={cfg.get('크기(pt)')} font={cfg.get('폰트(pt)')} color={cfg.get('색상')} align=({cfg.get('좌우 정렬')},{cfg.get('상하 정렬')})")
+            
+            # Parse dialogue_csv
+            import csv, io as _io
+            reader = csv.reader(_io.StringIO(dialogue_csv))
+            entries = list(reader)
+            if entries and [c.strip('"') for c in entries[0][:4]] == ["순번","원어","학습어","읽기"]:
+                entries = entries[1:]
 
-            use_section_background = self.section_checkbox_var.get()
-
-            def draw_label(img, draw, label_name, text, use_section_background):
-                cfg = row_map.get(label_name, {})
-                # 좌표/폭/크기/색상/정렬
-                try:
-                    x = int(cfg.get("x", 100))
-                except Exception:
-                    x = 100
-                try:
-                    y = int(cfg.get("y", 100))
-                except Exception:
-                    y = 100
-                try:
-                    w = int(cfg.get("w", 1720))
-                except Exception:
-                    w = 1720
-                try:
-                    size = int(cfg.get("크기(pt)", 64))
-                except Exception:
-                    size = 64
-                color_hex = cfg.get("색상", "#FFFFFF")
-                align_h = cfg.get("좌우 정렬", "Left")
-                align_v = cfg.get("상하 정렬", "Top")
-                font_name = cfg.get("폰트(pt)")
-
-                # 행별 효과 온오프
-                def as_bool(v):
-                    try:
-                        return str(v).strip().lower() in ["true", "1", "yes", "y"]
-                    except Exception:
-                        return False
-                row_bg = as_bool(cfg.get("바탕", "False"))
-                row_shadow = as_bool(cfg.get("쉐도우", "False"))
-                row_border = as_bool(cfg.get("외곽선", "False"))
+            conversation_settings = self.get_all_settings()["tabs"]["회화 설정"]
+            
+            # Assuming a simple scene structure for conversation frames
+            # Each row in CSV becomes a "scene" for conversation generation
+            conversation_scenes = []
+            for idx, row in enumerate(entries):
+                cols = [c.strip('"') for c in row]
+                seq = cols[0] if len(cols) > 0 else ''
+                native = cols[1] if len(cols) > 1 else ''
+                learning = cols[2] if len(cols) > 2 else ''
+                reading = cols[3] if len(cols) > 3 else ''
                 
-                font_path = self.root.image_page.font_map.get(font_name)
-                try:
-                    fnt = ImageFont.truetype(font_path, size) if font_path else ImageFont.load_default()
-                except Exception:
-                    fnt = ImageFont.load_default()
-                # 색상 변환
-                try:
-                    col = ImageColor.getrgb(color_hex)
-                except Exception:
-                    col = (255,255,255)
-                # 쉐도우/외곽선 (행 체크박스 기준만 사용)
-                shadow_px = int(self.w_shadow_thick.get() or 0) if row_shadow else 0
-                border_px = int(self.w_border_thick.get() or 0) if row_border else 0
-                try:
-                    shadow_col = ImageColor.getrgb(self.w_shadow_color.get()) if shadow_px else (0,0,0)
-                except Exception:
-                    shadow_col = (0,0,0)
-                # 텍스트 크기 측정(정렬 계산용)
-                tw, th = draw.textbbox((0,0), text, font=fnt)[2:]
-                if align_h == "Center":
-                    tx = x + max(0, (w - tw) // 2)
-                elif align_h == "Right":
-                    tx = x + max(0, (w - tw))
-                else:
-                    tx = x
-                if align_v == "Middle":
-                    ty = y - th // 2
-                elif align_v == "Bottom":
-                    ty = y - th
-                else:
-                    ty = y
-                print(f"[draw_label] {label_name}: x={x} y={y} w={w} size={size} color={color_hex} align=({align_h},{align_v}) text='{text[:60]}'")
-                # 텍스트 실제 위치 bbox 계산 (최종 좌표에서의 경계)
-                bbox_l, bbox_t, bbox_r, bbox_b = draw.textbbox((tx, ty), text, font=fnt)
-                bbox_w = bbox_r - bbox_l
-                bbox_h = bbox_b - bbox_t
-                # 텍스트 바탕 박스(여백 포함) 렌더링 - 실제 bbox 기준 (오버레이 합성으로 투명도 보존)
-                if row_bg:
-                    try:
-                        bg_rgb = ImageColor.getrgb(self.w_bg.get())
-                    except Exception:
-                        bg_rgb = (128,128,128)
-                    try:
-                        alpha_px = max(0, min(255, int(float(self.w_alpha.get()) * 255)))
-                    except Exception:
-                        alpha_px = 255
-                    try:
-                        margin_px = int(self.w_margin.get())
-                    except Exception:
-                        margin_px = 0
-                    
-                    if use_section_background:
-                        left = x
-                        top = y
-                        right = x + w
-                        bottom = y + size
-                    else:
-                        left = max(0, bbox_l - margin_px)
-                        top = max(0, bbox_t - margin_px)
-                        right = min(width, bbox_r + margin_px)
-                        bottom = min(height, bbox_b + margin_px)
+                conversation_scenes.append({
+                    "id": f"conversation_{idx+1}",
+                    "type": "conversation",
+                    "content": {
+                        "order": seq,
+                        "native_script": native,
+                        "learning_script": learning,
+                        "reading_script": reading
+                    }
+                })
+            
+            # Call _generate_conversation_frames for each conversation scene
+            frame_counter = 0
+            for scene in conversation_scenes:
+                frames = subtitle_generator._generate_conversation_frames(scene, frame_counter, 30, dialog_dir)
+                frame_counter += len(frames)
 
-                    rect = (int(left), int(top), int(right), int(bottom))
-                    # RGBA 이미지 전제: 오버레이에 그리고 합성
-                    overlay = Image.new('RGBA', (width, height), (0,0,0,0))
-                    o_draw = ImageDraw.Draw(overlay)
-                    o_draw.rectangle(rect, fill=(bg_rgb[0], bg_rgb[1], bg_rgb[2], alpha_px))
-                    img.alpha_composite(overlay)
-                    print(f"[bg-box] rect={rect} bbox={(bbox_l,bbox_t,bbox_r,bbox_b)} size={(bbox_w,bbox_h)} color={self.w_bg.get()} alpha={self.w_alpha.get()} margin={self.w_margin.get()}")
-                # 쉐도우: 블러/오프셋/알파 적용
-                if shadow_px:
-                    try:
-                        from PIL import ImageFilter
-                        try:
-                            blur = max(0, int(float(self.w_shadow_blur.get())))
-                        except Exception:
-                            blur = 0
-                        # 블러 사용 여부 적용
-                        try:
-                            if hasattr(self, 'shadow_blur_enabled') and (not bool(self.shadow_blur_enabled.get())):
-                                blur = 0
-                        except Exception:
-                            pass
-                        try:
-                            offx = int(float(self.w_shadow_offx.get()))
-                            offy = int(float(self.w_shadow_offy.get()))
-                        except Exception:
-                            offx, offy = shadow_px, shadow_px
-                        try:
-                            s_alpha = max(0, min(255, int(float(self.w_shadow_alpha.get()) * 255)))
-                        except Exception:
-                            s_alpha = 153
-                        # 최소 bbox 오버레이 생성
-                        margin = max(shadow_px, blur) * 3
-                        ox1, oy1 = max(0, tx - margin), max(0, ty - margin)
-                        ox2, oy2 = min(width, tx + tw + margin), min(height, ty + th + margin)
-                        overlay = Image.new('RGBA', (max(1, ox2-ox1), max(1, oy2-oy1)), (0,0,0,0))
-                        o_draw = ImageDraw.Draw(overlay)
-                        o_draw.text(((tx+offx)-ox1, (ty+offy)-oy1), text, fill=(shadow_col[0], shadow_col[1], shadow_col[2], s_alpha), font=fnt, stroke_width=0)
-                        if blur > 0:
-                            overlay = overlay.filter(ImageFilter.GaussianBlur(radius=blur))
-                        img.alpha_composite(overlay, (ox1, oy1))
-                    except Exception:
-                        # 폴백: 단순 오프셋 그림자
-                        draw.text((tx+shadow_px, ty+shadow_px), text, fill=shadow_col, font=fnt)
-                # 외곽 포함 본문
-                try:
-                    draw.text((tx, ty), text, fill=col, font=fnt, stroke_width=border_px, stroke_fill=self.w_border_color.get())
-                except Exception:
-                    draw.text((tx, ty), text, fill=col, font=fnt)
-            for idx, row in enumerate(lines, start=1):
-                try:
-                    cols = [c.strip('"') for c in row.split(',')]
-                    seq = cols[0] if len(cols) > 0 else ''
-                    native = cols[1] if len(cols) > 1 else ''
-                    learning = cols[2] if len(cols) > 2 else ''
-                    reading = cols[3] if len(cols) > 3 else ''
-                except Exception:
-                    continue
-                print(f"[row] idx={idx} seq='{seq}' 원어='{native[:60]}' 학습어='{learning[:60]}' 읽기='{reading[:60]}'")
-                print(f"[공통] bg_color={self.w_bg.get()} alpha={self.w_alpha.get()} margin={self.w_margin.get()} shadow_thick={self.w_shadow_thick.get()} shadow_color={self.w_shadow_color.get()} border_thick={self.w_border_thick.get()} border_color={self.w_border_color.get()}")
-                img1 = self._make_base_canvas(width, height)
-                d1 = ImageDraw.Draw(img1)
-                draw_label(img1, d1, "순번", f"{seq}", use_section_background)
-                draw_label(img1, d1, "원어", native, use_section_background)
-                save1 = os.path.join(dialog_dir, f"{identifier}_{idx:03d}_a.png")
-                img1.save(save1)
-                print(f"[save] {save1}")
-                img2 = self._make_base_canvas(width, height)
-                d2 = ImageDraw.Draw(img2)
-                draw_label(img2, d2, "순번", f"{seq}", use_section_background)
-                draw_label(img2, d2, "원어", native, use_section_background)
-                draw_label(img2, d2, "학습어", learning, use_section_background)
-                draw_label(img2, d2, "읽기", reading, use_section_background)
-                save2 = os.path.join(dialog_dir, f"{identifier}_{idx:03d}_b.png")
-                img2.save(save2)
-                print(f"[save] {save2}")
-            # 썸네일 미리보기 생성
-            try:
-                self.generate_thumbnail_images()
-            except Exception as e:
-                print(f"[썸네일 미리보기 오류] {e}")
-            # 인트로 이미지 생성
-            try:
-                self.generate_intro_images()
-            except Exception as e:
-                print(f"[인트로 미리보기 오류] {e}")
-            # 엔딩 이미지 생성
-            try:
-                self.generate_ending_images()
-            except Exception as e:
-                print(f"[엔딩 미리보기 오류] {e}")
+            # Generate thumbnail images
+            self.generate_thumbnail_images()
+            
+            # Generate intro images
+            self.generate_intro_images()
+            
+            # Generate ending images
+            self.generate_ending_images()
+            
             print("[미리보기] 완료")
         except Exception as e:
             try:
@@ -703,640 +571,91 @@ class ImageTabView(ctk.CTkFrame):
         """썸네일 설정과 AI 데이터의 thumbnailTextVersions를 사용해 썸네일 이미지를 생성합니다."""
         if not getattr(self, 'root', None):
             return
+        
         project_name = self.root.data_page.project_name_var.get()
         identifier = self.root.data_page.identifier_var.get()
         out_dir = os.path.join(config.OUTPUT_PATH, project_name, identifier)
-        thumb_dir = os.path.join(out_dir, 'thumbnail')
-        os.makedirs(thumb_dir, exist_ok=True)
-        data = getattr(self.root.data_page, 'generated_data', None) or {}
-        versions = data.get('thumbnailTextVersions') or []
-        if not versions:
-            self._log_json('[썸네일] thumbnailTextVersions가 없습니다.')
-            print('[썸네일] thumbnailTextVersions 없음')
-            return
-        # 썸네일 설정 탭 구성 사용
+        
+        thumbnail_settings = self.get_all_settings()["tabs"]["썸네일 설정"]
+        
         try:
-            thumb_cfg = (self.text_tabs.get("썸네일 설정").get_settings() if hasattr(self, 'text_tabs') and self.text_tabs.get("썸네일 설정") else (self.default_text_configs or {}).get("썸네일 설정", {}))
-        except Exception:
-            thumb_cfg = (self.default_text_configs or {}).get("썸네일 설정", {})
-        rows_cfg = thumb_cfg.get("rows", [])
-        row_map = {str(r.get("행", "")): r for r in rows_cfg}
-        print("[썸네일] 설정 로우 구성:")
-        for k in ["1행","2행","3행","4행"]:
-            cfg = row_map.get(k, {})
-            print(f"  - {k}: x={cfg.get('x')} y={cfg.get('y')} w={cfg.get('w')} size={cfg.get('크기(pt)')} font={cfg.get('폰트(pt)')} color={cfg.get('색상')} align=({cfg.get('좌우 정렬')},{cfg.get('상하 정렬')})")
-        from PIL import Image, ImageDraw, ImageFont, ImageColor
-        # 공통 캔버스 크기 (해상도 파싱)
-        res_text = thumb_cfg.get('해상도') or '1920x1080'
-        try:
-            width, height = [int(v) for v in res_text.lower().split('x')[:2]]
-        except Exception:
-            width, height = 1920, 1080
-
-        def as_bool(v):
-            try:
-                return str(v).strip().lower() in ["true","1","yes","y"]
-            except Exception:
-                return False
-
-        def draw_label(img, draw, label_name, text):
-            cfg = row_map.get(label_name, {})
-            try:
-                x = int(cfg.get("x", 100))
-            except Exception:
-                x = 100
-            try:
-                y = int(cfg.get("y", 100))
-            except Exception:
-                y = 100
-            try:
-                w = int(cfg.get("w", 1720))
-            except Exception:
-                w = 1720
-            try:
-                size = int(cfg.get("크기(pt)", 64))
-            except Exception:
-                size = 64
-            color_hex = cfg.get("색상", "#FFFFFF")
-            align_h = cfg.get("좌우 정렬", "Left")
-            align_v = cfg.get("상하 정렬", "Top")
-            row_bg = as_bool(cfg.get("바탕", "False"))
-            row_shadow = as_bool(cfg.get("쉐도우", "False"))
-            row_border = as_bool(cfg.get("외곽선", "False"))
-            # 폰트 로딩 함수
-            def load_font(px):
-                try:
-                    return ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial Unicode.ttf", px)
-                except Exception:
-                    return ImageFont.load_default()
-            fnt = load_font(size)
-            try:
-                col = ImageColor.getrgb(color_hex)
-            except Exception:
-                col = (255,255,255)
-            # 쉐도우/외곽선 픽셀
-            shadow_px = int(self.w_shadow_thick.get() or 0) if row_shadow else 0
-            border_px = int(self.w_border_thick.get() or 0) if row_border else 0
-            try:
-                shadow_col = ImageColor.getrgb(self.w_shadow_color.get()) if shadow_px else (0,0,0)
-            except Exception:
-                shadow_col = (0,0,0)
-            # 사이즈 자동 축소: 텍스트 폭이 w를 넘으면 줄어들 때까지 감소
-            try:
-                min_size = max(16, int(size * 0.5))
-            except Exception:
-                min_size = 16
-            tw, th = draw.textbbox((0,0), text, font=fnt)[2:]
-            while tw > w and size > min_size:
-                size = max(min_size, size - 4)
-                fnt = load_font(size)
-                tw, th = draw.textbbox((0,0), text, font=fnt)[2:]
-            # 정렬 보정 좌표
-            if align_h == "Center":
-                tx = x + max(0, (w - tw) // 2)
-            elif align_h == "Right":
-                tx = x + max(0, (w - tw))
-            else:
-                tx = x
-            if align_v == "Middle":
-                ty = y - th // 2
-            elif align_v == "Bottom":
-                ty = y - th
-            else:
-                ty = y
-            # bbox
-            bbox_l, bbox_t, bbox_r, bbox_b = draw.textbbox((tx, ty), text, font=fnt)
-            # 바탕 박스
-            if row_bg:
-                try:
-                    bg_rgb = ImageColor.getrgb(self.w_bg.get())
-                except Exception:
-                    bg_rgb = (128,128,128)
-                try:
-                    alpha_px = max(0, min(255, int(float(self.w_alpha.get()) * 255)))
-                except Exception:
-                    alpha_px = 255
-                try:
-                    margin_px = int(self.w_margin.get())
-                except Exception:
-                    margin_px = 0
-                left = max(0, bbox_l - margin_px)
-                top = max(0, bbox_t - margin_px)
-                right = min(width, bbox_r + margin_px)
-                bottom = min(height, bbox_b + margin_px)
-                overlay = Image.new('RGBA', (width, height), (0,0,0,0))
-                o_draw = ImageDraw.Draw(overlay)
-                o_draw.rectangle((left, top, right, bottom), fill=(bg_rgb[0], bg_rgb[1], bg_rgb[2], alpha_px))
-                img.alpha_composite(overlay)
-            # 쉐도우(블러 지원)
-            if shadow_px:
-                try:
-                    from PIL import ImageFilter
-                    try:
-                        blur = max(0, int(float(self.w_shadow_blur.get())))
-                    except Exception:
-                        blur = 0
-                    try:
-                        if hasattr(self, 'shadow_blur_enabled') and (not bool(self.shadow_blur_enabled.get())):
-                            blur = 0
-                    except Exception:
-                        pass
-                    try:
-                        offx = int(float(self.w_shadow_offx.get()))
-                        offy = int(float(self.w_shadow_offy.get()))
-                    except Exception:
-                        offx, offy = shadow_px, shadow_px
-                    try:
-                        s_alpha = max(0, min(255, int(float(self.w_shadow_alpha.get()) * 255)))
-                    except Exception:
-                        s_alpha = 153
-                    margin = max(shadow_px, blur) * 3
-                    ox1, oy1 = max(0, tx - margin), max(0, ty - margin)
-                    ox2, oy2 = min(width, tx + tw + margin), min(height, ty + th + margin)
-                    overlay = Image.new('RGBA', (max(1, ox2-ox1), max(1, oy2-oy1)), (0,0,0,0))
-                    o_draw = ImageDraw.Draw(overlay)
-                    o_draw.text(((tx+offx)-ox1, (ty+offy)-oy1), text, fill=(shadow_col[0], shadow_col[1], shadow_col[2], s_alpha), font=fnt)
-                    if blur > 0:
-                        overlay = overlay.filter(ImageFilter.GaussianBlur(radius=blur))
-                    img.alpha_composite(overlay, (ox1, oy1))
-                except Exception:
-                    draw.text((tx+shadow_px, ty+shadow_px), text, fill=shadow_col, font=fnt)
-            # 본문
-            try:
-                draw.text((tx, ty), text, fill=col, font=fnt, stroke_width=border_px, stroke_fill=self.w_border_color.get())
-            except Exception:
-                draw.text((tx, ty), text, fill=col, font=fnt)
-
-        # 최대 3세트 생성
-        for idx, ver in enumerate(versions[:3], start=1):
-            text = (ver or {}).get('text') or ''
-            # 4줄로 분해(부족하면 빈 문자열)
-            lines = [ln.strip() for ln in (text.splitlines() if isinstance(text, str) else []) if ln.strip()]
-            # 출력 로그
-            print(f"[썸네일] 버전 {idx}: 줄 수={len(lines)}")
-            for i, ln in enumerate(lines[:4], start=1):
-                print(f"  [L{i}] {ln}")
-            img = self._make_base_canvas(width, height)
-            d = ImageDraw.Draw(img)
-            # 1~4행 매핑하여 그리기
-            for i in range(1,5):
-                label = f"{i}행"
-                txt = lines[i-1] if i-1 < len(lines) else ''
-                if not txt:
-                    continue
-                draw_label(img, d, label, txt)
-            savep = os.path.join(thumb_dir, f"thumbnail_{idx}.jpg")
-            try:
-                img.convert('RGB').save(savep, quality=92)
-            except Exception:
-                img.save(savep.replace('.jpg', '.png'))
-            print(f"[썸네일 저장] {savep}")
+            subtitle_generator = self._get_subtitle_generator()
+            subtitle_generator.generate_thumbnail_frames(project_name, identifier, out_dir, thumbnail_settings)
+            self._log_json('[썸네일] 생성 완료')
+            print('[썸네일] 생성 완료')
+        except Exception as e:
+            self._log_json(f'[썸네일 오류] {e}')
+            print(f'[썸네일 오류] {e}')
 
     def generate_intro_images(self):
         """인트로 설정과 introScript를 사용해 인트로 이미지를 생성합니다."""
         if not getattr(self, 'root', None):
             return
+        
         project_name = self.root.data_page.project_name_var.get()
         identifier = self.root.data_page.identifier_var.get()
         out_dir = os.path.join(config.OUTPUT_PATH, project_name, identifier)
-        intro_dir = os.path.join(out_dir, 'intro')
-        os.makedirs(intro_dir, exist_ok=True)
-        data = getattr(self.root.data_page, 'generated_data', None) or {}
-        intro_text = (data.get('introScript') or '').strip()
+        
+        intro_text = (self.root.data_page.generated_data.get('introScript') or '').strip()
         if not intro_text:
             self._log_json('[인트로] introScript가 없습니다.')
             print('[인트로] introScript 없음')
             return
-        # 인트로 설정 읽기
+        
+        intro_settings = self.get_all_settings()["tabs"]["인트로 설정"]
+        
         try:
-            intro_cfg = (self.text_tabs.get("인트로 설정").get_settings() if hasattr(self, 'text_tabs') and self.text_tabs.get("인트로 설정") else (self.default_text_configs or {}).get("인트로 설정", {}))
-        except Exception:
-            intro_cfg = (self.default_text_configs or {}).get("인트로 설정", {})
-        rows_cfg = intro_cfg.get("rows", [])
-        if not rows_cfg:
-            print('[인트로] 설정 로우가 없습니다.')
-            return
-        row = rows_cfg[0]
-        from PIL import Image, ImageDraw, ImageFont, ImageColor, ImageFilter
-        # 해상도
-        res_text = intro_cfg.get('해상도') or '1920x1080'
-        try:
-            width, height = [int(v) for v in res_text.lower().split('x')[:2]]
-        except Exception:
-            width, height = 1920, 1080
-
-        def as_bool(v):
-            try:
-                return str(v).strip().lower() in ["true","1","yes","y"]
-            except Exception:
-                return False
-
-        # 설정 파싱
-        try:
-            x = int(row.get("x", 100))
-        except Exception:
-            x = 100
-        try:
-            y = int(row.get("y", 100))
-        except Exception:
-            y = 100
-        try:
-            w = int(row.get("w", 1720))
-        except Exception:
-            w = 1720
-        try:
-            size_base = int(row.get("크기(pt)", 64))
-        except Exception:
-            size_base = 64
-        color_hex = row.get("색상", "#FFFFFF")
-        align_h = row.get("좌우 정렬", "Left")
-        align_v = row.get("상하 정렬", "Top")
-        row_bg = as_bool(row.get("바탕", "False"))
-        row_shadow = as_bool(row.get("쉐도우", "False"))
-        row_border = as_bool(row.get("외곽선", "False"))
-
-        def load_font(px):
-            try:
-                return ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial Unicode.ttf", px)
-            except Exception:
-                return ImageFont.load_default()
-
-        # 문장 분리 (마침표/물음표/느낌표 포함 후 분리)
-        import re
-        sentences = [p.strip() for p in re.split(r"(?<=[\.!\?。？！])\s+", intro_text) if p.strip()]
-        print(f"[인트로] 문장 수={len(sentences)}")
-
-        def wrap_text(draw, text, font, max_w):
-            # 공백 기준 우선, 없으면 문자 단위로 줄바꿈
-            lines = []
-            if not text:
-                return lines
-            tokens = text.split(' ')
-            if len(tokens) == 1:
-                # 공백이 거의 없는 경우(한글/중문): 문자 단위
-                cur = ''
-                for ch in text:
-                    test = cur + ch
-                    tw, _ = draw.textbbox((0,0), test, font=font)[2:]
-                    if tw <= max_w:
-                        cur = test
-                    else:
-                        if cur:
-                            lines.append(cur)
-                        cur = ch
-                if cur:
-                    lines.append(cur)
-                return lines
-            # 단어 단위 래핑
-            cur = ''
-            for t in tokens:
-                test = (cur + ' ' + t).strip()
-                tw, _ = draw.textbbox((0,0), test, font=font)[2:]
-                if not cur or tw <= max_w:
-                    cur = test
-                else:
-                    lines.append(cur)
-                    cur = t
-            if cur:
-                lines.append(cur)
-            return lines
-
-        for idx, s in enumerate(sentences, start=1):
-            img = self._make_base_canvas(width, height)
-            d = ImageDraw.Draw(img)
-            # 기본 폰트 및 색상
-            fnt = load_font(size_base)
-            try:
-                col = ImageColor.getrgb(color_hex)
-            except Exception:
-                col = (255,255,255)
-            # 래핑 라인 계산 (폰트 자동 축소 적용)
-            size = size_base
-            min_size = max(16, int(size_base * 0.5))
-            lines = wrap_text(d, s, fnt, w)
-            while any(d.textbbox((0,0), ln, font=fnt)[2] > w for ln in lines) and size > min_size:
-                size = max(min_size, size - 4)
-                fnt = load_font(size)
-                lines = wrap_text(d, s, fnt, w)
-            # 총 높이 계산 (라인 간격 1.25)
-            line_h = d.textbbox((0,0), 'Ag', font=fnt)[3]
-            spacing = max(1, int(line_h * 0.25))
-            total_h = 0
-            bboxes = []
-            for ln in lines:
-                lb = d.textbbox((0,0), ln, font=fnt)
-                bboxes.append(lb)
-                total_h += (lb[3] - lb[1]) + spacing
-            if bboxes:
-                total_h -= spacing
-            # 시작 y 계산 (상하 정렬)
-            if align_v == 'Middle':
-                # 전체 캔버스 기준 세로 중앙 배치
-                sy = max(0, (height - total_h) // 2)
-            elif align_v == 'Bottom':
-                sy = y - total_h
-            else:
-                sy = y
-            # 각 라인 렌더링
-            cy = sy
-            for i, ln in enumerate(lines):
-                tw = d.textbbox((0,0), ln, font=fnt)[2]
-                if align_h == 'Center':
-                    tx = x + max(0, (w - tw)//2)
-                elif align_h == 'Right':
-                    tx = x + max(0, (w - tw))
-                else:
-                    tx = x
-                # 바탕 박스(라인별)
-                if row_bg:
-                    try:
-                        bg_rgb = ImageColor.getrgb(self.w_bg.get())
-                    except Exception:
-                        bg_rgb = (128,128,128)
-                    try:
-                        alpha_px = max(0, min(255, int(float(self.w_alpha.get()) * 255)))
-                    except Exception:
-                        alpha_px = 255
-                    try:
-                        margin_px = int(self.w_margin.get())
-                    except Exception:
-                        margin_px = 0
-                    lb = d.textbbox((tx, cy), ln, font=fnt)
-                    overlay = Image.new('RGBA', (width, height), (0,0,0,0))
-                    o_draw = ImageDraw.Draw(overlay)
-                    o_draw.rectangle((max(0, lb[0]-margin_px), max(0, lb[1]-margin_px), min(width, lb[2]+margin_px), min(height, lb[3]+margin_px)),
-                                     fill=(bg_rgb[0], bg_rgb[1], bg_rgb[2], alpha_px))
-                    img.alpha_composite(overlay)
-                # 쉐도우(블러)
-                if row_shadow:
-                    try:
-                        shadow_px = int(self.w_shadow_thick.get() or 0)
-                    except Exception:
-                        shadow_px = 0
-                    if shadow_px:
-                        try:
-                            blur = max(0, int(float(self.w_shadow_blur.get())))
-                        except Exception:
-                            blur = 0
-                        try:
-                            if hasattr(self, 'shadow_blur_enabled') and (not bool(self.shadow_blur_enabled.get())):
-                                blur = 0
-                        except Exception:
-                            pass
-                        try:
-                            offx = int(float(self.w_shadow_offx.get()))
-                            offy = int(float(self.w_shadow_offy.get()))
-                        except Exception:
-                            offx, offy = shadow_px, shadow_px
-                        try:
-                            s_alpha = max(0, min(255, int(float(self.w_shadow_alpha.get()) * 255)))
-                        except Exception:
-                            s_alpha = 153
-                        try:
-                            shadow_col = ImageColor.getrgb(self.w_shadow_color.get())
-                        except Exception:
-                            shadow_col = (0,0,0)
-                        lb = d.textbbox((tx, cy), ln, font=fnt)
-                        margin = max(shadow_px, blur) * 3
-                        ox1, oy1 = max(0, lb[0] - margin), max(0, lb[1] - margin)
-                        ox2, oy2 = min(width, lb[2] + margin), min(height, lb[3] + margin)
-                        overlay = Image.new('RGBA', (max(1, ox2-ox1), max(1, oy2-oy1)), (0,0,0,0))
-                        o_draw = ImageDraw.Draw(overlay)
-                        o_draw.text(((tx+offx)-ox1, (cy+offy)-oy1), ln, fill=(shadow_col[0], shadow_col[1], shadow_col[2], s_alpha), font=fnt)
-                        if blur > 0:
-                            overlay = overlay.filter(ImageFilter.GaussianBlur(radius=blur))
-                        img.alpha_composite(overlay, (ox1, oy1))
-                # 본문
-                try:
-                    border_px = int(self.w_border_thick.get() or 0) if row_border else 0
-                except Exception:
-                    border_px = 0
-                try:
-                    d.text((tx, cy), ln, fill=col, font=fnt, stroke_width=border_px, stroke_fill=self.w_border_color.get())
-                except Exception:
-                    d.text((tx, cy), ln, fill=col, font=fnt)
-                cy += (d.textbbox((0,0), ln, font=fnt)[3] - d.textbbox((0,0), ln, font=fnt)[1]) + spacing
-            savep = os.path.join(intro_dir, f"intro_{idx:03d}.png")
-            img.save(savep)
-            print(f"[인트로 저장] {savep}")
+            subtitle_generator = self._get_subtitle_generator()
+            # Create a dummy scene for intro generation
+            intro_scene = {
+                "id": "intro_scene",
+                "type": "intro",
+                "content": {
+                    "script": intro_text
+                }
+            }
+            # _generate_intro_ending_frames expects a scene dict
+            subtitle_generator._generate_intro_ending_frames(intro_scene, 0, 30, os.path.join(out_dir, "intro"))
+            self._log_json('[인트로] 생성 완료')
+            print('[인트로] 생성 완료')
+        except Exception as e:
+            self._log_json(f'[인트로 오류] {e}')
+            print(f'[인트로 오류] {e}')
 
     def generate_ending_images(self):
         """엔딩 설정과 endingScript를 사용해 엔딩 이미지를 생성합니다."""
         if not getattr(self, 'root', None):
             return
+        
         project_name = self.root.data_page.project_name_var.get()
         identifier = self.root.data_page.identifier_var.get()
         out_dir = os.path.join(config.OUTPUT_PATH, project_name, identifier)
-        ending_dir = os.path.join(out_dir, 'ending')
-        os.makedirs(ending_dir, exist_ok=True)
-        data = getattr(self.root.data_page, 'generated_data', None) or {}
-        ending_text = (data.get('endingScript') or '').strip()
+        
+        ending_text = (self.root.data_page.generated_data.get('endingScript') or '').strip()
         if not ending_text:
             self._log_json('[엔딩] endingScript가 없습니다.')
             print('[엔딩] endingScript 없음')
             return
-        # 엔딩 설정 읽기
+        
+        ending_settings = self.get_all_settings()["tabs"]["엔딩 설정"]
+        
         try:
-            ending_cfg = (self.text_tabs.get("엔딩 설정").get_settings() if hasattr(self, 'text_tabs') and self.text_tabs.get("엔딩 설정") else (self.default_text_configs or {}).get("엔딩 설정", {}))
-        except Exception:
-            ending_cfg = (self.default_text_configs or {}).get("엔딩 설정", {})
-        rows_cfg = ending_cfg.get("rows", [])
-        if not rows_cfg:
-            print('[엔딩] 설정 로우가 없습니다.')
-            return
-        row = rows_cfg[0]
-        from PIL import Image, ImageDraw, ImageFont, ImageColor, ImageFilter
-        # 해상도
-        res_text = ending_cfg.get('해상도') or '1920x1080'
-        try:
-            width, height = [int(v) for v in res_text.lower().split('x')[:2]]
-        except Exception:
-            width, height = 1920, 1080
-
-        def as_bool(v):
-            try:
-                return str(v).strip().lower() in ["true","1","yes","y"]
-            except Exception:
-                return False
-
-        # 설정 파싱
-        try:
-            x = int(row.get("x", 100))
-        except Exception:
-            x = 100
-        try:
-            y = int(row.get("y", 100))
-        except Exception:
-            y = 100
-        try:
-            w = int(row.get("w", 1720))
-        except Exception:
-            w = 1720
-        try:
-            size_base = int(row.get("크기(pt)", 64))
-        except Exception:
-            size_base = 64
-        color_hex = row.get("색상", "#FFFFFF")
-        align_h = row.get("좌우 정렬", "Left")
-        align_v = row.get("상하 정렬", "Top")
-        row_bg = as_bool(row.get("바탕", "False"))
-        row_shadow = as_bool(row.get("쉐도우", "False"))
-        row_border = as_bool(row.get("외곽선", "False"))
-
-        def load_font(px):
-            try:
-                return ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial Unicode.ttf", px)
-            except Exception:
-                return ImageFont.load_default()
-
-        # 문장 분리
-        import re
-        sentences = [p.strip() for p in re.split(r"(?<=[\.!\?。？！])\s+", ending_text) if p.strip()]
-        print(f"[엔딩] 문장 수={len(sentences)}")
-
-        def wrap_text(draw, text, font, max_w):
-            lines = []
-            if not text:
-                return lines
-            tokens = text.split(' ')
-            if len(tokens) == 1:
-                cur = ''
-                for ch in text:
-                    test = cur + ch
-                    tw, _ = draw.textbbox((0,0), test, font=font)[2:]
-                    if tw <= max_w:
-                        cur = test
-                    else:
-                        if cur:
-                            lines.append(cur)
-                        cur = ch
-                if cur:
-                    lines.append(cur)
-                return lines
-            cur = ''
-            for t in tokens:
-                test = (cur + ' ' + t).strip()
-                tw, _ = draw.textbbox((0,0), test, font=font)[2:]
-                if not cur or tw <= max_w:
-                    cur = test
-                else:
-                    lines.append(cur)
-                    cur = t
-            if cur:
-                lines.append(cur)
-            return lines
-
-        for idx, s in enumerate(sentences, start=1):
-            img = self._make_base_canvas(width, height)
-            d = ImageDraw.Draw(img)
-            fnt = load_font(size_base)
-            try:
-                col = ImageColor.getrgb(color_hex)
-            except Exception:
-                col = (255,255,255)
-            size = size_base
-            min_size = max(16, int(size_base * 0.5))
-            lines = wrap_text(d, s, fnt, w)
-            while any(d.textbbox((0,0), ln, font=fnt)[2] > w for ln in lines) and size > min_size:
-                size = max(min_size, size - 4)
-                fnt = load_font(size)
-                lines = wrap_text(d, s, fnt, w)
-            line_h = d.textbbox((0,0), 'Ag', font=fnt)[3]
-            spacing = max(1, int(line_h * 0.25))
-            total_h = 0
-            for ln in lines:
-                lb = d.textbbox((0,0), ln, font=fnt)
-                total_h += (lb[3] - lb[1]) + spacing
-            if lines:
-                total_h -= spacing
-            if align_v == 'Middle':
-                # 전체 캔버스 기준 세로 중앙 배치
-                sy = max(0, (height - total_h) // 2)
-            elif align_v == 'Bottom':
-                sy = y - total_h
-            else:
-                sy = y
-            cy = sy
-            for ln in lines:
-                tw = d.textbbox((0,0), ln, font=fnt)[2]
-                if align_h == 'Center':
-                    tx = x + max(0, (w - tw)//2)
-                elif align_h == 'Right':
-                    tx = x + max(0, (w - tw))
-                else:
-                    tx = x
-                # 바탕 박스
-                if row_bg:
-                    try:
-                        bg_rgb = ImageColor.getrgb(self.w_bg.get())
-                    except Exception:
-                        bg_rgb = (128,128,128)
-                    try:
-                        alpha_px = max(0, min(255, int(float(self.w_alpha.get()) * 255)))
-                    except Exception:
-                        alpha_px = 255
-                    try:
-                        margin_px = int(self.w_margin.get())
-                    except Exception:
-                        margin_px = 0
-                    lb = d.textbbox((tx, cy), ln, font=fnt)
-                    overlay = Image.new('RGBA', (width, height), (0,0,0,0))
-                    o_draw = ImageDraw.Draw(overlay)
-                    o_draw.rectangle((max(0, lb[0]-margin_px), max(0, lb[1]-margin_px), min(width, lb[2]+margin_px), min(height, lb[3]+margin_px)),
-                                     fill=(bg_rgb[0], bg_rgb[1], bg_rgb[2], alpha_px))
-                    img.alpha_composite(overlay)
-                # 쉐도우
-                if row_shadow:
-                    try:
-                        shadow_px = int(self.w_shadow_thick.get() or 0)
-                    except Exception:
-                        shadow_px = 0
-                    if shadow_px:
-                        try:
-                            blur = max(0, int(float(self.w_shadow_blur.get())))
-                        except Exception:
-                            blur = 0
-                        try:
-                            if hasattr(self, 'shadow_blur_enabled') and (not bool(self.shadow_blur_enabled.get())):
-                                blur = 0
-                        except Exception:
-                            pass
-                        try:
-                            offx = int(float(self.w_shadow_offx.get()))
-                            offy = int(float(self.w_shadow_offy.get()))
-                        except Exception:
-                            offx, offy = shadow_px, shadow_px
-                        try:
-                            s_alpha = max(0, min(255, int(float(self.w_shadow_alpha.get()) * 255)))
-                        except Exception:
-                            s_alpha = 153
-                        try:
-                            shadow_col = ImageColor.getrgb(self.w_shadow_color.get())
-                        except Exception:
-                            shadow_col = (0,0,0)
-                        lb = d.textbbox((tx, cy), ln, font=fnt)
-                        margin = max(shadow_px, blur) * 3
-                        ox1, oy1 = max(0, lb[0] - margin), max(0, lb[1] - margin)
-                        ox2, oy2 = min(width, lb[2] + margin), min(height, lb[3] + margin)
-                        overlay = Image.new('RGBA', (max(1, ox2-ox1), max(1, oy2-oy1)), (0,0,0,0))
-                        o_draw = ImageDraw.Draw(overlay)
-                        o_draw.text(((tx+offx)-ox1, (cy+offy)-oy1), ln, fill=(shadow_col[0], shadow_col[1], shadow_col[2], s_alpha), font=fnt)
-                        if blur > 0:
-                            overlay = overlay.filter(ImageFilter.GaussianBlur(radius=blur))
-                        img.alpha_composite(overlay, (ox1, oy1))
-                # 본문
-                try:
-                    border_px = int(self.w_border_thick.get() or 0) if row_border else 0
-                except Exception:
-                    border_px = 0
-                try:
-                    d.text((tx, cy), ln, fill=col, font=fnt, stroke_width=border_px, stroke_fill=self.w_border_color.get())
-                except Exception:
-                    d.text((tx, cy), ln, fill=col, font=fnt)
-                cy += (d.textbbox((0,0), ln, font=fnt)[3] - d.textbbox((0,0), ln, font=fnt)[1]) + spacing
-            savep = os.path.join(ending_dir, f"ending_{idx:03d}.png")
-            img.save(savep)
-            print(f"[엔딩 저장] {savep}")
+            subtitle_generator = self._get_subtitle_generator()
+            # Create a dummy scene for ending generation
+            ending_scene = {
+                "id": "ending_scene",
+                "type": "ending",
+                "content": {
+                    "script": ending_text
+                }
+            }
+            # _generate_intro_ending_frames expects a scene dict
+            subtitle_generator._generate_intro_ending_frames(ending_scene, 0, 30, os.path.join(out_dir, "ending"))
+            self._log_json('[엔딩] 생성 완료')
+            print('[엔딩] 생성 완료')
+        except Exception as e:
+            self._log_json(f'[엔딩 오류] {e}')
+            print(f'[엔딩 오류] {e}')
 
     def _on_click_browse(self):
         try:
@@ -1671,20 +990,32 @@ class TextSettingsTab(ctk.CTkFrame):
         top_controls_frame = ctk.CTkFrame(self, fg_color="transparent")
         top_controls_frame.grid(row=0, column=0, padx=10, pady=5, sticky="ew")
         
-        def create_top_control(p, label, width_chars, values, default_val):
-            frame = ctk.CTkFrame(p, fg_color="transparent")
-            ctk.CTkLabel(frame, text=f"{label}:").pack(side="left", padx=(0, 3))
-            combo = ctk.CTkComboBox(frame, values=values, width=width_chars * 9, 
-                                  fg_color=config.COLOR_THEME["widget"], 
-                                  text_color=config.COLOR_THEME["text"])
-            combo.set(default_val)
-            combo.pack(side="left")
-            frame.pack(side="left", padx=(0, 20))
-            return combo
+        rows_params = {
+            "values": [str(i) for i in range(1, 11)],
+            "fg_color": config.COLOR_THEME["widget"],
+            "text_color": config.COLOR_THEME["text"]
+        }
+        frame, self._controls["행수"] = create_labeled_widget(top_controls_frame, "텍스트 행수", 6, "combo", rows_params)
+        self._controls["행수"].set(default_data["행수"])
+        frame.pack(side="left", padx=(0, 20))
 
-        self._controls["행수"] = create_top_control(top_controls_frame, "텍스트 행수", 6, [str(i) for i in range(1, 11)], default_data["행수"])
-        self._controls["비율"] = create_top_control(top_controls_frame, "화면비율", 10, ["16:9", "1:1", "9:16"], default_data["비율"])
-        self._controls["해상도"] = create_top_control(top_controls_frame, "해상도", 15, ["1920x1080", "1080x1080", "1080x1920", "1024x768"], default_data["해상도"])
+        ratio_params = {
+            "values": ["16:9", "1:1", "9:16"],
+            "fg_color": config.COLOR_THEME["widget"],
+            "text_color": config.COLOR_THEME["text"]
+        }
+        frame, self._controls["비율"] = create_labeled_widget(top_controls_frame, "화면비율", 10, "combo", ratio_params)
+        self._controls["비율"].set(default_data["비율"])
+        frame.pack(side="left", padx=(0, 20))
+
+        resolution_params = {
+            "values": ["1920x1080", "1080x1080", "1080x1920", "1024x768"],
+            "fg_color": config.COLOR_THEME["widget"],
+            "text_color": config.COLOR_THEME["text"]
+        }
+        frame, self._controls["해상도"] = create_labeled_widget(top_controls_frame, "해상도", 15, "combo", resolution_params)
+        self._controls["해상도"].set(default_data["해상도"])
+        frame.pack(side="left", padx=(0, 20))
 
         # --- 설정 그리드 ---
         grid_frame = ctk.CTkScrollableFrame(self)
@@ -1747,6 +1078,80 @@ class TextSettingsTab(ctk.CTkFrame):
                     
                 widget.grid(row=row_idx, column=col_idx, padx=1, pady=1) if not (key in ["바탕", "쉐도우", "외곽선"]) else None
                 self._grid_widgets.append((row_idx, key, widget))
+
+    def get_settings(self):
+        try:
+            result = {
+                "행수": self._controls.get("행수").get() if self._controls.get("행수") else "",
+                "비율": self._controls.get("비율").get() if self._controls.get("비율") else "",
+                "해상도": self._controls.get("해상도").get() if self._controls.get("해상도") else "",
+                "rows": []
+            }
+            # 행 이름 수집
+            row_names = {}
+            for row_idx, key, widget in self._grid_widgets:
+                if key == "행":
+                    row_names[row_idx] = widget.cget("text")
+            # 값 수집
+            row_map = {idx: {"행": name} for idx, name in row_names.items()}
+            for row_idx, key, widget in self._grid_widgets:
+                if key == "행":
+                    continue
+                if isinstance(widget, ctk.CTkCheckBox):
+                    # 체크박스는 True/False 문자열로 저장
+                    val = "True" if widget.get() in [True, "True", "1", 1] else "False"
+                elif isinstance(widget, ctk.CTkComboBox):
+                    val = widget.get()
+                elif isinstance(widget, ctk.CTkEntry):
+                    val = widget.get()
+                else:
+                    val = getattr(widget, 'get', lambda: '')()
+                row_map.setdefault(row_idx, {"행": row_names.get(row_idx, str(row_idx))})
+                row_map[row_idx][key] = val
+            result["rows"] = [row_map[idx] for idx in sorted(row_map.keys())]
+            return result
+        except Exception:
+            return {"행수": "", "비율": "", "해상도": "", "rows": []}
+
+    def apply_settings(self, data):
+        try:
+            if self._controls.get("행수") and data.get("행수"):
+                self._controls["행수"].set(str(data.get("행수")))
+            if self._controls.get("비율") and data.get("비율"):
+                self._controls["비율"].set(str(data.get("비율")))
+            if self._controls.get("해상도") and data.get("해상도"):
+                self._controls["해상도"].set(str(data.get("해상도")))
+            rows = data.get("rows", [])
+            # row 이름 인덱스 맵 구성
+            rowidx_to_name = {}
+            for row_idx, key, widget in self._grid_widgets:
+                if key == "행":
+                    rowidx_to_name[row_idx] = widget.cget("text")
+            # 위젯에 값 반영
+            for row_idx, key, widget in self._grid_widgets:
+                if key == "행":
+                    continue
+                row_name = rowidx_to_name.get(row_idx)
+                row_data = next((r for r in rows if str(r.get("행")) == str(row_name)), None)
+                if not row_data:
+                    continue
+                val = row_data.get(key)
+                if val is None:
+                    continue
+                if isinstance(widget, ctk.CTkCheckBox):
+                    # 체크박스 복원
+                    val_str = str(val)
+                    if val_str in ["True", "1", "true", "YES", "Yes", "y", "Y"]:
+                        widget.select()
+                    else:
+                        widget.deselect()
+                elif isinstance(widget, ctk.CTkComboBox):
+                    widget.set(str(val))
+                elif isinstance(widget, ctk.CTkEntry):
+                    widget.delete(0, tk.END)
+                    widget.insert(0, str(val))
+        except Exception:
+            pass
 
     def get_settings(self):
         try:

@@ -46,14 +46,14 @@ class SpeakerTabView(ctk.CTkFrame):
         self.native_speaker_frame = ctk.CTkFrame(self, fg_color=config.COLOR_THEME["widget"])
         self.native_speaker_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
         
-        self.native_speaker_label = ctk.CTkLabel(self.native_speaker_frame, text="원어 화자:")
-        self.native_speaker_label.pack(side="left", padx=10, pady=10)
-        
-        self.native_speaker_dropdown = ctk.CTkComboBox(self.native_speaker_frame, width=50*9, values=[], 
-                                                     fg_color=config.COLOR_THEME["widget"], 
-                                                     text_color=config.COLOR_THEME["text"])
-        self.native_speaker_dropdown.pack(side="left", padx=10, pady=10)
-        
+        widget_params = {
+            "values": [],
+            "fg_color": config.COLOR_THEME["widget"],
+            "text_color": config.COLOR_THEME["text"]
+        }
+        frame, self.native_speaker_dropdown = create_labeled_widget(self.native_speaker_frame, "원어 화자", 50, "combo", widget_params)
+        frame.pack(side="left", padx=10, pady=10)
+
         ctk.CTkButton(self.native_speaker_frame, text="미리듣기", command=lambda: self._preview_voice(
             self.native_speaker_dropdown.get(), self.native_lang_code
         ), **button_kwargs).pack(side="left", padx=10, pady=10)
@@ -128,30 +128,31 @@ class SpeakerTabView(ctk.CTkFrame):
         learner_voices = api_services.get_voices_for_language(self.learning_lang_code)
 
         for i in range(num_speakers):
-            frame = ctk.CTkFrame(self.learner_speakers_container)
-            frame.pack(pady=2, padx=10, fill="x")
+            container_frame = ctk.CTkFrame(self.learner_speakers_container)
+            container_frame.pack(pady=2, padx=10, fill="x")
 
-            label = ctk.CTkLabel(frame, text=f"학습어 화자 {i+1}:")
-            label.pack(side="left", padx=10, pady=5)
+            widget_params = {
+                "values": learner_voices,
+                "fg_color": config.COLOR_THEME["widget"],
+                "text_color": config.COLOR_THEME["text"]
+            }
             
-            dropdown = ctk.CTkComboBox(frame, width=50*9, values=learner_voices, 
-                                       fg_color=config.COLOR_THEME["widget"], 
-                                       text_color=config.COLOR_THEME["text"])
+            frame, dropdown = create_labeled_widget(container_frame, f"학습어 화자 {i+1}", 50, "combo", widget_params)
             if learner_voices:
                 dropdown.set(learner_voices[i % len(learner_voices)])
-            dropdown.pack(side="left", padx=10, pady=10)
+            frame.pack(side="left", padx=10, pady=10)
             
             button_kwargs = {
                 "fg_color": config.COLOR_THEME["button"],
                 "hover_color": config.COLOR_THEME["button_hover"],
                 "text_color": config.COLOR_THEME["text"]
             }
-            button = ctk.CTkButton(frame, text="미리 듣기", command=lambda dd=dropdown: self._preview_voice(
+            button = ctk.CTkButton(container_frame, text="미리 듣기", command=lambda dd=dropdown: self._preview_voice(
                 dd.get(), self.learning_lang_code
             ), **button_kwargs)
             button.pack(side="left", padx=10, pady=10)
 
-            self.learner_speaker_widgets.append({"frame": frame, "dropdown": dropdown})
+            self.learner_speaker_widgets.append({"frame": container_frame, "dropdown": dropdown})
 
     def _preview_voice(self, voice_name, lang_code):
         if not voice_name or not lang_code:

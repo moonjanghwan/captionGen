@@ -1,18 +1,11 @@
-"""
-자막 이미지 생성기
-
-SSML mark 태그 기반으로 정확한 타이밍에 맞춰 PNG 시퀀스를 자동 생성합니다.
-"""
-
 import os
-import json
 import re
-from typing import Dict, List, Any, Optional, Tuple
+import json
+from typing import Dict, Any, List, Tuple
 from dataclasses import dataclass
-from PIL import Image # Added missing import for Image
+from PIL import Image, ImageDraw
 
 from .text_renderer import TextRenderer
-
 
 @dataclass
 class SubtitleFrame:
@@ -22,452 +15,359 @@ class SubtitleFrame:
     end_time: float
     duration: float
     scene_id: str
-    screen_type: str
-    content: List[str]
+    text: str
     output_path: str
 
-
 class SubtitleGenerator:
-    """자막 이미지 생성 클래스"""
-    
     def __init__(self, settings: Dict[str, Any], identifier: str, log_callback=None):
-        """
-        자막 생성기 초기화
-        
-        Args:
-            settings: UI에서 전달된 전체 설정
-            identifier: 프로젝트 식별자
-            log_callback: 로그 메시지를 전달할 콜백 함수
-        """
-        self.text_renderer = TextRenderer(settings, log_callback)
+        self.text_renderer = TextRenderer(settings)
         self.identifier = identifier
         self.log_callback = log_callback
-        self.frames = []
+        self.frames: List[SubtitleFrame] = []
         self.output_dir = ""
         self.resolution = (1920, 1080)
-    
+
     def _log(self, message):
         if self.log_callback:
             self.log_callback(message, "INFO")
         else:
             print(message)
 
-    def generate_from_manifest(self, manifest_data: Dict[str, Any], 
-                             output_dir: str, fps: int = 30) -> List[SubtitleFrame]:
-        """
-        Manifest에서 자막 이미지 시퀀스 생성
-        
-        Args:
-            manifest_data: Manifest 데이터
-            output_dir: 출력 디렉토리
-            fps: 프레임 레이트
-            
-        Returns:
-            List[SubtitleFrame]: 생성된 프레임 정보 리스트
-        """
+    def generate_from_manifest(self, manifest_data: Dict[str, Any], output_dir: str, script_type: str, fps: int = 30) -> List[SubtitleFrame]:
         self.output_dir = output_dir
         self.resolution = self._parse_resolution(manifest_data.get("resolution", "1920x1080"))
         
-        # 출력 디렉토리 생성
-        os.makedirs(output_dir, exist_ok=True)
-        
-        # 장면별 자막 이미지 생성
         scenes = manifest_data.get("scenes", [])
         frame_counter = 0
         
         for scene in scenes:
             scene_type = scene.get("type", "")
             
-            if scene_type == "conversation":
-                frames = self._generate_conversation_frames(scene, frame_counter, fps)
+            scene_output_dir = os.path.join(self.output_dir, self.identifier, "dialog" if scene_type == "conversation" else scene_type)
+            os.makedirs(scene_output_dir, exist_ok=True)
+
+            if scene_type == "intro" or scene_type == "ending":
+                # Modified to generate a single image for the entire script
+                frames = self._generate_intro_ending_frames(scene, frame_counter, fps, scene_output_dir)
+                self.frames.extend(frames)
+                frame_counter += len(frames) # Should be 1 frame per intro/ending scene
+            elif scene_type == "dialogue":
+                frames = self._generate_dialogue_frames(scene, frame_counter, fps, scene_output_dir)
                 self.frames.extend(frames)
                 frame_counter += len(frames)
-            elif scene_type == "intro":
-                frames = self._generate_intro_frames(scene, frame_counter, fps)
+            elif scene_type == "conversation":
+                frames = self._generate_conversation_frames(scene, frame_counter, fps, scene_output_dir)
                 self.frames.extend(frames)
                 frame_counter += len(frames)
-            elif scene_type == "ending":
-                frames = self._generate_ending_frames(scene, frame_counter, fps)
-                self.frames.extend(frames)
-                frame_counter += len(frames)
-        
-        # 프레임 정보 저장
-        self._save_frame_info()
-        
+
+        # Add thumbnail generation here, assuming it's not part of the manifest scenes directly
+        # self.generate_thumbnail_frames(...) # This will be added later
+
+        self._save_frame_info(script_type)
         return self.frames
-    
+
     def _parse_resolution(self, resolution_str: str) -> Tuple[int, int]:
-        """해상도 문자열을 튜플로 변환"""
         try:
             width, height = map(int, resolution_str.split('x'))
             return width, height
         except:
             return (1920, 1080)
-    
-    def _generate_conversation_frames(self, scene: Dict[str, Any], 
-                                    start_frame: int, fps: int) -> List[SubtitleFrame]:
-        """conversation 타입 장면의 프레임 생성"""
-        self._log(f"Generating conversation frames for scene: {scene.get('id')}")
+
+    def _generate_intro_ending_frames(self, scene: Dict[str, Any], start_frame: int, fps: int, scene_output_dir: str) -> List[SubtitleFrame]:
+        self._log(f"Generating frames for scene: {scene.get('id')}")
+        full_script = scene.get("content", {}).get("script", "")
+        
         frames = []
-        content = scene.get("content", {})
-        sequence = content.get("order", 1)
-        scene_id = scene.get("id", f"conversation_{sequence}")
+        if not full_script.strip():
+            return frames
+
+        image = Image.new("RGBA", self.resolution, (0, 0, 0, 0))
         
-        # 화면 1: 순번 + 원어
-        screen1_frame = self._create_conversation_screen1_frame(
-            scene, start_frame, fps, scene_id
+        # Get settings for intro/ending
+        settings_key = f"{scene.get('type')} 설정"
+        text_settings = self.text_renderer.config.get("tabs", {}).get(settings_key, {})
+        
+        font_name = text_settings.get("폰트(pt)", "KoPubWorld돋움체")
+        font_size = int(text_settings.get("크기(pt)", 48))
+        font_color = text_settings.get("색상", "#FFFFFF")
+        max_width = self.resolution[0] - 100 # Example max width
+        align = text_settings.get("정렬", "center") # Default to center
+        vertical_align = text_settings.get("수직정렬", "top") # Default to top
+        position = (self.resolution[0] // 2, 50) # Example position, will be adjusted by align/vertical_align
+
+        # Render the entire script onto a single image
+        self.text_renderer.render_text_to_image(
+            image=image,
+            text=full_script,
+            position=position,
+            font_name=font_name,
+            font_size=font_size,
+            font_color=font_color,
+            max_width=max_width,
+            align=align,
+            vertical_align=vertical_align
+            # Add stroke, shadow settings if available in text_settings
         )
-        frames.append(screen1_frame)
         
-        # 화면 2: 순번 + 원어 + 학습어 + 읽기
-        screen2_frame = self._create_conversation_screen2_frame(
-            scene, start_frame + 1, fps, scene_id
+        output_path = os.path.join(scene_output_dir, f"{self.identifier}_{start_frame:04d}.png")
+        self.text_renderer.save_image(image, output_path)
+        
+        # Estimate duration for the entire script
+        duration = self._estimate_speech_duration(full_script) 
+
+        frame = SubtitleFrame(
+            frame_number=start_frame,
+            start_time=start_frame / fps,
+            end_time=(start_frame + duration * fps) / fps,
+            duration=duration,
+            scene_id=scene.get("id"),
+            text=full_script,
+            output_path=output_path
         )
-        frames.append(screen2_frame)
-        
+        frames.append(frame)
         return frames
-    
-    def _create_conversation_screen1_frame(self, scene: Dict[str, Any], 
-                                         frame_number: int, fps: int, 
-                                         scene_id: str) -> SubtitleFrame:
-        """conversation 화면 1 프레임 생성"""
-        self._log(f"  - Creating conversation screen 1 frame {frame_number}")
-        content = scene.get("content", {})
-        sequence = content.get("order", 1)
-        native_script = content.get("native_script", "")
-        
-        # 예상 지속 시간 (원어 발음 + 1초 무음)
-        duration = self._estimate_speech_duration(native_script) + 1.0
-        
-        # Get line settings from config
-        rows_cfg = self.text_renderer.config.get("tabs", {}).get("회화 설정", {}).get("rows", [])
-        seq_cfg = next((row for row in rows_cfg if row.get("행") == "순번"), {})
-        native_cfg = next((row for row in rows_cfg if row.get("행") == "원어"), {})
-        line_settings = [seq_cfg, native_cfg]
 
-        # 이미지 생성
-        image = self.text_renderer.render_conversation_screen1(
-            sequence, native_script, self.resolution[0], self.resolution[1], line_settings
-        )
+    def _generate_dialogue_frames(self, scene: Dict[str, Any], start_frame: int, fps: int, scene_output_dir: str) -> List[SubtitleFrame]:
+        self._log(f"Generating dialogue frames for scene: {scene.get('id')}")
+        script = scene.get("content", {}).get("script", [])
+        frames = []
         
-        # 파일 저장
-        output_path = os.path.join(self.output_dir, f"{self.identifier}_{frame_number:03d}.png")
-        self.text_renderer.save_image(image, output_path)
-        self._log(f"    - Saved image: {output_path}")
-        
-        return SubtitleFrame(
-            frame_number=frame_number,
-            start_time=frame_number / fps,
-            end_time=(frame_number + duration * fps) / fps,
-            duration=duration,
-            scene_id=scene_id,
-            screen_type="screen1",
-            content=[str(sequence), native_script],
-            output_path=output_path
-        )
-    
-    def _create_conversation_screen2_frame(self, scene: Dict[str, Any], 
-                                         frame_number: int, fps: int, 
-                                         scene_id: str) -> SubtitleFrame:
-        """conversation 화면 2 프레임 생성"""
-        self._log(f"  - Creating conversation screen 2 frame {frame_number}")
-        content = scene.get("content", {})
-        sequence = content.get("order", 1)
-        native_script = content.get("native_script", "")
-        learning_script = content.get("learning_script", "")
-        reading_script = content.get("reading_script", "")
-        
-        # 예상 지속 시간 (4명의 학습어 발음 + 3초 무음)
-        duration = self._estimate_speech_duration(learning_script) * 4 + 3.0
-        
-        # Get line settings from config
-        rows_cfg = self.text_renderer.config.get("tabs", {}).get("회화 설정", {}).get("rows", [])
-        seq_cfg = next((row for row in rows_cfg if row.get("행") == "순번"), {})
-        native_cfg = next((row for row in rows_cfg if row.get("행") == "원어"), {})
-        learning_cfg = next((row for row in rows_cfg if row.get("행") == "학습어"), {})
-        reading_cfg = next((row for row in rows_cfg if row.get("행") == "읽기"), {})
-        line_settings = [seq_cfg, native_cfg, learning_cfg, reading_cfg]
+        text_settings = self.text_renderer.config.get("tabs", {}).get("대화 설정", {})
+        font_name = text_settings.get("폰트(pt)", "KoPubWorld돋움체")
+        font_size = int(text_settings.get("크기(pt)", 48))
+        font_color = text_settings.get("색상", "#FFFFFF")
+        max_width = self.resolution[0] - 100
+        align = text_settings.get("정렬", "left")
+        vertical_align = text_settings.get("수직정렬", "top")
+        position = (50, 50) # Example position
 
-        # 이미지 생성
-        image = self.text_renderer.render_conversation_screen2(
-            sequence, native_script, learning_script, reading_script,
-            self.resolution[0], self.resolution[1], line_settings
-        )
-        
-        # 파일 저장
-        output_path = os.path.join(self.output_dir, f"{self.identifier}_{frame_number:03d}.png")
-        self.text_renderer.save_image(image, output_path)
-        self._log(f"    - Saved image: {output_path}")
-        
-        return SubtitleFrame(
-            frame_number=frame_number,
-            start_time=frame_number / fps,
-            end_time=(frame_number + duration * fps) / fps,
-            duration=duration,
-            scene_id=scene_id,
-            screen_type="screen2",
-            content=[str(sequence), native_script, learning_script, reading_script],
-            output_path=output_path
-        )
-    
-    def _generate_intro_frames(self, scene: Dict[str, Any], 
-                              start_frame: int, fps: int) -> List[SubtitleFrame]:
-        """intro 타입 장면의 프레임 생성"""
-        self._log(f"Generating intro frames for scene: {scene.get('id')}")
-        scene_id = scene.get("id", "intro")
-        full_script = scene.get("content", {}).get("script", "")
-        
-        # 예상 지속 시간
-        duration = self._estimate_speech_duration(full_script)
-        
-        # Get line settings from config
-        rows_cfg = self.text_renderer.config.get("tabs", {}).get("인트로 설정", {}).get("rows", [])
-        line_settings = rows_cfg
-
-        # 이미지 생성
-        image = self.text_renderer.render_intro_ending(
-            full_script, self.resolution[0], self.resolution[1], "intro", line_settings
-        )
-        
-        # 파일 저장
-        output_path = os.path.join(self.output_dir, f"{self.identifier}_{start_frame:03d}.png")
-        self.text_renderer.save_image(image, output_path)
-        self._log(f"    - Saved image: {output_path}")
-        
-        frame = SubtitleFrame(
-            frame_number=start_frame,
-            start_time=start_frame / fps,
-            end_time=(start_frame + duration * fps) / fps,
-            duration=duration,
-            scene_id=scene_id,
-            screen_type="intro",
-            content=[full_script],
-            output_path=output_path
-        )
-        
-        return [frame]
-    
-    def _generate_ending_frames(self, scene: Dict[str, Any], 
-                               start_frame: int, fps: int) -> List[SubtitleFrame]:
-        """ending 타입 장면의 프레임 생성"""
-        self._log(f"Generating ending frames for scene: {scene.get('id')}")
-        scene_id = scene.get("id", "ending")
-        full_script = scene.get("content", {}).get("script", "")
-        
-        # 예상 지속 시간
-        duration = self._estimate_speech_duration(full_script)
-        
-        # Get line settings from config
-        rows_cfg = self.text_renderer.config.get("tabs", {}).get("엔딩 설정", {}).get("rows", [])
-        line_settings = rows_cfg
-
-        # 이미지 생성
-        image = self.text_renderer.render_intro_ending(
-            full_script, self.resolution[0], self.resolution[1], "ending", line_settings
-        )
-        
-        # 파일 저장
-        output_path = os.path.join(self.output_dir, f"{self.identifier}_{start_frame:03d}.png")
-        self.text_renderer.save_image(image, output_path)
-        self._log(f"    - Saved image: {output_path}")
-        
-        frame = SubtitleFrame(
-            frame_number=start_frame,
-            start_time=start_frame / fps,
-            end_time=(start_frame + duration * fps) / fps,
-            duration=duration,
-            scene_id=scene_id,
-            screen_type="ending",
-            content=[full_script],
-            output_path=output_path
-        )
-        
-        return [frame]
-    
-    def _estimate_speech_duration(self, text: str) -> float:
-        """텍스트 발음 지속 시간 추정 (초)"""
-        # 간단한 추정 로직
-        # 한글: 약 0.3초/음절, 영어: 약 0.2초/단어, 한자: 약 0.4초/자
-        duration = 0
-        
-        for char in text:
-            if '\u4e00' <= char <= '\u9fff':  # 한자
-                duration += 0.4
-            elif '\uac00' <= char <= '\ud7af':  # 한글
-                duration += 0.3
-            elif '\u0041' <= char <= '\u005a' or '\u0061' <= char <= '\u007a':  # 영문
-                duration += 0.1
-            else:
-                duration += 0.2
-        
-        # 최소 지속 시간 보장
-        return max(duration, 2.0)
-    
-    def generate_from_ssml_marks(self, ssml_content: str, output_dir: str, 
-                                fps: int = 30) -> List[SubtitleFrame]:
-        """
-        SSML mark 태그에서 자막 이미지 시퀀스 생성
-        
-        Args:
-            ssml_content: SSML 내용
-            output_dir: 출력 디렉토리
-            fps: 프레임 레이트
+        for i, item in enumerate(script):
+            text = f"{item.get('speaker', '')}: {item.get('text', '')}"
+            duration = self._estimate_speech_duration(text)
+            image = Image.new("RGBA", self.resolution, (0, 0, 0, 0))
             
-        Returns:
-            List[SubtitleFrame]: 생성된 프레임 정보 리스트
-        """
-        self.output_dir = output_dir
+            self.text_renderer.render_text_to_image(
+                image=image,
+                text=text,
+                position=position,
+                font_name=font_name,
+                font_size=font_size,
+                font_color=font_color,
+                max_width=max_width,
+                align=align,
+                vertical_align=vertical_align
+            )
+            
+            output_path = os.path.join(scene_output_dir, f"{self.identifier}_{start_frame + i:04d}.png")
+            self.text_renderer.save_image(image, output_path)
+            
+            frame = SubtitleFrame(
+                frame_number=start_frame + i,
+                start_time=(start_frame + i) / fps,
+                end_time=(start_frame + i + duration * fps) / fps,
+                duration=duration,
+                scene_id=scene.get("id"),
+                text=text,
+                output_path=output_path
+            )
+            frames.append(frame)
+        return frames
+
+    def _generate_conversation_frames(self, scene: Dict[str, Any], start_frame: int, fps: int, scene_output_dir: str) -> List[SubtitleFrame]:
+        self._log(f"Generating conversation frames for scene: {scene.get('id')}")
+        content = scene.get("content", {})
+        frames = []
         
-        # 출력 디렉토리 생성
-        os.makedirs(output_dir, exist_ok=True)
+        text_settings = self.text_renderer.config.get("tabs", {}).get("회화 설정", {})
+        font_name = text_settings.get("폰트(pt)", "KoPubWorld돋움체")
+        font_size = int(text_settings.get("크기(pt)", 48))
+        font_color = text_settings.get("색상", "#FFFFFF")
+        max_width = self.resolution[0] - 100
+        align = text_settings.get("정렬", "center")
+        vertical_align = text_settings.get("수직정렬", "center") # Conversation might be centered
+
+        # Screen 1
+        text1 = f"{content.get('order', '')}\n{content.get('native_script', '')}"
+        duration1 = self._estimate_speech_duration(content.get('native_script', ''))
+        image1 = Image.new("RGBA", self.resolution, (0, 0, 0, 0))
         
-        # mark 태그 분석
-        marks = self._extract_marks_from_ssml(ssml_content)
+        self.text_renderer.render_text_to_image(
+            image=image1,
+            text=text1,
+            position=(self.resolution[0] // 2, self.resolution[1] // 2), # Center of the screen
+            font_name=font_name,
+            font_size=font_size,
+            font_color=font_color,
+            max_width=max_width,
+            align=align,
+            vertical_align=vertical_align
+        )
         
-        # 프레임 생성
+        output_path1 = os.path.join(scene_output_dir, f"{self.identifier}_{start_frame:04d}.png")
+        self.text_renderer.save_image(image1, output_path1)
+        frame1 = SubtitleFrame(
+            frame_number=start_frame,
+            start_time=start_frame / fps,
+            end_time=(start_frame + duration1 * fps) / fps,
+            duration=duration1,
+            scene_id=scene.get("id"),
+            text=text1,
+            output_path=output_path1
+        )
+        frames.append(frame1)
+
+        # Screen 2
+        text2 = (f"{content.get('order', '')}\n"
+                 f"{content.get('native_script', '')}\n"
+                 f"{content.get('learning_script', '')}\n"
+                 f"{content.get('reading_script', '')}")
+        duration2 = self._estimate_speech_duration(content.get('learning_script', ''))
+        image2 = Image.new("RGBA", self.resolution, (0, 0, 0, 0))
+        
+        self.text_renderer.render_text_to_image(
+            image=image2,
+            text=text2,
+            position=(self.resolution[0] // 2, self.resolution[1] // 2), # Center of the screen
+            font_name=font_name,
+            font_size=font_size,
+            font_color=font_color,
+            max_width=max_width,
+            align=align,
+            vertical_align=vertical_align
+        )
+        
+        output_path2 = os.path.join(scene_output_dir, f"{self.identifier}_{start_frame + 1:04d}.png")
+        self.text_renderer.save_image(image2, output_path2)
+        frame2 = SubtitleFrame(
+            frame_number=start_frame + 1,
+            start_time=(start_frame + 1) / fps,
+            end_time=(start_frame + 1 + duration2 * fps) / fps,
+            duration=duration2,
+            scene_id=scene.get("id"),
+            text=text2,
+            output_path=output_path2
+        )
+        frames.append(frame2)
+
+        return frames
+
+    def generate_thumbnail_frames(self, project_name: str, identifier: str, output_dir: str, thumbnail_settings: Dict[str, Any]) -> List[SubtitleFrame]:
+        self._log(f"Generating thumbnail frames for project: {project_name}")
+        
+        thumbnail_output_dir = os.path.join(output_dir, identifier, "thumbnail")
+        os.makedirs(thumbnail_output_dir, exist_ok=True)
+
+        # Assuming AI generated JSON file path
+        ai_json_path = os.path.join(output_dir, identifier, f"{identifier}_ai.json")
+        thumbnail_texts = []
+
+        try:
+            with open(ai_json_path, 'r', encoding='utf-8') as f:
+                ai_data = json.load(f)
+                # Assuming the structure of ai_data contains a list of thumbnail suggestions
+                # Each suggestion is a dictionary with a 'text' key
+                if 'thumbnail_suggestions' in ai_data:
+                    for suggestion in ai_data['thumbnail_suggestions']:
+                        if 'text' in suggestion:
+                            thumbnail_texts.append(suggestion['text'])
+                elif 'thumbnail' in ai_data and isinstance(ai_data['thumbnail'], list):
+                    # Alternative structure if 'thumbnail' is a list of strings
+                    thumbnail_texts.extend(ai_data['thumbnail'])
+                elif 'thumbnail_text' in ai_data and isinstance(ai_data['thumbnail_text'], list):
+                    # Another alternative structure
+                    thumbnail_texts.extend(ai_data['thumbnail_text'])
+                else:
+                    self._log(f"⚠️ AI JSON 파일에서 썸네일 텍스트를 찾을 수 없습니다: {ai_json_path}")
+
+        except FileNotFoundError:
+            self._log(f"❌ AI JSON 파일을 찾을 수 없습니다: {ai_json_path}")
+            return []
+        except json.JSONDecodeError:
+            self._log(f"❌ AI JSON 파일 디코딩 오류: {ai_json_path}")
+            return []
+
         frames = []
         frame_counter = 0
         
-        for i in range(0, len(marks) - 1, 2):
-            start_mark = marks[i]
-            end_mark = marks[i + 1]
+        # Use thumbnail_settings for font, color, etc.
+        font_name = thumbnail_settings.get("폰트(pt)", "KoPubWorld돋움체")
+        font_size = int(thumbnail_settings.get("크기(pt)", 72)) # Larger default for thumbnails
+        font_color = thumbnail_settings.get("색상", "#FFFFFF")
+        max_width = self.resolution[0] - 200 # More padding for thumbnails
+        align = thumbnail_settings.get("정렬", "center")
+        vertical_align = thumbnail_settings.get("수직정렬", "center")
+        position = (self.resolution[0] // 2, self.resolution[1] // 2)
+
+        # Generate 3 sets of images
+        for i in range(min(3, len(thumbnail_texts) // 4)): # Ensure we have at least 4 lines per set
+            current_texts = thumbnail_texts[i*4 : (i+1)*4]
+            if not current_texts:
+                continue
+
+            # Print to terminal
+            self._log(f"썸네일 텍스트 세트 {i+1}:")
+            for line in current_texts:
+                self._log(f"- {line}")
+
+            image = Image.new("RGBA", self.resolution, (0, 0, 0, 0))
             
-            if self._is_valid_mark_pair(start_mark, end_mark):
-                frame = self._create_frame_from_marks(
-                    start_mark, end_mark, frame_counter, fps
-                )
-                if frame:
-                    frames.append(frame)
-                    frame_counter += 1
-        
-        self.frames = frames
-        self._save_frame_info()
-        
-        return frames
-    
-    def _extract_marks_from_ssml(self, ssml_content: str) -> List[Dict[str, Any]]:
-        """SSML에서 mark 태그 추출"""
-        marks = []
-        mark_pattern = r'<mark name="([^"]+)"\s*/>'
-        
-        for match in re.finditer(mark_pattern, ssml_content):
-            mark_name = match.group(1)
-            position = match.start()
+            # Join lines with newline characters for render_text_to_image
+            full_text = "\n".join(current_texts)
+
+            # Font size adjustment logic
+            current_font_size = font_size
+            temp_image = Image.new("RGBA", (1,1)) # Dummy image for text dimension calculation
+            temp_draw = ImageDraw.Draw(temp_image)
             
-            # mark 타입 분석
-            mark_type = self._analyze_mark_type(mark_name)
-            scene_id = self._extract_scene_id(mark_name)
-            
-            marks.append({
-                "name": mark_name,
-                "position": position,
-                "type": mark_type,
-                "scene_id": scene_id
-            })
-        
-        return marks
-    
-    def _analyze_mark_type(self, mark_name: str) -> str:
-        """mark 이름을 분석하여 타입 반환"""
-        if "screen1" in mark_name:
-            return "screen1"
-        elif "screen2" in mark_name:
-            return "screen2"
-        elif "intro" in mark_name:
-            return "intro"
-        elif "ending" in mark_name:
-            return "ending"
-        else:
-            return "general"
-    
-    def _extract_scene_id(self, mark_name: str) -> str:
-        """mark 이름에서 장면 ID 추출"""
-        if "scene_" in mark_name:
-            parts = mark_name.split("_")
-            if len(parts) >= 2:
-                return parts[1]
-        return "unknown"
-    
-    def _is_valid_mark_pair(self, start_mark: Dict[str, Any], 
-                           end_mark: Dict[str, Any]) -> bool:
-        """두 mark가 유효한 시작-끝 쌍인지 확인"""
-        start_name = start_mark["name"]
-        end_name = end_mark["name"]
-        
-        # 같은 장면의 같은 타입인지 확인
-        if start_mark["scene_id"] != end_mark["scene_id"]:
-            return False
-        
-        # 시작과 끝 패턴 확인
-        if "start" in start_name and "end" in end_name:
-            # screen1_start와 screen1_end
-            if "screen1" in start_name and "screen1" in end_name:
-                return True
-            # screen2_start와 screen2_end
-            elif "screen2" in start_name and "screen2" in end_name:
-                return True
-            # intro_start와 intro_end
-            elif "intro" in start_name and "intro" in end_name:
-                return True
-            # ending_start와 ending_end
-            elif "ending" in start_name and "ending" in end_name:
-                return True
-        
-        return False
-    
-    def _create_frame_from_marks(self, start_mark: Dict[str, Any], 
-                                end_mark: Dict[str, Any], frame_number: int, 
-                                fps: int) -> Optional[SubtitleFrame]:
-        """mark 쌍으로부터 프레임 생성"""
-        try:
-            scene_id = start_mark["scene_id"]
-            mark_type = start_mark["type"]
-            
-            # 예상 지속 시간 (위치 기반 추정)
-            duration = self._estimate_duration_from_marks(start_mark, end_mark)
-            
-            # 더미 이미지 생성 (실제로는 SSML 내용을 분석해야 함)
-            image = Image.new('RGBA', self.resolution, "#000000")
-            
-            # 파일 저장
-            output_path = os.path.join(self.output_dir, f"{scene_id}_{mark_type}_{frame_number:04d}.png")
-            self.text_renderer.save_image(image, output_path)
-            
-            return SubtitleFrame(
-                frame_number=frame_number,
-                start_time=frame_number / fps,
-                end_time=(frame_number + duration * fps) / fps,
-                duration=duration,
-                scene_id=scene_id,
-                screen_type=mark_type,
-                content=[f"Frame {frame_number}"],
-                output_path=output_path
+            while True:
+                temp_font = self.text_renderer._get_font(font_name, current_font_size)
+                wrapped_lines = self.text_renderer._get_wrapped_text_lines(full_text, temp_font, max_width)
+                
+                total_text_height = 0
+                for line in wrapped_lines:
+                    _, h = self.text_renderer._get_text_dimensions(line, temp_font)
+                    total_text_height += h * 1.2
+                
+                if total_text_height <= self.resolution[1] - 100 or current_font_size <= 20: # Stop if fits or too small
+                    break
+                current_font_size -= 2 # Reduce font size
+
+            self._log(f"썸네일 텍스트 세트 {i+1} 최종 폰트 크기: {current_font_size}")
+
+            self.text_renderer.render_text_to_image(
+                image=image,
+                text=full_text,
+                position=position,
+                font_name=font_name,
+                font_size=current_font_size, # Use adjusted font size
+                font_color=font_color,
+                max_width=max_width,
+                align=align,
+                vertical_align=vertical_align
             )
             
-        except Exception as e:
-            print(f"프레임 생성 실패: {e}")
-            return None
-    
-    def _estimate_duration_from_marks(self, start_mark: Dict[str, Any], 
-                                    end_mark: Dict[str, Any]) -> float:
-        """mark 위치로부터 지속 시간 추정"""
-        # 위치 기반 대략적 추정
-        start_pos = start_mark["position"]
-        end_pos = end_mark["position"]
-        
-        # SSML 길이 대비 위치 비율로 시간 추정
-        # 실제로는 TTS API 응답의 정확한 시간 사용 필요
-        
-        # 기본값 반환
-        if "screen1" in start_mark["name"]:
-            return 5.0  # 화면 1: 원어 + 1초 무음
-        elif "screen2" in start_mark["name"]:
-            return 19.0  # 화면 2: 4명의 학습어 + 3초 무음
-        else:
-            return 10.0  # 기본값
-    
-    def _save_frame_info(self):
-        """프레임 정보를 JSON 파일로 저장"""
+            output_path = os.path.join(thumbnail_output_dir, f"{identifier}_thumbnail_{frame_counter:04d}.png")
+            self.text_renderer.save_image(image, output_path)
+            
+            duration = self._estimate_speech_duration(full_text) # Estimate duration for thumbnail
+            frame = SubtitleFrame(
+                frame_number=frame_counter,
+                start_time=0.0, # Thumbnails don't have specific timing in video
+                end_time=0.0,
+                duration=duration,
+                scene_id=f"thumbnail_{i}",
+                text=full_text,
+                output_path=output_path
+            )
+            frames.append(frame)
+            frame_counter += 1
+            
+        return frames
+
+    def _estimate_speech_duration(self, text: str) -> float:
+        return max(len(text) * 0.1, 1.0) # Simple estimation
+
+    def _save_frame_info(self, script_type: str):
         frame_info = {
             "total_frames": len(self.frames),
             "resolution": f"{self.resolution[0]}x{self.resolution[1]}",
@@ -479,58 +379,16 @@ class SubtitleGenerator:
                     "end_time": frame.end_time,
                     "duration": frame.duration,
                     "scene_id": frame.scene_id,
-                    "screen_type": frame.screen_type,
-                    "content": frame.content,
+                    "text": frame.text,
                     "output_path": frame.output_path
                 }
                 for frame in self.frames
             ]
         }
         
-        output_path = os.path.join(self.output_dir, "subtitle_frames.json")
+        file_suffix = {"회화": "conversation", "대화": "conversation", "인트로": "intro", "엔딩": "ending"}.get(script_type)
+        output_path = os.path.join(self.output_dir, self.identifier, f"{self.identifier}_{file_suffix}_frames.json")
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(frame_info, f, ensure_ascii=False, indent=2)
         
-        print(f"✅ 프레임 정보 저장: {output_path}")
-    
-    def create_ffmpeg_concat_list(self, output_path: str) -> bool:
-        """FFmpeg concat 리스트 파일 생성"""
-        try:
-            with open(output_path, 'w', encoding='utf-8') as f:
-                for frame in self.frames:
-                    f.write(f"file '{frame.output_path}'\n")
-                    f.write(f"duration {frame.duration}\n")
-                
-                # 마지막 프레임은 duration 없이 (FFmpeg concat demuxer 특성)
-                if self.frames:
-                    last_frame = self.frames[-1]
-                    f.write(f"file '{last_frame.output_path}'\n")
-            
-            print(f"✅ FFmpeg concat 리스트 생성: {output_path}")
-            return True
-            
-        except Exception as e:
-            print(f"❌ FFmpeg concat 리스트 생성 실패: {e}")
-            return False
-    
-    def get_frame_summary(self) -> Dict[str, Any]:
-        """프레임 요약 정보 반환"""
-        if not self.frames:
-            return {}
-        
-        total_duration = sum(frame.duration for frame in self.frames)
-        scene_types = {}
-        
-        for frame in self.frames:
-            scene_type = frame.screen_type
-            if scene_type not in scene_types:
-                scene_types[scene_type] = 0
-            scene_types[scene_type] += 1
-        
-        return {
-            "total_frames": len(self.frames),
-            "total_duration": total_duration,
-            "scene_types": scene_types,
-            "resolution": f"{self.resolution[0]}x{self.resolution[1]}",
-            "output_directory": self.output_dir
-        }
+        self._log(f"✅ 프레임 정보 저장: {output_path}")

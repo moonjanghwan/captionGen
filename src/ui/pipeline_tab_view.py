@@ -251,39 +251,76 @@ class PipelineTabView(ctk.CTkFrame):
             self.manifest_button.configure(state="disabled", text="스크립트를 선택하세요")
     
     def _create_manifest(self):
-        """Manifest 생성 - 선택된 스크립트만 개별 생성"""
+        """timeline_manifest.json 생성"""
         if not PIPELINE_AVAILABLE:
             messagebox.showerror("오류", "파이프라인 모듈을 사용할 수 없습니다.")
             return
         
-        script_type = self.script_var.get()
-        if not script_type:
-            messagebox.showerror("오류", "스크립트를 선택하세요.")
-            return
-        
         try:
-            # 스크립트 데이터 수집
-            script_data = self._collect_script_data(script_type)
-            if not script_data:
-                messagebox.showerror("오류", "스크립트 데이터를 수집할 수 없습니다.")
-                return
+            # 1. 데이터 수집
+            project_name = self.root.data_page.project_name_var.get()
+            identifier = self.root.data_page.identifier_var.get()
+            resolution = self.root.image_page.get_all_settings()["tabs"]["회화 설정"]["해상도"]
+            default_background = self.root.image_page.get_all_settings()["common"]["bg"]["value"]
+
+            intro_script = self._collect_script_data("인트로")
+            ending_script = self._collect_script_data("엔딩")
+            conversation_data = self._collect_script_data("회화")
+            dialogue_data = self._collect_script_data("대화")
+
+            # 2. Manifest 구조 생성
+            manifest_data = {
+                "project_name": project_name,
+                "resolution": resolution,
+                "default_background": default_background,
+                "scenes": []
+            }
+
+            # 3. Scene 추가
+            if intro_script:
+                manifest_data["scenes"].append({
+                    "id": "intro_01",
+                    "type": "intro",
+                    "content": {"script": intro_script}
+                })
             
-            # 선택된 스크립트만 Manifest 생성
-            manifest_data = self._generate_manifest_data(script_type, script_data)
+            if conversation_data and "scenes" in conversation_data:
+                for i, scene in enumerate(conversation_data["scenes"]):
+                    manifest_data["scenes"].append({
+                        "id": f"conversation_{i+1:02d}",
+                        "type": "conversation",
+                        "content": scene
+                    })
+
+            if dialogue_data and "scenes" in dialogue_data:
+                manifest_data["scenes"].append({
+                    "id": "dialogue_01",
+                    "type": "dialogue",
+                    "content": {"script": dialogue_data["scenes"]}
+                })
+
+            if ending_script:
+                manifest_data["scenes"].append({
+                    "id": "ending_01",
+                    "type": "ending",
+                    "content": {"script": ending_script}
+                })
+
+            # 4. 파일 저장
+            output_dir = os.path.join("output", project_name, identifier, "manifest")
+            os.makedirs(output_dir, exist_ok=True)
+            filepath = os.path.join(output_dir, "timeline_manifest.json")
             
-            # 출력 창에 JSON 디스플레이
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(manifest_data, f, ensure_ascii=False, indent=2)
+            
             self.output_text.delete("1.0", tk.END)
-            self.output_text.insert("end", f"📋 {script_type} Manifest 생성 완료!\n\n")
+            self.output_text.insert("end", f"📋 timeline_manifest.json 생성 완료!\n\n")
             self.output_text.insert("end", "=== Manifest JSON 내용 ===\n")
             self.output_text.insert("end", json.dumps(manifest_data, ensure_ascii=False, indent=2))
-            
-            # 파일명 형식에 맞춰 저장
-            filename = self._save_manifest_file(manifest_data, script_type)
-            if filename:
-                self.output_text.insert("end", f"\n\n💾 파일 저장 완료: {filename}")
-            
-            self._add_output_message(f"✅ {script_type} Manifest 생성 완료", "INFO")
-            
+            self.output_text.insert("end", f"\n\n💾 파일 저장 완료: {filepath}")
+            self._add_output_message(f"✅ timeline_manifest.json 생성 완료", "INFO")
+
         except Exception as e:
             error_msg = f"Manifest 생성 실패: {e}"
             self._add_output_message(error_msg, "ERROR")
@@ -418,29 +455,33 @@ class PipelineTabView(ctk.CTkFrame):
         if not PIPELINE_AVAILABLE:
             messagebox.showerror("오류", "파이프라인 모듈을 사용할 수 없습니다.")
             return
-        
-        try:
-            script_type = self.script_var.get()
-            self._add_output_message(f"📝 {script_type} 자막 이미지 생성 시작...", "INFO")
-            
-            project_name = self.root.data_page.project_name_var.get() if hasattr(self.root, 'data_page') else "kor-chn"
-            identifier = self.root.data_page.identifier_var.get() if hasattr(self.root, 'data_page') else "kor-chn"
 
-            if script_type == "회화":
-                self._generate_conversation_images(project_name, identifier)
-            elif script_type == "인트로":
-                self._generate_intro_images(project_name, identifier)
-            elif script_type == "엔딩":
-                self._generate_ending_images(project_name, identifier)
-            elif script_type == "대화":
-                self._generate_dialogue_images(project_name, identifier)
-            else:
-                self._add_output_message(f"지원하지 않는 스크립트 타입: {script_type}", "ERROR")
+        def task():
+            try:
+                script_type = self.script_var.get()
+                self._add_output_message(f"📝 {script_type} 자막 이미지 생성 시작...", "INFO")
+                
+                project_name = self.root.data_page.project_name_var.get() if hasattr(self.root, 'data_page') else "kor-chn"
+                identifier = self.root.data_page.identifier_var.get() if hasattr(self.root, 'data_page') else "kor-chn"
 
-        except Exception as e:
-            error_msg = f"자막 이미지 생성 실패: {e}"
-            self._add_output_message(error_msg, "ERROR")
-            messagebox.showerror("오류", error_msg)
+                if script_type == "회화":
+                    self._generate_conversation_images(project_name, identifier)
+                elif script_type == "인트로":
+                    self._generate_intro_images(project_name, identifier)
+                elif script_type == "엔딩":
+                    self._generate_ending_images(project_name, identifier)
+                elif script_type == "대화":
+                    self._generate_dialogue_images(project_name, identifier)
+                else:
+                    self._add_output_message(f"지원하지 않는 스크립트 타입: {script_type}", "ERROR")
+
+            except Exception as e:
+                error_msg = f"자막 이미지 생성 실패: {e}"
+                self._add_output_message(error_msg, "ERROR")
+                messagebox.showerror("오류", error_msg)
+
+        thread = threading.Thread(target=task)
+        thread.start()
 
     def _generate_conversation_images(self, project_name, identifier):
         """회화 스크립트 자막 이미지 생성"""
@@ -461,7 +502,7 @@ class PipelineTabView(ctk.CTkFrame):
             image_settings = self.root.image_page.get_all_settings()
 
             # 자막 생성기 초기화
-            subtitle_generator = SubtitleGenerator(settings=image_settings)
+            subtitle_generator = SubtitleGenerator(settings=image_settings, identifier=identifier, log_callback=self._add_output_message)
             
             # 출력 디렉토리 설정
             output_dir = os.path.join("output", project_name, identifier, "subtitles")
@@ -493,7 +534,7 @@ class PipelineTabView(ctk.CTkFrame):
             image_settings = self.root.image_page.get_all_settings()
 
             # 자막 생성기 초기화
-            subtitle_generator = SubtitleGenerator(settings=image_settings)
+            subtitle_generator = SubtitleGenerator(settings=image_settings, identifier=identifier, log_callback=self._add_output_message)
             
             # 출력 디렉토리 설정
             output_dir = os.path.join("output", project_name, identifier, "subtitles")
@@ -525,7 +566,7 @@ class PipelineTabView(ctk.CTkFrame):
             image_settings = self.root.image_page.get_all_settings()
 
             # 자막 생성기 초기화
-            subtitle_generator = SubtitleGenerator(settings=image_settings)
+            subtitle_generator = SubtitleGenerator(settings=image_settings, identifier=identifier, log_callback=self._add_output_message)
             
             # 출력 디렉토리 설정
             output_dir = os.path.join("output", project_name, identifier, "subtitles")
@@ -557,7 +598,7 @@ class PipelineTabView(ctk.CTkFrame):
             image_settings = self.root.image_page.get_all_settings()
 
             # 자막 생성기 초기화
-            subtitle_generator = SubtitleGenerator(settings=image_settings)
+            subtitle_generator = SubtitleGenerator(settings=image_settings, identifier=identifier, log_callback=self._add_output_message)
             
             # 출력 디렉토리 설정
             output_dir = os.path.join("output", project_name, identifier, "subtitles")

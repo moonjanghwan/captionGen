@@ -13,15 +13,17 @@ import json
 class TextRenderer:
     """텍스트 렌더링 클래스"""
     
-    def __init__(self, settings: Dict[str, Any]):
+    def __init__(self, settings: Dict[str, Any], log_callback=None):
         """
         텍스트 렌더러 초기화
         
         Args:
             settings: UI에서 전달된 전체 설정
+            log_callback: 로그 메시지를 전달할 콜백 함수
         """
         self.config = self._load_config(settings)
         self.fonts = {}
+        self.log_callback = log_callback
         self._load_fonts()
     
     def _load_config(self, settings: Dict[str, Any]) -> Dict[str, Any]:
@@ -80,6 +82,12 @@ class TextRenderer:
             else:
                 base_config[key] = value
     
+    def _log(self, message):
+        if self.log_callback:
+            self.log_callback(message, "INFO")
+        else:
+            print(message)
+
     def _load_fonts(self):
         """폰트 로드 - 실제 사용 시점에 로드되도록 변경"""
         pass
@@ -97,13 +105,13 @@ class TextRenderer:
                     self.fonts[font_name] = font_path
                     return ImageFont.truetype(font_path, font_size)
                 else:
-                    print(f"⚠️ 폰트 파일을 찾을 수 없습니다: {font_path}")
+                    self._log(f"⚠️ 폰트 파일을 찾을 수 없습니다: {font_path}")
 
             # 기본 폰트 사용
             return ImageFont.load_default()
                 
         except Exception as e:
-            print(f"⚠️ 폰트 생성 실패: {e}")
+            self._log(f"⚠️ 폰트 생성 실패: {e}")
             return ImageFont.load_default()
     
     def _detect_language(self, text: str) -> str:
@@ -225,6 +233,7 @@ class TextRenderer:
             current_y = padding
 
         # 각 줄별로 렌더링
+        self._log("--- Rendering multiline text ---")
         for i, line in enumerate(lines):
             if not line.strip():
                 if i < len(line_settings):
@@ -235,16 +244,16 @@ class TextRenderer:
             
             settings = line_settings[i] if i < len(line_settings) else self.config["default_settings"]
 
-            print(f"  - Line {i}: {line}")
-            print(f"    Settings: {settings}")
+            self._log(f"  - Line {i}: {line}")
+            self._log(f"    Settings: {settings}")
 
-            font_size = settings.get("font_size", self.config["default_settings"]["font_size"])
+            font_size = int(settings.get("크기(pt)", self.config["default_settings"]["font_size"]))
             font_name = settings.get("폰트(pt)")
             font_color = settings.get("색상", self.config["default_settings"]["font_color"])
             alignment = settings.get("좌우 정렬", self.config["default_settings"]["alignment"])
-            stroke_width = settings.get("stroke_width", self.config["default_settings"]["stroke_width"])
+            stroke_width = int(settings.get("stroke_width", self.config["default_settings"]["stroke_width"]))
             stroke_color = settings.get("stroke_color", self.config["default_settings"]["stroke_color"])
-            line_spacing = settings.get("line_spacing", self.config["default_settings"]["line_spacing"])
+            line_spacing = int(settings.get("line_spacing", self.config["default_settings"]["line_spacing"]))
 
             # 언어별 폰트 선택
             font = self._get_font(line, font_size, font_name)

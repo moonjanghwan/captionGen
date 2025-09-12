@@ -527,6 +527,8 @@ class ImageTabView(ctk.CTkFrame):
                 color_hex = cfg.get("색상", "#FFFFFF")
                 align_h = cfg.get("좌우 정렬", "Left")
                 align_v = cfg.get("상하 정렬", "Top")
+                font_name = cfg.get("폰트(pt)")
+
                 # 행별 효과 온오프
                 def as_bool(v):
                     try:
@@ -536,8 +538,10 @@ class ImageTabView(ctk.CTkFrame):
                 row_bg = as_bool(cfg.get("바탕", "False"))
                 row_shadow = as_bool(cfg.get("쉐도우", "False"))
                 row_border = as_bool(cfg.get("외곽선", "False"))
+                
+                font_path = self.root.image_page.font_map.get(font_name)
                 try:
-                    fnt = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial Unicode.ttf", size)
+                    fnt = ImageFont.truetype(font_path, size) if font_path else ImageFont.load_default()
                 except Exception:
                     fnt = ImageFont.load_default()
                 # 색상 변환

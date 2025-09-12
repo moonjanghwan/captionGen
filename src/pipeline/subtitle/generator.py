@@ -30,18 +30,28 @@ class SubtitleFrame:
 class SubtitleGenerator:
     """자막 이미지 생성 클래스"""
     
-    def __init__(self, settings: Dict[str, Any]):
+    def __init__(self, settings: Dict[str, Any], identifier: str, log_callback=None):
         """
         자막 생성기 초기화
         
         Args:
             settings: UI에서 전달된 전체 설정
+            identifier: 프로젝트 식별자
+            log_callback: 로그 메시지를 전달할 콜백 함수
         """
-        self.text_renderer = TextRenderer(settings)
+        self.text_renderer = TextRenderer(settings, log_callback)
+        self.identifier = identifier
+        self.log_callback = log_callback
         self.frames = []
         self.output_dir = ""
         self.resolution = (1920, 1080)
     
+    def _log(self, message):
+        if self.log_callback:
+            self.log_callback(message, "INFO")
+        else:
+            print(message)
+
     def generate_from_manifest(self, manifest_data: Dict[str, Any], 
                              output_dir: str, fps: int = 30) -> List[SubtitleFrame]:
         """
@@ -97,8 +107,10 @@ class SubtitleGenerator:
     def _generate_conversation_frames(self, scene: Dict[str, Any], 
                                     start_frame: int, fps: int) -> List[SubtitleFrame]:
         """conversation 타입 장면의 프레임 생성"""
+        self._log(f"Generating conversation frames for scene: {scene.get('id')}")
         frames = []
-        sequence = scene.get("sequence", 1)
+        content = scene.get("content", {})
+        sequence = content.get("order", 1)
         scene_id = scene.get("id", f"conversation_{sequence}")
         
         # 화면 1: 순번 + 원어
@@ -119,8 +131,10 @@ class SubtitleGenerator:
                                          frame_number: int, fps: int, 
                                          scene_id: str) -> SubtitleFrame:
         """conversation 화면 1 프레임 생성"""
-        sequence = scene.get("sequence", 1)
-        native_script = scene.get("native_script", "")
+        self._log(f"  - Creating conversation screen 1 frame {frame_number}")
+        content = scene.get("content", {})
+        sequence = content.get("order", 1)
+        native_script = content.get("native_script", "")
         
         # 예상 지속 시간 (원어 발음 + 1초 무음)
         duration = self._estimate_speech_duration(native_script) + 1.0
@@ -137,8 +151,9 @@ class SubtitleGenerator:
         )
         
         # 파일 저장
-        output_path = os.path.join(self.output_dir, f"{scene_id}_screen1_{frame_number:04d}.png")
+        output_path = os.path.join(self.output_dir, f"{self.identifier}_{frame_number:03d}.png")
         self.text_renderer.save_image(image, output_path)
+        self._log(f"    - Saved image: {output_path}")
         
         return SubtitleFrame(
             frame_number=frame_number,
@@ -155,10 +170,12 @@ class SubtitleGenerator:
                                          frame_number: int, fps: int, 
                                          scene_id: str) -> SubtitleFrame:
         """conversation 화면 2 프레임 생성"""
-        sequence = scene.get("sequence", 1)
-        native_script = scene.get("native_script", "")
-        learning_script = scene.get("learning_script", "")
-        reading_script = scene.get("reading_script", "")
+        self._log(f"  - Creating conversation screen 2 frame {frame_number}")
+        content = scene.get("content", {})
+        sequence = content.get("order", 1)
+        native_script = content.get("native_script", "")
+        learning_script = content.get("learning_script", "")
+        reading_script = content.get("reading_script", "")
         
         # 예상 지속 시간 (4명의 학습어 발음 + 3초 무음)
         duration = self._estimate_speech_duration(learning_script) * 4 + 3.0
@@ -178,8 +195,9 @@ class SubtitleGenerator:
         )
         
         # 파일 저장
-        output_path = os.path.join(self.output_dir, f"{scene_id}_screen2_{frame_number:04d}.png")
+        output_path = os.path.join(self.output_dir, f"{self.identifier}_{frame_number:03d}.png")
         self.text_renderer.save_image(image, output_path)
+        self._log(f"    - Saved image: {output_path}")
         
         return SubtitleFrame(
             frame_number=frame_number,
@@ -195,8 +213,9 @@ class SubtitleGenerator:
     def _generate_intro_frames(self, scene: Dict[str, Any], 
                               start_frame: int, fps: int) -> List[SubtitleFrame]:
         """intro 타입 장면의 프레임 생성"""
+        self._log(f"Generating intro frames for scene: {scene.get('id')}")
         scene_id = scene.get("id", "intro")
-        full_script = scene.get("full_script", "")
+        full_script = scene.get("content", {}).get("script", "")
         
         # 예상 지속 시간
         duration = self._estimate_speech_duration(full_script)
@@ -211,8 +230,9 @@ class SubtitleGenerator:
         )
         
         # 파일 저장
-        output_path = os.path.join(self.output_dir, f"{scene_id}_{start_frame:04d}.png")
+        output_path = os.path.join(self.output_dir, f"{self.identifier}_{start_frame:03d}.png")
         self.text_renderer.save_image(image, output_path)
+        self._log(f"    - Saved image: {output_path}")
         
         frame = SubtitleFrame(
             frame_number=start_frame,
@@ -230,8 +250,9 @@ class SubtitleGenerator:
     def _generate_ending_frames(self, scene: Dict[str, Any], 
                                start_frame: int, fps: int) -> List[SubtitleFrame]:
         """ending 타입 장면의 프레임 생성"""
+        self._log(f"Generating ending frames for scene: {scene.get('id')}")
         scene_id = scene.get("id", "ending")
-        full_script = scene.get("full_script", "")
+        full_script = scene.get("content", {}).get("script", "")
         
         # 예상 지속 시간
         duration = self._estimate_speech_duration(full_script)
@@ -246,8 +267,9 @@ class SubtitleGenerator:
         )
         
         # 파일 저장
-        output_path = os.path.join(self.output_dir, f"{scene_id}_{start_frame:04d}.png")
+        output_path = os.path.join(self.output_dir, f"{self.identifier}_{start_frame:03d}.png")
         self.text_renderer.save_image(image, output_path)
+        self._log(f"    - Saved image: {output_path}")
         
         frame = SubtitleFrame(
             frame_number=start_frame,

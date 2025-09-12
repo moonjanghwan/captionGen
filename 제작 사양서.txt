@@ -672,7 +672,7 @@ Sheets로 내보내기
 /
 📋 파일명 규칙 상세
 파일 타입	규칙	예시
-프로젝트 폴더	{project_name}	중국어_기초_회화_일상_인사말
+프로젝트 폴더	{project_name}	kor-chn
 Manifest	{project_name}_manifest.json	중국어_기초_회화_일상_인사말_manifest.json
 SSML	{project_name}_ssml.txt	중국어_기초_회화_일상_인사말_ssml.txt
 오디오	{project_name}_audio.mp3	중국어_기초_회화_일상_인사말_audio.mp3
@@ -685,8 +685,11 @@ SSML	{project_name}_ssml.txt	중국어_기초_회화_일상_인사말_ssml.txt
 한글: 그대로 사용 (UTF-8 지원)
 특수문자: -, _만 허용, 나머지는 _로 변환
 길이 제한: 최대 100자
-
-
+mp3 파일을 ./output/{프로젝트명}/{식별자}/mp3 폴더에 {식별자}_intro.mp3,{식별자}_ending.mp3 파일로 저장한다.
+SSML 파일을 ./output/{프로젝트명}/{식별자}/SSML 폴더에 {식별자}_intro.ssml, {식별자}_ending.ssml 파일로 저장한다.
+Manifest	./output/{프로젝트명}/{식별자}/manifest 폴더에 {식별자}_intro.json, {식별자}_ending.json
+자막 프레임	{project_name}_scene_{N}_screen{M}_{frame:04d}.png	중국어_기초_회화_일상_인사말_scene_01_screen1_0000.png
+최종 비디오	{project_name}_final.mp4	중국어_기초_회화_일상_인사말_final.mp4
 =======================================
 파이프라인 탭 UI와 기능 정의
 
@@ -697,9 +700,40 @@ SSML	{project_name}_ssml.txt	중국어_기초_회화_일상_인사말_ssml.txt
     
 
     수정
-    2. 스크립트 선택 탭과 창으로 만들어 선택된 스크립트를 창에 디스플레이 한다.
     
-    7. 디스플레이 창을 각 섹션의 크기에 맞춰 키워준다.
-    8. '선택된 스크립트 내용', '파이프라인 출력' 라벨을 삭제
     9. 인트로,엔딩의 Manafest 파일은 문장 단위로 읽어서 만드는 걸로 수정해 줘야 돼
    
+   
+   
+   파일 저장 디렉토리 구조 (최종 확정안)
+
+  모든 생성 파일은 기본적으로 ./output/{프로젝트명}/{식별자}/ 경로 아래에 종류별로
+  분류되어 저장됩니다.
+
+   * Manifest 파일:
+       * 경로: manifest/
+       * 파일명: timeline_manifest.json
+       * 전체 경로 예시: ./output/kor-chn/kor-chn/manifest/timeline_manifest.json
+
+   * 오디오 파일 (MP3):
+       * 경로: mp3/
+       * 파일명 형식: {식별자}_{타입}.mp3 (예: kor-chn_intro.mp3)
+       * 전체 경로 예시: ./output/kor-chn/kor-chn/mp3/kor-chn_intro.mp3
+
+   * SSML 파일:
+       * 경로: SSML/
+       * 파일명 형식: {식별자}_{타입}.ssml (예: kor-chn_intro.ssml)
+       * 전체 경로 예시: ./output/kor-chn/kor-chn/SSML/kor-chn_intro.ssml
+
+   * 자막 이미지 파일 (PNG):
+       * 경로:
+           * 인트로: intro/
+           * 엔딩: ending/
+           * 회화/대화: dialog/
+       * 파일명 형식: {식별자}_{일련번호}.png (예: kor-chn_001.png)
+       * 전체 경로 예시: ./output/kor-chn/kor-chn/intro/kor-chn_001.png
+
+   * 최종 비디오 파일 (MP4):
+       * 경로: mp4/
+       * 파일명 형식: {프로젝트명}_final.mp4
+       * 전체 경로 예시: ./output/kor-chn/kor-chn/mp4/kor-chn_final.mp4

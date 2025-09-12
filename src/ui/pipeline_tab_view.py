@@ -16,12 +16,14 @@ import io
 import time as time_module
 from tkinter import filedialog, messagebox
 from typing import Dict, Any, Optional
+import tempfile
 
 # 파이프라인 모듈 import
 try:
     from src.pipeline.ui_integrated_manager import (
         UIIntegratedPipelineManager, UIPipelineConfig
     )
+    from src.pipeline.subtitle.generator import SubtitleGenerator
     PIPELINE_AVAILABLE = True
 except ImportError as e:
     print(f"⚠️ 파이프라인 모듈 import 실패: {e}")
@@ -143,7 +145,18 @@ class PipelineTabView(ctk.CTkFrame):
             width=150,
             height=40
         )
-        self.video_button.pack(side="left")
+        self.video_button.pack(side="left", padx=(0, 10))
+
+        self.final_button = ctk.CTkButton(
+            button_frame,
+            text="🚀 최종 생성",
+            command=self._final_generation,
+            fg_color="#F1C40F",
+            hover_color="#F39C12",
+            width=150,
+            height=40
+        )
+        self.final_button.pack(side="left")
     
     def _create_script_section(self):
         """스크립트 섹션 생성"""
@@ -212,6 +225,7 @@ class PipelineTabView(ctk.CTkFrame):
         # 우클릭 메뉴 추가
         self.output_context_menu = tk.Menu(self.output_text, tearoff=0)
         self.output_context_menu.add_command(label="복사", command=self._copy_selected_text)
+        self.output_context_menu.add_command(label="붙여넣기", command=self._paste_to_output)
         self.output_context_menu.add_command(label="전체 선택", command=self._select_all_output)
         self.output_context_menu.add_separator()
         self.output_context_menu.add_command(label="지우기", command=self._clear_output)
@@ -409,19 +423,156 @@ class PipelineTabView(ctk.CTkFrame):
             script_type = self.script_var.get()
             self._add_output_message(f"📝 {script_type} 자막 이미지 생성 시작...", "INFO")
             
-            # 추후 기능 구현 예정
-            self.output_text.delete("1.0", tk.END)
-            self.output_text.insert("end", f"📝 {script_type} 자막 이미지 생성\n\n")
-            self.output_text.insert("end", "이 기능은 추후 구현 예정입니다.\n")
-            self.output_text.insert("end", "현재는 Manifest와 SSML 생성만 지원합니다.")
-            
-            self._add_output_message("⚠️ 자막 이미지 생성은 추후 구현 예정", "WARNING")
-            
+            project_name = self.root.data_page.project_name_var.get() if hasattr(self.root, 'data_page') else "kor-chn"
+            identifier = self.root.data_page.identifier_var.get() if hasattr(self.root, 'data_page') else "kor-chn"
+
+            if script_type == "회화":
+                self._generate_conversation_images(project_name, identifier)
+            elif script_type == "인트로":
+                self._generate_intro_images(project_name, identifier)
+            elif script_type == "엔딩":
+                self._generate_ending_images(project_name, identifier)
+            elif script_type == "대화":
+                self._generate_dialogue_images(project_name, identifier)
+            else:
+                self._add_output_message(f"지원하지 않는 스크립트 타입: {script_type}", "ERROR")
+
         except Exception as e:
             error_msg = f"자막 이미지 생성 실패: {e}"
             self._add_output_message(error_msg, "ERROR")
             messagebox.showerror("오류", error_msg)
+
+    def _generate_conversation_images(self, project_name, identifier):
+        """회화 스크립트 자막 이미지 생성"""
+        try:
     
+            
+            # Manifest 파일 경로
+            manifest_path = "output/manifest_conversation.json"
+            if not os.path.exists(manifest_path):
+                self._add_output_message(f"❌ Manifest 파일을 찾을 수 없습니다: {manifest_path}", "ERROR")
+                messagebox.showerror("오류", f"Manifest 파일을 찾을 수 없습니다: {manifest_path}")
+                return
+
+            with open(manifest_path, 'r', encoding='utf-8') as f:
+                manifest_data = json.load(f)
+
+            # 이미지 설정 가져오기
+            image_settings = self.root.image_page.get_all_settings()
+
+            # 자막 생성기 초기화
+            subtitle_generator = SubtitleGenerator(settings=image_settings)
+            
+            # 출력 디렉토리 설정
+            output_dir = os.path.join("output", project_name, identifier, "subtitles")
+            
+            # 자막 이미지 생성
+            frames = subtitle_generator.generate_from_manifest(manifest_data, output_dir)
+
+        except Exception as e:
+            error_msg = f"회화 자막 이미지 생성 실패: {e}"
+            self._add_output_message(error_msg, "ERROR")
+            messagebox.showerror("오류", error_msg)
+
+    def _generate_intro_images(self, project_name, identifier):
+        """인트로 스크립트 자막 이미지 생성"""
+        try:
+            
+            
+            # Manifest 파일 경로
+            manifest_path = "output/manifest_intro.json"
+            if not os.path.exists(manifest_path):
+                self._add_output_message(f"❌ Manifest 파일을 찾을 수 없습니다: {manifest_path}", "ERROR")
+                messagebox.showerror("오류", f"Manifest 파일을 찾을 수 없습니다: {manifest_path}")
+                return
+
+            with open(manifest_path, 'r', encoding='utf-8') as f:
+                manifest_data = json.load(f)
+
+            # 이미지 설정 가져오기
+            image_settings = self.root.image_page.get_all_settings()
+
+            # 자막 생성기 초기화
+            subtitle_generator = SubtitleGenerator(settings=image_settings)
+            
+            # 출력 디렉토리 설정
+            output_dir = os.path.join("output", project_name, identifier, "subtitles")
+            
+            # 자막 이미지 생성
+            frames = subtitle_generator.generate_from_manifest(manifest_data, output_dir)
+
+        except Exception as e:
+            error_msg = f"인트로 자막 이미지 생성 실패: {e}"
+            self._add_output_message(error_msg, "ERROR")
+            messagebox.showerror("오류", error_msg)
+
+    def _generate_ending_images(self, project_name, identifier):
+        """엔딩 스크립트 자막 이미지 생성"""
+        try:
+            
+            
+            # Manifest 파일 경로
+            manifest_path = "output/manifest_ending.json"
+            if not os.path.exists(manifest_path):
+                self._add_output_message(f"❌ Manifest 파일을 찾을 수 없습니다: {manifest_path}", "ERROR")
+                messagebox.showerror("오류", f"Manifest 파일을 찾을 수 없습니다: {manifest_path}")
+                return
+
+            with open(manifest_path, 'r', encoding='utf-8') as f:
+                manifest_data = json.load(f)
+
+            # 이미지 설정 가져오기
+            image_settings = self.root.image_page.get_all_settings()
+
+            # 자막 생성기 초기화
+            subtitle_generator = SubtitleGenerator(settings=image_settings)
+            
+            # 출력 디렉토리 설정
+            output_dir = os.path.join("output", project_name, identifier, "subtitles")
+            
+            # 자막 이미지 생성
+            frames = subtitle_generator.generate_from_manifest(manifest_data, output_dir)
+
+        except Exception as e:
+            error_msg = f"엔딩 자막 이미지 생성 실패: {e}"
+            self._add_output_message(error_msg, "ERROR")
+            messagebox.showerror("오류", error_msg)
+
+    def _generate_dialogue_images(self, project_name, identifier):
+        """대화 스크립트 자막 이미지 생성"""
+        try:
+            
+            
+            # Manifest 파일 경로
+            manifest_path = "output/manifest_dialog.json"
+            if not os.path.exists(manifest_path):
+                self._add_output_message(f"❌ Manifest 파일을 찾을 수 없습니다: {manifest_path}", "ERROR")
+                messagebox.showerror("오류", f"Manifest 파일을 찾을 수 없습니다: {manifest_path}")
+                return
+
+            with open(manifest_path, 'r', encoding='utf-8') as f:
+                manifest_data = json.load(f)
+
+            # 이미지 설정 가져오기
+            image_settings = self.root.image_page.get_all_settings()
+
+            # 자막 생성기 초기화
+            subtitle_generator = SubtitleGenerator(settings=image_settings)
+            
+            # 출력 디렉토리 설정
+            output_dir = os.path.join("output", project_name, identifier, "subtitles")
+            
+            # 자막 이미지 생성
+            frames = subtitle_generator.generate_from_manifest(manifest_data, output_dir)
+
+        except Exception as e:
+            error_msg = f"대화 자막 이미지 생성 실패: {e}"
+            self._add_output_message(error_msg, "ERROR")
+            messagebox.showerror("오류", error_msg)
+    
+    def _final_generation(self):
+        self._add_output_message("🚀 최종 생성 시작...", "INFO")
+
     def _render_video(self):
         """비디오 렌더링"""
         if not PIPELINE_AVAILABLE:
@@ -445,220 +596,102 @@ class PipelineTabView(ctk.CTkFrame):
             self._add_output_message(error_msg, "ERROR")
             messagebox.showerror("오류", error_msg)
     
-    def _on_script_change(self, value):
-        """스크립트 변경 이벤트"""
-        try:
-            self._refresh_script()
-        except Exception as e:
-            self._add_output_message(f"스크립트 변경 실패: {e}", "ERROR")
-    
+    def _on_script_change(self, choice=None):
+        self.after(50, self._refresh_script)
+
     def _refresh_script(self):
-        """스크립트 새로고침"""
+        """스크립트 종류에 따라 UI를 새로고침합니다."""
+        script_type = self.script_var.get()
+        
+        self.script_text.grid_remove()
+        self.csv_tree.grid_remove()
+        self.csv_scroll_y.grid_remove()
+        for item in self.csv_tree.get_children():
+            self.csv_tree.delete(item)
+        self.script_text.delete("1.0", tk.END)
+
         try:
-            script_type = self.script_var.get()
             script_data = self._collect_script_data(script_type)
             
-            if script_data:
-                self.script_text.delete("1.0", tk.END)
-                self.script_text.insert("end", f"📄 {script_type} 스크립트\n")
-                self.script_text.insert("end", "="*50 + "\n\n")
-                
-                if script_type == "회화":
-                    self._display_conversation_script(script_data)
-                elif script_type == "인트로":
-                    self._display_intro_script(script_data)
-                elif script_type == "엔딩":
-                    self._display_ending_script(script_data)
-                elif script_type == "대화":
-                    self._display_dialogue_script(script_data)
-                
-                self._add_output_message(f"✅ {script_type} 스크립트 로드 완료", "INFO")
+            if script_type in ["회화", "대화"] and isinstance(script_data, dict) and "scenes" in script_data:
+                self._show_csv_grid(script_data["scenes"])
+            elif isinstance(script_data, str):
+                self._show_text_content(script_data)
             else:
-                self.script_text.delete("1.0", tk.END)
-                self.script_text.insert("end", f"❌ {script_type} 스크립트를 찾을 수 없습니다.\n")
-                self.script_text.insert("end", "데이터 생성 탭에서 먼저 스크립트를 생성하세요.")
-                
+                self._show_text_content(f"표시할 데이터가 없습니다: {script_type}")
+
         except Exception as e:
-            self._add_output_message(f"스크립트 새로고침 실패: {e}", "ERROR")
-    
-    def _collect_script_data(self, script_type):
-        """스크립트 데이터 수집"""
-        try:
-            # 데이터 생성 탭에서 스크립트 데이터 수집
-            if hasattr(self.root, 'data_page') and self.root.data_page:
-                return self._collect_from_data_tab(script_type)
-            else:
-                # 기본 데이터 반환
-                return self._get_default_script_data(script_type)
-        except Exception as e:
-            self._add_output_message(f"스크립트 데이터 수집 실패: {e}", "ERROR")
+            self._show_text_content(f"스크립트 로딩 중 오류 발생: {e}")
+
+    def _collect_script_data(self, script_type: str) -> Optional[Any]:
+        """데이터 탭에서 스크립트 데이터를 가져옵니다."""
+        if not hasattr(self.root, 'data_page'):
             return None
-    
-    def _collect_from_data_tab(self, script_type):
-        """데이터 탭에서 스크립트 데이터 수집"""
-        try:
-            if not hasattr(self.root, 'data_page') or not self.root.data_page:
+        
+        data_page = self.root.data_page
+        if not hasattr(data_page, 'generated_data') or not data_page.generated_data:
+            if not data_page.load_generated_data():
                 return None
-            
-            data_page = self.root.data_page
-            generated_data = getattr(data_page, "generated_data", None)
-            
-            if not generated_data:
-                return None
-            
-            # 데이터 생성 탭의 스크립트 선택과 동일한 방식으로 데이터 추출
-            if script_type == "회화":
-                # 회화 스크립트: dialogueCsv 데이터 사용
-                dialogue_csv = generated_data.get("fullVideoScript", {}).get("dialogueCsv") or generated_data.get("dialogueCsv", "")
-                if dialogue_csv and dialogue_csv.strip():
-                    return self._parse_dialogue_csv(dialogue_csv)
-                else:
-                    return None
-                    
-            elif script_type == "인트로":
-                # 인트로 스크립트: introScript 데이터 사용
-                intro_script = generated_data.get("introScript", "")
-                if intro_script:
-                    return {
-                        "type": "intro",
-                        "script": intro_script
-                    }
-                return None
-                
-            elif script_type == "엔딩":
-                # 엔딩 스크립트: endingScript 데이터 사용
-                ending_script = generated_data.get("endingScript", "")
-                if ending_script:
-                    return {
-                        "type": "ending",
-                        "script": ending_script
-                    }
-                return None
-                
-            elif script_type == "대화":
-                # 대화 스크립트: dialogueCsv 데이터 사용 (회화와 동일)
-                dialogue_csv = generated_data.get("fullVideoScript", {}).get("dialogueCsv") or generated_data.get("dialogueCsv", "")
-                if dialogue_csv and dialogue_csv.strip():
-                    return self._parse_dialogue_csv(dialogue_csv)
-                else:
-                    return None
-            
+
+        if not hasattr(data_page, 'generated_data'):
             return None
-            
-        except Exception as e:
-            self._add_output_message(f"데이터 탭 데이터 수집 실패: {e}", "ERROR")
+
+        data = data_page.generated_data
+        if not data:
             return None
-    
-    def _parse_dialogue_csv(self, dialogue_csv):
-        """dialogueCsv 데이터를 파싱하여 구조화된 데이터로 변환"""
-        try:
-            import csv
-            import io
-            
-            # CSV 파싱
-            reader = csv.reader(io.StringIO(dialogue_csv))
-            rows = list(reader)
-            
-            # 헤더 제거
-            if rows and len(rows[0]) >= 4:
-                header = [col.strip('"') for col in rows[0][:4]]
-                if header[:4] == ["순번", "원어", "학습어", "읽기"]:
+
+        if script_type == "회화" or script_type == "대화":
+            dialogue_csv = data.get("fullVideoScript", {}).get("dialogueCsv") or data.get("dialogueCsv", "")
+            if dialogue_csv and dialogue_csv.strip():
+                reader = csv.reader(io.StringIO(dialogue_csv))
+                rows = list(reader)
+                if rows and [c.strip('"') for c in rows[0][:4]] == ["순번", "원어", "학습어", "읽기"]:
                     rows = rows[1:]
-            
-            scenes = []
-            for row in rows:
-                if len(row) >= 4:
-                    normalized = [col.strip('"') for col in row[:4]]
-                    scene = {
-                        "order": normalized[0],
-                        "native_script": normalized[1],
-                        "learning_script": normalized[2],
-                        "reading_script": normalized[3]
-                    }
-                    scenes.append(scene)
-            
-            return {
-                "type": "conversation",
-                "scenes": scenes
-            }
-            
-        except Exception as e:
-            self._add_output_message(f"CSV 파싱 실패: {e}", "ERROR")
+                
+                scenes = []
+                for row in rows:
+                    normalized = [c.strip('"') for c in row]
+                    padded = (normalized + [""] * 4)[:4]
+                    scenes.append({
+                        "order": padded[0],
+                        "native_script": padded[1],
+                        "learning_script": padded[2],
+                        "reading_script": padded[3]
+                    })
+                return {"scenes": scenes}
             return None
-    
+        elif script_type == "인트로":
+            return data.get("introScript", "")
+        elif script_type == "엔딩":
+            return data.get("endingScript", "")
+        else:
+            return None
+
     def _show_text_content(self, content: str):
         """텍스트 내용을 텍스트 박스에 표시"""
-        try:
-            # Treeview 숨기고 텍스트 표시
-            self.csv_tree.grid_remove()
-            self.csv_scroll_y.grid_remove()
-        except Exception:
-            pass
+        self.csv_tree.grid_remove()
+        self.csv_scroll_y.grid_remove()
         self.script_text.grid(row=0, column=0, sticky="nsew")
         self.script_text.delete("1.0", tk.END)
-        self.script_text.insert("end", content)
-    
+        self.script_text.insert("1.0", content)
+
     def _show_csv_grid(self, scenes):
         """CSV 데이터를 그리드로 표시"""
-        try:
-            # 텍스트 숨기고 그리드 표시
-            self.script_text.grid_remove()
-            self.csv_tree.grid(row=0, column=0, sticky="nsew")
-            self.csv_scroll_y.grid(row=0, column=1, sticky="ns")
-            
-            # 기존 행 제거
-            for iid in self.csv_tree.get_children():
-                self.csv_tree.delete(iid)
-            
-            # 데이터 추가
-            for scene in scenes:
-                values = [
-                    scene.get('order', ''),
-                    scene.get('native_script', ''),
-                    scene.get('learning_script', ''),
-                    scene.get('reading_script', '')
-                ]
-                self.csv_tree.insert("", tk.END, values=values)
-                
-        except Exception as e:
-            # 오류 시 텍스트로 표시
-            self._show_text_content(f"그리드 표시 실패: {e}")
-    
-    def _get_default_script_data(self, script_type):
-        """기본 스크립트 데이터 반환"""
-        if script_type == "회화":
-            return {
-                "type": "conversation",
-                "scenes": [
-                    {
-                        "native_script": "안녕하세요!",
-                        "learning_script": "你好！",
-                        "reading_script": "니하오!"
-                    }
-                ]
-            }
-        elif script_type == "인트로":
-            return {
-                "type": "intro",
-                "script": "안녕하세요! 학습을 시작하겠습니다."
-            }
-        elif script_type == "엔딩":
-            return {
-                "type": "ending",
-                "script": "학습이 완료되었습니다. 다음에 또 만나요!"
-            }
-        elif script_type == "대화":
-            return {
-                "type": "dialogue",
-                "scenes": [
-                    {
-                        "native_script": "안녕하세요!",
-                        "learning_script": "你好！"
-                    }
-                ]
-            }
+        self.script_text.grid_remove()
+        self.csv_tree.grid(row=0, column=0, sticky="nsew")
+        self.csv_scroll_y.grid(row=0, column=1, sticky="ns")
         
-        return None
+        for iid in self.csv_tree.get_children():
+            self.csv_tree.delete(iid)
+        
+        for scene in scenes:
+            values = [
+                scene.get('order', ''),
+                scene.get('native_script', ''),
+                scene.get('learning_script', ''),
+                scene.get('reading_script', '')
+            ]
+            self.csv_tree.insert("", tk.END, values=values)
     
     def _display_conversation_script(self, script_data):
         """회화 스크립트 표시 - 그리드 형식으로 표시"""
@@ -791,7 +824,7 @@ class PipelineTabView(ctk.CTkFrame):
                     })
             
             elif script_type == "인트로":
-                script = script_data.get("script", "")
+                script = script_data
                 # 문장 단위로 분리 (마침표, 느낌표, 물음표 기준)
                 sentences = self._split_into_sentences(script)
                 
@@ -831,7 +864,7 @@ class PipelineTabView(ctk.CTkFrame):
 
             
             elif script_type == "엔딩":
-                script = script_data.get("script", "")
+                script = script_data
                 # 문장 단위로 분리 (마침표, 느낌표, 물음표 기준)
                 sentences = self._split_into_sentences(script)
                 
@@ -911,7 +944,14 @@ class PipelineTabView(ctk.CTkFrame):
         """Manifest 파일 저장 - 파일명 형식에 맞춰 저장"""
         try:
             # 파일명 형식: manifest_[스크립트타입].json
-            filename = f"manifest_{script_type.lower()}.json"
+            script_type_mapping = {
+                "회화": "conversation",
+                "인트로": "intro",
+                "엔딩": "ending",
+                "대화": "dialog"
+            }
+            script_suffix = script_type_mapping.get(script_type, script_type.lower())
+            filename = f"manifest_{script_suffix}.json"
             filepath = os.path.join("output", filename)
             
             # 출력 디렉토리 생성
@@ -1002,7 +1042,7 @@ class PipelineTabView(ctk.CTkFrame):
             
             print(f"[SSML 생성] 인트로 화자: {intro_voice}")
             
-            script = script_data.get("script", "")
+            script = script_data
             # 문장 단위로 분리
             sentences = self._split_into_sentences(script)
             
@@ -1034,7 +1074,7 @@ class PipelineTabView(ctk.CTkFrame):
             
             print(f"[SSML 생성] 엔딩 화자: {ending_voice}")
             
-            script = script_data.get("script", "")
+            script = script_data
             # 문장 단위로 분리
             sentences = self._split_into_sentences(script)
             
@@ -1101,15 +1141,38 @@ class PipelineTabView(ctk.CTkFrame):
         except Exception as e:
             raise Exception(f"대화 SSML 생성 실패: {e}")
     
+    def _save_subtitle_image(self, image, project_name, identifier, script_type, image_index):
+        """Saves a subtitle image to the correct directory with the correct filename."""
+        dir_map = {
+            "회화": "dialog",
+            "인트로": "intro",
+            "엔딩": "ending",
+            "대화": "dialog"
+        }
+        sub_dir = dir_map.get(script_type)
+        if not sub_dir:
+            return None
+
+        image_dir = os.path.join(config.OUTPUT_PATH, project_name, identifier, sub_dir)
+        os.makedirs(image_dir, exist_ok=True)
+        
+        filename = f"{identifier}_{image_index:03d}.png"
+        filepath = os.path.join(image_dir, filename)
+        image.save(filepath, 'PNG')
+        return filepath
+
     def _add_output_message(self, message: str, level: str = "INFO"):
         """출력 메시지 추가"""
         try:
             from datetime import datetime
             timestamp = datetime.now().strftime("%H:%M:%S")
             
+            log_message = f"[{timestamp}] {level}: {message}"
             # 출력 창에 메시지 추가
-            self.output_text.insert("end", f"[{timestamp}] {level}: {message}\n")
+            self.output_text.insert("end", f"{log_message}\n")
             self.output_text.see("end")
+            # 터미널에도 출력
+            print(log_message)
             
         except Exception:
             pass
@@ -1125,6 +1188,18 @@ class PipelineTabView(ctk.CTkFrame):
         except tk.TclError:
             # 선택된 텍스트가 없는 경우
             self._add_output_message("복사할 텍스트를 먼저 선택하세요.", "WARNING")
+
+    def _paste_to_output(self):
+        """클립보드의 텍스트를 출력 창에 붙여넣기"""
+        try:
+            clipboard_text = self.clipboard_get()
+            if clipboard_text:
+                # 현재 커서 위치에 붙여넣기
+                self.output_text.insert(tk.INSERT, clipboard_text)
+                self._add_output_message("클립보드의 텍스트가 출력 창에 붙여넣기되었습니다.", "SUCCESS")
+        except tk.TclError:
+            # 클립보드에 텍스트가 없는 경우
+            self._add_output_message("클립보드에 붙여넣을 텍스트가 없습니다.", "WARNING")
     
     def _select_all_output(self):
         """출력 창의 모든 텍스트 선택"""
@@ -1238,7 +1313,7 @@ class PipelineTabView(ctk.CTkFrame):
             
             # 파일명: {파일식별자}_{스크립트타입}.ssml (제작 사양서 규칙)
             script_type_mapping = {
-                "회화": "dialog",
+                "회화": "conversation",
                 "인트로": "intro", 
                 "엔딩": "ending",
                 "대화": "dialog"
@@ -1366,8 +1441,17 @@ class PipelineTabView(ctk.CTkFrame):
             base_dir = "output"
             project_dir = os.path.join(base_dir, project_name)
             identifier_dir = os.path.join(project_dir, identifier)
-            mp3_filename = f"{identifier}.mp3"
-            mp3_filepath = os.path.join(identifier_dir, mp3_filename)
+            mp3_dir = os.path.join(identifier_dir, "mp3")
+            os.makedirs(mp3_dir, exist_ok=True)
+            script_type_mapping = {
+                "회화": "conversation",
+                "인트로": "intro", 
+                "엔딩": "ending",
+                "대화": "dialog"
+            }
+            script_suffix = script_type_mapping.get(script_type, script_type.lower())
+            mp3_filename = f"{identifier}_{script_suffix}.mp3"
+            mp3_filepath = os.path.join(mp3_dir, mp3_filename)
             
             # 폴더 생성
             os.makedirs(identifier_dir, exist_ok=True)
@@ -1639,6 +1723,7 @@ class PipelineTabView(ctk.CTkFrame):
                 from google.cloud import texttospeech
                 import io
                 from pydub import AudioSegment
+                AudioSegment.converter = "/opt/homebrew/bin/ffmpeg"
                 print(f"[TTS API] google-cloud-texttospeech 패키지 로드 성공")
                 
                 # TTS 클라이언트 초기화
@@ -1846,6 +1931,26 @@ class PipelineTabView(ctk.CTkFrame):
         except Exception as e:
             self._add_output_message(f"❌ 설정 로드 실패: {e}", "ERROR")
     
+    def _save_subtitle_image(self, image, project_name, identifier, script_type, image_index):
+        """Saves a subtitle image to the correct directory with the correct filename."""
+        dir_map = {
+            "회화": "dialog",
+            "인트로": "intro",
+            "엔딩": "ending",
+            "대화": "dialog"
+        }
+        sub_dir = dir_map.get(script_type)
+        if not sub_dir:
+            return None
+
+        image_dir = os.path.join(config.OUTPUT_PATH, project_name, identifier, sub_dir)
+        os.makedirs(image_dir, exist_ok=True)
+        
+        filename = f"{identifier}_{image_index:03d}.png"
+        filepath = os.path.join(image_dir, filename)
+        image.save(filepath, 'PNG')
+        return filepath
+
     def _open_project_folder(self):
         """프로젝트 폴더 열기"""
         try:

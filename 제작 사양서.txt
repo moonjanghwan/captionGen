@@ -51,8 +51,8 @@ Sheets로 내보내기
 
 0. 메뉴 구성 방법
 
-    메뉴 구성 방법 : 바탕색(10) 입력창,텍스트 행수(4) Dropbox 와 같은 형식은 
-            라벨(크기: 글자 수), 입력창 이나 Dropbox 구분의 형태로 만들어줘
+    메뉴 구성 방법 : 바탕색(10) 입력창,텍스트 행수(4) Dropbox, 구간(5) 체크박스 와 같은 형식은 
+            라벨(크기: 글자 수), 입력창 이나 Dropbox, 체크박스 구분의 형태로 만들어줘
     메뉴버튼을 선택을 하면 선택된 메뉴 버튼은 다른 칼라로 선택 된 것을 표시 해줘야 돼
 
 1. 데이터 생성 메뉴 : 4개의 섹션으로 구성 한다.위에서 아래로 구성한다.
@@ -114,17 +114,17 @@ Sheets로 내보내기
                 비디오 : 배경 비디오 선택 (mp4)
                 찾아 보기 버튼은 이미지일 경우에는 JPG 나 PNG, 동영상일 경우는 MP4 파일을 검색 하게 한다.
             라디오 버튼의 선택에 따라서 입력창에는 해당 데이타를 입력 할 수 있도록 한다
-        2행: '바탕 설정:' 텍스트,  (5) 체크박스,바탕색(15) 입력창 Default = #000000,
+        2행: '바탕 설정:' 텍스트,  구간(5) 체크박스 Default = False,바탕색(15) 입력창 Default = #000000,
             투명도(10) 입력창 Default = 1.0, 여백(10) Dropbox Default = 2
-        3행: '쉐도우 설정:' 텍스트, (5) 체크박스, 두께(6) 입력창 Default = 2, 쉐도우 색상(10) 입력창 Default = #000000,
-        4행: '외곽선 설정:' 텍스트, (5) 체크박스, 두께(6) 입력창 Default = 2, 외곽선 색상(10) 입력창 Default = #000000   
+        3행: '쉐도우 설정:' 텍스트, 두께(6) 입력창 Default = 2, 쉐도우 색상(10) 입력창 Default = #000000,
+        4행: '외곽선 설정:' 텍스트, 두께(6) 입력창 Default = 2, 외곽선 색상(10) 입력창 Default = #000000   
         
-        공통 설정에서 바탕 설정, 쉐도우 설정, 외곽선 설정에 체크박스를 넣어 체크시에만 값을 변경, 입력할 수 있고, 
-        체크가 안되면 뒤의 입력을 비활성화 한다.
+        2행에서 체크박스 구간은 선택(True)이 될 경우에는 텍스트라인 전체 x,y,xw,xh를 바탕으로 사용하는 형태로 동작 한다.
+            False일 경우에는 텍스트 에만 바탕이 생성 된다.
         미리보기 나 비디오 생성에서 이미지를 만들 때는 바탕 설정, 쉐도우 설정,외곽선 설정의 체크박스에 따라 비디오 생성에 반영 한다.
 
     3.2. 텍스트 설정
-        - '회화 설정', '썸네일 설정','인트로 설정', '엔딩 설정', '스크립트 설정'의 5개 탭으로 구성 되있다.
+        - '회화 설정', '썸네일 설정','인트로 설정', '엔딩 설정', '대화 설정'의 5개 탭으로 구성 되있다.
         - 텍스트 행수(8) Dropbox Default = 4, 화면비율(16) Dropbox Default = 16:9, 
                 해상도(16)Dropbox  Default = 1920 X 1080
         - 타이틀은 행, x, y, w, 크기(pt),폰트(pt),색상,굵기,좌우 정렬,상하 정렬로 구성하고 입력창과 Dropbox의 중앙 절렬한다.
@@ -245,22 +245,33 @@ Sheets로 내보내기
         - 인트로/ 엔딩 스크립트 창 : 문장 단위로 줄바꿈을 한다.
     
     - 오디오 생성
-        회화 스크립트 창에서 데이터를 한 행씩 가져와서 오디오를 실시간 생성한다.
-        화자 : 원어화자, 학습어 화자 1,2,3,4 
-        대화 순번 : 다음과 같이 재생하며 화자간에는 1초의 무음을 넣어준다.
-            1. 원어화자 - 원어
-            2. 학습어 화자 1 - 학습어
-            3. 학습어 화자 2 - 학습어
-            4. 학습어 화자 3 - 학습어
-            3. 학습어 화자 4 (1 원어, 4 학습어)
-        화자간에는 1초의 무음을 넣는다.
-        전체 행을 mp3로 만든다.
-        SSML `<mark>` 태그를 사용하여 정확한 타이밍이 있는 '오디오 생성'과 
-            같은 방법으로 mp3 파일을 만든다.
-        이때 만들어진 mp3 파일을 ./output/{프로젝트명}/{식별자} 폴더에 {식별자}.mp3 파일로 저장한다.
-        
+        1. 회화 오디오 생성
+            회화 스크립트 창에서 데이터를 한 행씩 가져와서 오디오를 실시간 생성한다.
+            화자 : 원어화자, 학습어 화자 1,2,3,4 
+            대화 순번 : 다음과 같이 재생하며 화자간에는 1초의 무음을 넣어준다.
+                1. 원어화자 - 원어
+                2. 학습어 화자 1 - 학습어
+                3. 학습어 화자 2 - 학습어
+                4. 학습어 화자 3 - 학습어
+                3. 학습어 화자 4 (1 원어, 4 학습어)
+            화자간에는 1초의 무음을 넣는다.
+            전체 행을 mp3로 만든다.
+            SSML `<mark>` 태그를 사용하여 정확한 타이밍이 있는 '오디오 생성'과 
+                같은 방법으로 mp3 파일을 만든다.
+            이때 만들어진 mp3 파일을 ./output/{프로젝트명}/{식별자}/mp3 폴더에 {식별자}_conversation.mp3 파일로 저장한다.
+            이때 만들어진 SSML 파일을 ./output/{프로젝트명}/{식별자}/SSML 폴더에 {식별자}_conversation.ssml 파일로 저장한다.
+        2. 인트로/엔딩 오디오 생성
+            인트로/엔딩 스크립트 창에서 데이터를 한 문장씩 가져와서 오디오를 실시간 생성한다.
+            화자 : 원어화자
+            문장 간에는 1초의 무음을 넣는다.
+            전체 문장을 mp3로 만든다.
+            SSML `<mark>` 태그를 사용하여 정확한 타이밍이 있는 '오디오 생성'과 
+                같은 방법으로 mp3 파일을 만든다.
+            이때 만들어진 mp3 파일을 ./output/{프로젝트명}/{식별자}/mp3 폴더에 {식별자}_intro.mp3,{식별자}_ending.mp3 파일로 저장한다.
+            이때 만들어진 SSML 파일을 ./output/{프로젝트명}/{식별자}/SSML 폴더에 {식별자}_intro.ssml, {식별자}_ending.ssml 파일로 저장한다.
 
-    - 오디오 듣기 버튼
+
+    - 오디오 듣기 conversation
         화자 : 원어화자, 학습어 화자 1,2,3,4 
         대화 순번 : 원어화자, 학습어 화자 1, 학습어 화자 2, 학습어 화자 3, 학습어 화자 4 (1 원어, 4 학습어)순서로 읽기
         읽는 순서 :  각 행별로 다음 순서로 읽고 전체 행을 읽는다.
@@ -271,7 +282,7 @@ Sheets로 내보내기
         각 화자 오디오 클립 사이에 1초 무음을 포함하여 연결하는 로직을 구현합니다.
         
 
-    - '회화 비디오' 버튼
+    - '회화 비디오' 
         각 행별로 2개의 독립적인 텍스트 화면을 생성하는 로직을 구현합니다.
         사전에 다음과 같이 png 자막 파일을 만든다. 이때 배경은 칼라로하고 #000000 색으로 한다.
             화면 1: 순번, 원어 텍스트만 화면에 표시한다.
@@ -350,34 +361,36 @@ Sheets로 내보내기
     - 메시지 창 섹션
         현재 UI에 설정된 모든 디자인 값을 JSON 형식 또는 읽기 
 
-    - '미리보기' 버튼
+    - '자막 이미지 생성' 버튼
 
         png 파일을 만든다.
         각 설정 탭에 따라 다음과 같이 동작한다.
+        각 텍스트의 속성은 텍스트 설정에 있는 모든 설정 값을 반영하여 텍스트를 생성 한다.
+        이미지 설정 탭에서 정리된 설정 값을 반영하여 이미지를 만듭니다.
         파일을 ./output/{프로젝트명}/{식별자} 폴더에 dialog, thumbnail, intro, ending 폴더를 만들어 
             번호를 붙여 {식별자}_001.png의 형식으로 저장한다.
 
-        1. 회화 설정 : 
+        1. 회화 이미지 생성 : 
             각 행별로 2개의 독립적인 텍스트 화면을 생성하는 로직을 구현합니다.
             화면 1: 순번, 원어 텍스트만 화면에 표시한다.
             화면 2: 순번, 원어, 학습어, 읽기를 화면에 표시한다.
             이미지 생성시 회화 설정에 설정된 데이터를 사용한다.
 
-        2. 썸네일 설정
+        2. 썸네일 이미지 생성
             AI 생성 JSON 파일을 읽어 파싱하여 썸네일 문장을 추출하여 사용한다.
             4줄의 텍스트를 읽어 이미지 파일을 만든다. 이떄 읽은 값을 터미널에 출력한다.
             주어진 3 세트를 이미지로 만든다.
             이미지 생성시 썸네일 설정에 설정된 데이터를 사용한다.
             텍스트가 w를 넘는 경우 적당히 폰트사이즈를 줄여 텍스트를 만든다.
 
-        3. 인트로 설정
+        3. 인트로 이미지 생성
             AI 생성 JSON 파일을 읽어 파싱하여 인트로 스크립트를 사용한다.
             문장별로 읽어 문장일 길어 w를 넘으면 스마트 줄바꿈을 하고 상하 정렬이 
                 top : x,y를 기준으로 화면 아래로 텍스트를 쓴다.
                 bottom : x, y가 마지막 줄의 기준이고 그 위로 줄을 쓴다.
             스크립트 전체 문장을 이미지로 만든다.
 
-        4. 엔딩 설정    
+        4. 엔딩 이미지 생성    
             인트로 스크립트를 사용한다.md 인라인 스크립트로 텍스트의 속성을 변경한다.
             문장별로 읽어 문장일 길어 w를 넘으면 스마트 줄바꿈을 하고 상하 정렬이 
                 top : x,y를 기준으로 화면 아래로 텍스트를 쓴다.
@@ -393,355 +406,261 @@ Sheets로 내보내기
 
 
 
-===========================================
-
-### **타입별 영상 제작을 위한 표준화된 자동화 파이프라인**
-
-이 시스템은 비디오의 구조와 내용을 정의하는 **Manifest 파일**을 기반으로, 오디오 생성, 자막 이미지 생성, 최종 비디오 렌더링 과정을 완전히 자동화하는 것을 목표로 합니다.
-
-#### **[1단계] 비디오 구조 설계 (Timeline Manifest 작성)**
-
-자동화의 시작은 만들고자 하는 비디오의 전체 흐름과 내용을 기계가 읽을 수 있는 형식으로 정의하는 것입니다. 이 역할을 하는 것이 바로 `timeline_manifest.json` 파일입니다. 이 파일은 전체 파이프라인의 \*\*청사진(Blueprint)\*\*이자 \*\*단일 정보 소스(Single Source of Truth)\*\*가 됩니다.
-
-**프로세스:**
-
-1.  **`timeline_manifest.json` 파일 생성:** 프로젝트의 루트에 이 파일을 생성합니다.
-2.  **전체 구조 정의:** `scenes`라는 배열(Array)을 만들어, 비디오에 포함될 각 장면을 순서대로 객체(Object) 형태로 추가합니다. 자동화 스크립트는 이 `scenes` 배열을 순서대로 읽어 비디오를 조립합니다.
-3.  **장면(Scene) 타입별 속성 정의:** 각 장면 객체에는 `id`(고유 식별자)와 `type`을 필수로 지정합니다. `type` (`intro`, `conversation`, `dialogue`, `ending`)에 따라 후속 자동화 단계(자막 생성, 오디오 구성 등)가 어떤 로직을 실행할지 결정됩니다.
-
-**`timeline_manifest.json` 예시:**
-
-```json
-{
-  "project_name": "Effective Communication Ep.1",
-  "resolution": "1920x1080",
-  "default_background": "assets/bg_main.mp4",
-  "scenes": [
-    {
-      "id": "intro_01",
-      "type": "intro",
-      "full_script": "안녕하세요! 효과적인 커뮤니케이션 시리즈에 오신 것을 환영합니다."
-    },
-    {
-      "id": "dialogue_01",
-      "type": "dialogue",
-      "script": [
-        { "speaker": "A", "text": "어제 보낸 파일 확인하셨나요?" },
-        { "speaker": "B", "text": "네, 지금 막 확인했습니다. 몇 가지 질문이 있어요." }
-      ]
-    },
-    {
-      "id": "conversation_01",
-      "type": "conversation",
-      "sequence": 1,
-      "native_script": "Let's get started.",
-      "learning_script": "시작해 봅시다.",
-      "reading_script": "Si-jak-hae bop-si-da."
-    },
-    {
-      "id": "ending_01",
-      "type": "ending",
-      "full_script": "시청해주셔서 감사합니다. 구독과 좋아요를 잊지 마세요!"
-    }
-  ]
-}
-```
 
-이처럼 Manifest 파일을 작성하면, 비디오의 순서를 바꾸거나 대사를 수정하는 등의 모든 변경 작업을 **오직 이 파일 하나만 수정**하는 것으로 관리할 수 있게 됩니다.
 
------
-
-#### **[2단계] 오디오 생성 및 타임스탬프 추출 (SSML 활용)**
-
-Manifest의 각 Scene을 순회하며 필요한 모든 오디오와 타이밍 데이터를 생성합니다.
-
-**프로세스:**
-
-1.  `timeline_manifest.json`의 `scenes` 배열을 반복합니다.
-2.  각 scene의 `type`에 따라 다른 SSML을 구성하여 TTS API에 요청합니다.
-      * **`intro`, `ending`, `dialogue`:** 문장 단위로 `<mark>` 태그를 삽입합니다.
-      * **`conversation`:** 원어, 학습어(4회 반복) 음성을 각각 생성하고, 화자 사이에 1초 무음을 프로그래밍 방식으로 추가할 오디오 리스트를 준비합니다.
-3.  결과로 마스터 오디오 파일(`_master.mp3`)과 각 `<mark>`의 정확한 시간이 기록된 타이밍 파일(`_segments.json`)을 저장합니다.
-
------
-
-#### **[3단계] 타입별 자막 PNG 시퀀스 생성**
-
-이 단계가 시스템의 핵심입니다. Manifest의 `type`을 기준으로 각기 다른 자막 생성 로직을 호출합니다.
-
-**프로세스:**
-
-1.  다시 `scenes` 배열을 반복합니다.
-2.  `scene.type`에 따라 분기 처리합니다.
-      * **`type: "intro"` 또는 `type: "ending"`:**
-          * `full_script`를 가져옵니다.
-          * `_segments.json`의 문장 타이밍에 맞춰, '스마트 줄바꿈' 로직을 적용한 자막 이미지를 생성합니다.
-          * 결과물: `intro_01_seg_0.png`, `intro_01_seg_1.png`...
-      * **`type: "conversation"`:**
-          * 요구사항에 명시된 2개의 화면을 별도로 렌더링합니다.
-          * **화면 1:** 원어 음성 길이에 맞춰 "순번 + 원어" 텍스트가 포함된 `conversation_01_screen1.png`를 생성합니다.
-          * **화면 2:** 4명의 학습어 음성 전체 길이에 맞춰 "순번 + 원어 + 학습어 + 읽기" 텍스트가 포함된 `conversation_01_screen2.png`를 생성합니다.
-      * **`type: "dialogue"`:**
-          * `script` 배열을 가져옵니다.
-          * `_segments.json`의 화자별 대사 타이밍에 맞춰, 지정된 위치에 화자 이름과 대사가 포함된 자막 이미지를 생성합니다.
-          * 결과물: `dialogue_01_seg_0.png` (A), `dialogue_01_seg_1.png` (B) ...
-
------
-
-#### **[4단계] 최종 비디오 렌더링 (FFmpeg)**
-
-모든 재료(배경, 오디오, 자막 PNG)를 합쳐 최종 비디오를 완성합니다.
-
-**프로세스:**
-
-1.  자동화 스크립트는 Manifest 파일과 지금까지 생성된 모든 리소스(오디오, 타이밍 데이터, PNG 시퀀스)를 읽어 들입니다.
-2.  FFmpeg 스크립트를 동적으로 생성합니다. 이 스크립트는 `_segments.json`의 정확한 타임스탬프를 사용하여, 적절한 시간에 각 자막 PNG 이미지를 `overlay` 필터로 추가하고, 최종 오디오 파일을 합칩니다.
-3.  생성된 FFmpeg 명령을 실행하여 최종 비디오 파일(`.mp4`)을 출력합니다.
-
-### **이 접근법의 장단점 분석**
-
-  * **👍 장점:**
-
-      * **품질과 자유도:** 자막을 이미지로 만들기 때문에 폰트, 스타일, 그라데이션, 그림자, 레이아웃 등 디자인에 제약이 거의 없습니다.
-      * **완벽한 표준화:** 모든 비디오는 Manifest 파일이라는 단일 설계도를 따르므로, 누가 작업하든 일관된 결과물을 보장합니다.
-      * **높은 확장성:** 새로운 비디오 타입(예: 퀴즈 비디오)이 추가되어도 Manifest에 `type: "quiz"`를 정의하고, 해당 타입의 자막 생성 로직만 추가하면 시스템을 쉽게 확장할 수 있습니다.
-      * **대량 생산 최적화:** 한번 시스템이 구축되면, Manifest 파일만 계속 작성하여 수십, 수백 개의 비디오를 자동으로 생산할 수 있습니다.
-
-  * **👎 단점:**
-
-      * **초기 구축 비용:** Manifest 파서, 타입별 자막 생성기, FFmpeg 스크립트 생성기 등 초기 개발에 공수가 들어갑니다.
-      * **유연성 저하:** 모든 것이 자동화에 맞춰져 있어, "이 부분만 살짝 다르게" 같은 예외적인 수정을 하려면 코드를 변경해야 할 수 있습니다. (물론 이 또한 Manifest에 예외 처리를 위한 속성을 추가하여 해결 가능합니다.)
-
-각 scene에 대해 FFmpeg 렌더링 스크립트를 동적으로 생성합니다.
-
-_segments.json 또는 계산된 오디오 길이를 기반으로, 각 자막 PNG 파일이 정확한 시간에 화면에 나타나고 사라지도록 overlay 필터를 설정합니다.
-
-conversation 타입의 경우, FFmpeg 타임라인에 2개의 overlay 필터를 순차적으로 적용합니다.
-
-overlay 1: 원어 음성 시간 동안 _screen1.png 표시
-
-overlay 2: 학습어 음성 시간 동안 _screen2.png 표시
-
-FFmpeg를 실행하여 각 Scene에 대한 비디오 클립(intro_01.mp4, conversation_01.mp4 등)을 생성합니다.
-
-(선택) 모든 클립을 이어 붙여 하나의 전체 강의 영상으로 합칩니다.
-
-결론: 이 접근법의 효율성 분석
-장점 (왜 효율적인가?)
-최상의 품질과 디자인 자유도: 자막을 이미지로 사전 렌더링하므로, 폰트, 색상, 그라데이션, 외곽선, 그림자, 심지어 텍스트에 이미지 포함까지 거의 모든 시각적 표현이 가능합니다. 이는 SRT/ASS 자막의 한계를 완전히 뛰어넘습니다.
-
-타이밍의 절대적 정확성: SSML <mark>로 생성된 타임스탬프를 기반으로 모든 것을(오디오, 자막 이미지 표시) 동기화하므로, 프레임 단위의 정확한 싱크를 보장합니다.
-
-표준화와 확장성: timeline_manifest.json이라는 단일 설계도와 타입별 렌더링 규칙 덕분에, 나중에 '퀴즈 비디오' 같은 새로운 타입을 추가하더라도 기존 시스템에 쉽게 통합할 수 있습니다.
-
-안정적인 결과물: 복잡한 스타일링을 렌더링 시점이 아닌 사전 제작 단계에서 처리하므로, 어떤 재생 환경에서도 항상 동일한 모습의 결과물을 보장합니다.
-
-단점 및 고려사항
-렌더링 속도: 수많은 PNG 파일을 생성하고 이를 비디오에 합성하는 과정은 실시간으로 SRT 자막을 입히는 것보다 더 많은 처리 시간과 컴퓨팅 자원을 요구합니다.
-
-저장 공간: 생성되는 PNG 시퀀스 파일들로 인해 일시적으로 더 많은 하드 디스크 공간이 필요합니다.
-
-수정의 번거로움: 자막 텍스트에 오타가 있을 경우, 오디오 생성 -> PNG 생성 -> 비디오 렌더링 과정을 다시 거쳐야 합니다. (물론 자동화되어 있으므로 큰 문제는 아닙니다.)
-
-최종 의견: '속도'만을 효율성의 척도로 본다면 가장 빠른 길은 아닐 수 있습니다. 하지만 **'고품질의 표준화된 영상을 안정적으로 대량 생산'**하는 것을 목표로 한다면, 
-제시하신 '자막 PNG 시퀀스' 방식은 매우 뛰어나고 전문적인 가장 효율적인 방법 중 하나가 맞습니다.
-
-여기서 회화, 인트로, 앤딩, 대화를 구분하는 이름을 사용(예: _intro, _ending 등)하는 내용으로 수정해줘
-
-그럼 회화 제작 방식으로 비디오를 만드는 ass 파일을 만드는 과정을 정확하게 만들어줘.
-이때 [Styles]의 Format: 은 화자 선택, 이미지 설정의 데이터를 사용하여 만들고,
-바탕을 사용하기 위해서는 layer를 사용해야하는데 이를 반영하고
-md 파일 내 색상, 폰트, 굵기 등 특정 속성을 반영하게 하는 기능을 반영하는 방법을 만들어줘 
-
-==============================================
-물론입니다. `timeline_manifest.json` 파일을 읽어 사용자가 요청한 로직에 따라 최종 비디오의 타임라인을 시뮬레이션하고, 
-그 예상 출력을 텍스트로 생성하는 Python 프로그램을 만들어 드리겠습니다.
-
-이 코드는 실제 오디오 파일이나 이미지 파일을 만들지는 않지만, 각 요소가 언제 나타나고 사라지는지를 초 단위로 정확하게 계산하여 보여줍니다.
-
-### **Python 프로그램 코드**
-
-```python
-import json
-
-def simulate_audio_duration(text: str) -> float:
-    """간단한 텍스트 길이에 기반하여 오디오 길이를 추정합니다."""
-    # 실제 TTS 결과와는 다르지만, 시뮬레이션을 위해 합리적인 추정치를 제공합니다.
-    # 글자당 약 0.4초로 계산하고 최소 1.5초를 보장합니다.
-    return max(1.5, len(text) * 0.4)
-
-def generate_expected_output(manifest: dict):
-    """
-    Manifest 파일을 기반으로 비디오 타임라인을 시뮬레이션하고
-    예상 출력을 텍스트로 생성합니다.
-    """
-    current_time = 0.0
-    timeline_events = []
-
-    print(f"## 프로젝트 '{manifest.get('project_name', 'N/A')}' 비디오 타임라인 시뮬레이션 ##\n")
-
-    # manifest의 각 scene을 순회하며 타임라인 생성
-    for scene in manifest.get("scenes", []):
-        if scene.get("type") == "conversation":
-            seq = scene.get("sequence")
-            native_script = scene.get("native_script")
-            learning_script = scene.get("learning_script")
-            reading_script = scene.get("reading_script")
-
-            timeline_events.append(f"\n--- 장면 {seq}: '{native_script}' 시작 ---")
-
-            # 1. 원어 화자 구간
-            native_duration = simulate_audio_duration(native_script)
-            start_time = current_time
-            end_time = current_time + native_duration
-            timeline_events.append(
-                f"[{start_time:05.2f}s - {end_time:05.2f}s] 🔊 AUDIO: '원어 화자'가 '{native_script}' 재생"
-            )
-            timeline_events.append(
-                f"[{start_time:05.2f}s - {end_time:05.2f}s] 🖼️ VIDEO: 화면 1 표시 (내용: {seq}, {native_script})"
-            )
-            current_time = end_time
-
-            # 2. 화자 간 무음
-            start_time = current_time
-            end_time = current_time + 1.0
-            timeline_events.append(f"[{start_time:05.2f}s - {end_time:05.2f}s] 🤫 SILENCE: 화자 간 1초 무음")
-            current_time = end_time
-
-            # 3. 학습어 화자 4명 반복 구간
-            learning_duration = simulate_audio_duration(learning_script)
-            learning_block_start_time = current_time
-            
-            # 화면 2가 표시될 전체 시간을 미리 계산
-            total_learning_block_duration = (learning_duration * 4) + (1.0 * 3) # 음성 4회 + 무음 3회
-            learning_block_end_time = learning_block_start_time + total_learning_block_duration
-            timeline_events.append(
-                f"[{learning_block_start_time:05.2f}s - {learning_block_end_time:05.2f}s] 🖼️ VIDEO: 화면 2 표시 (내용: {seq}, {native_script}, {learning_script}, {reading_script})"
-            )
-
-            # 각 학습어 화자 오디오 타임라인 추가
-            for i in range(4):
-                speaker_num = i + 1
-                start_time = current_time
-                end_time = current_time + learning_duration
-                timeline_events.append(
-                    f"[{start_time:05.2f}s - {end_time:05.2f}s] 🔊 AUDIO: '학습어 화자 {speaker_num}'가 '{learning_script}' 재생"
-                )
-                current_time = end_time
-
-                # 마지막 화자가 아니면 무음 추가
-                if i < 3:
-                    start_time = current_time
-                    end_time = current_time + 1.0
-                    timeline_events.append(f"[{start_time:05.2f}s - {end_time:05.2f}s] 🤫 SILENCE: 화자 간 1초 무음")
-                    current_time = end_time
-            
-            # 4. 행간 무음
-            start_time = current_time
-            end_time = current_time + 1.0
-            timeline_events.append(f"[{start_time:05.2f}s - {end_time:05.2f}s] 🤫 SILENCE: 다음 장면으로 넘어가기 전 1초 무음")
-            current_time = end_time
-
-    # 최종 타임라인 출력
-    for event in timeline_events:
-        print(event)
-
-# --- 프로그램 실행 ---
-
-# 1. JSON Manifest 데이터를 변수로 저장 (파일을 직접 읽어도 됩니다)
-manifest_data_string = """
-{
-  "project_name": "Korean-Chinese Conversation Practice",
-  "resolution": "1920x1080",
-  "default_background": "assets/background.mp4",
-  "scenes": [
-    {
-      "id": "conversation_01",
-      "type": "conversation",
-      "sequence": "1",
-      "native_script": "안녕하세요!",
-      "learning_script": "你好！",
-      "reading_script": "니하오!"
-    },
-    {
-      "id": "conversation_02",
-      "type": "conversation",
-      "sequence": "2",
-      "native_script": "고맙습니다!",
-      "learning_script": "谢谢！",
-      "reading_script": "씨에씨에!"
-    },
-    {
-      "id": "conversation_03",
-      "type": "conversation",
-      "sequence": "3",
-      "native_script": "천만에요!",
-      "learning_script": "不客气！",
-      "reading_script": "부커치!"
-    }
-  ]
-}
-"""
-
-# 2. JSON 문자열을 파이썬 딕셔너리로 변환
-manifest_data = json.loads(manifest_data_string)
-
-# 3. 함수를 실행하여 예상 출력 생성
-generate_expected_output(manifest_data)
-
-```
-
-### **프로그램 실행 결과 (예상 출력)**
-
-위 코드를 실행하면 다음과 같은 텍스트 결과가 출력됩니다. 이 결과가 바로 최종 비디오의 시간대별 구성과 정확히 일치하는 **예상 출력**입니다.
-
-```
-## 프로젝트 'Korean-Chinese Conversation Practice' 비디오 타임라인 시뮬레이션 ##
-
-
---- 장면 1: '안녕하세요!' 시작 ---
-[00.00s - 02.40s] 🔊 AUDIO: '원어 화자'가 '안녕하세요!' 재생
-[00.00s - 02.40s] 🖼️ VIDEO: 화면 1 표시 (내용: 1, 안녕하세요!)
-[02.40s - 03.40s] 🤫 SILENCE: 화자 간 1초 무음
-[03.40s - 12.60s] 🖼️ VIDEO: 화면 2 표시 (내용: 1, 안녕하세요!, 你好！, 니하오!)
-[03.40s - 05.00s] 🔊 AUDIO: '학습어 화자 1'가 '你好！' 재생
-[05.00s - 06.00s] 🤫 SILENCE: 화자 간 1초 무음
-[06.00s - 07.60s] 🔊 AUDIO: '학습어 화자 2'가 '你好！' 재생
-[07.60s - 08.60s] 🤫 SILENCE: 화자 간 1초 무음
-[08.60s - 10.20s] 🔊 AUDIO: '학습어 화자 3'가 '你好！' 재생
-[10.20s - 11.20s] 🤫 SILENCE: 화자 간 1초 무음
-[11.20s - 12.80s] 🔊 AUDIO: '학습어 화자 4'가 '你好！' 재생
-[12.80s - 13.80s] 🤫 SILENCE: 다음 장면으로 넘어가기 전 1초 무음
-
---- 장면 2: '고맙습니다!' 시작 ---
-[13.80s - 16.20s] 🔊 AUDIO: '원어 화자'가 '고맙습니다!' 재생
-[13.80s - 16.20s] 🖼️ VIDEO: 화면 1 표시 (내용: 2, 고맙습니다!)
-[16.20s - 17.20s] 🤫 SILENCE: 화자 간 1초 무음
-[17.20s - 26.40s] 🖼️ VIDEO: 화면 2 표시 (내용: 2, 고맙습니다!, 谢谢！, 씨에씨에!)
-[17.20s - 18.80s] 🔊 AUDIO: '학습어 화자 1'가 '谢谢！' 재생
-[18.80s - 19.80s] 🤫 SILENCE: 화자 간 1초 무음
-[19.80s - 21.40s] 🔊 AUDIO: '학습어 화자 2'가 '谢谢！' 재생
-[21.40s - 22.40s] 🤫 SILENCE: 화자 간 1초 무음
-[22.40s - 24.00s] 🔊 AUDIO: '학습어 화자 3'가 '谢谢！' 재생
-[24.00s - 25.00s] 🤫 SILENCE: 화자 간 1초 무음
-[25.00s - 26.60s] 🔊 AUDIO: '학습어 화자 4'가 '谢谢！' 재생
-[26.60s - 27.60s] 🤫 SILENCE: 다음 장면으로 넘어가기 전 1초 무음
-
---- 장면 3: '천만에요!' 시작 ---
-[27.60s - 30.00s] 🔊 AUDIO: '원어 화자'가 '천만에요!' 재생
-[27.60s - 30.00s] 🖼️ VIDEO: 화면 1 표시 (내용: 3, 천만에요!)
-[30.00s - 31.00s] 🤫 SILENCE: 화자 간 1초 무음
-[31.00s - 40.20s] 🖼️ VIDEO: 화면 2 표시 (내용: 3, 천만에요!, 不客气！, 부커치!)
-[31.00s - 32.60s] 🔊 AUDIO: '학습어 화자 1'가 '不客气！' 재생
-[32.60s - 33.60s] 🤫 SILENCE: 화자 간 1초 무음
-[33.60s - 35.20s] 🔊 AUDIO: '학습어 화자 2'가 '不客气！' 재생
-[35.20s - 36.20s] 🤫 SILENCE: 화자 간 1초 무음
-[36.20s - 37.80s] 🔊 AUDIO: '학습어 화자 3'가 '不客气！' 재생
-[37.80s - 38.80s] 🤫 SILENCE: 화자 간 1초 무음
-[38.80s - 40.40s] 🔊 AUDIO: '학습어 화자 4'가 '不客气！' 재생
-[40.40s - 41.40s] 🤫 SILENCE: 다음 장면으로 넘어가기 전 1초 무음
-```
-
+====================
+5. 파이프라인	
+====================
+
+
+ 최종 제안: Manifest 기반 동적 비디오 자동 생성 파이프라인 (v3 - 최종 구현안)
+
+  이 문서는 timeline_manifest.json을 중심으로, 현재 프로젝트 구조에 맞춰 최종 비디오를 출력하기까지의 모든 과정과 각 핵심 모듈의 전체 구현 코드 예시를 포함한 최종
+  실행 계획입니다.
+
+  [1단계] 비디오 구조 설계 (Timeline Manifest)
+
+  모든 제작 과정은 아래 timeline_manifest.json 파일 하나로 제어됩니다. 이 파일을 프로젝트 루트에 생성하거나, UI를 통해 생성/관리하게 됩니다.
+
+  `timeline_manifest.json` (최종 예시)
+
+    1 {
+    2   "project_name": "Effective Communication Ep.1",
+    3   "resolution": "1920x1080",
+    4   "default_background": "assets/bg_main.mp4",
+    5   "scenes": [
+    6     {
+    7       "id": "intro_01",
+    8       "type": "intro",
+    9       "content": {
+   10         "script": "안녕하세요! **효과적인 커뮤니케이션** 시리즈에 오신 것을 환영합니다. 오늘은 *[color=#00FFFF]경청의 중요성[/color]*에 대해 알아봅니다."
+   11       }
+   12     },
+   13     {
+   14       "id": "dialogue_01",
+   15       "type": "dialogue",
+   16       "background": "assets/bg_interview.jpg",
+   17       "content": {
+   18         "script": [
+   19           { "speaker": "A", "text": "어제 보낸 파일 확인하셨나요?" },
+   20           { "speaker": "B", "text": "네, 지금 막 확인했습니다. 몇 가지 질문이 있어요." }
+   21         ]
+   22       }
+   23     },
+   24     {
+   25       "id": "conversation_01",
+   26       "type": "conversation",
+   27       "content": {
+   28         "sequence": 1,
+   29         "native_script": "Let's get started.",
+   30         "learning_script": "시작해 봅시다.",
+   31         "reading_script": "Si-jak-hae bop-si-da."
+   32       }
+   33     },
+   34     {
+   35       "id": "ending_01",
+   36       "type": "ending",
+   37       "content": {
+   38         "script": "시청해주셔서 감사합니다. [size=110]**구독과 좋아요**[/size]를 잊지 마세요!"
+   39       }
+   40     }
+   41   ]
+   42 }
+
+  ---
+
+  [2단계] 오디오 및 타임스탬프 생성
+
+  위 Manifest를 기반으로, 2단계 파이프라인을 실행하면 다음과 같은 타임스탬프 파일이 생성됩니다.
+
+  `{identifier}_segments.json` (생성 예시)
+
+    1 {
+    2   "intro_01_seg_0": { "start": 0.5, "end": 3.2 },
+    3   "intro_01_seg_1": { "start": 3.8, "end": 5.1 },
+    4   "dialogue_01_A_0": { "start": 5.6, "end": 7.1 },
+    5   "dialogue_01_B_0": { "start": 7.5, "end": 9.8 },
+    6   "conversation_01_native": { "start": 10.2, "end": 11.0 },
+    7   "conversation_01_learning_0": { "start": 12.0, "end": 13.1 },
+    8   "conversation_01_learning_1": { "start": 14.1, "end": 15.2 },
+    9   "conversation_01_learning_2": { "start": 16.2, "end": 17.3 },
+   10   "conversation_01_learning_3": { "start": 18.3, "end": 19.4 },
+   11   "ending_01_seg_0": { "start": 20.0, "end": 22.5 }
+   12 }
+
+  ---
+
+  [3단계] 핵심 모듈 코드 구현
+
+  아래 내용은 제안서에 따라 수정될 각 핵심 파일의 전체 코드입니다. 이대로 각 파일을 수정하거나 생성하면 됩니다.
+
+  1. `src/ui/ui_utils.py` (신규 생성)
+  UI 위젯 생성을 표준화하기 위한 유틸리티 함수입니다.
+
+    1 import customtkinter as ctk
+    2 from src import config
+    3 import tkinter as tk
+    4
+    5 def create_labeled_widget(p, label_text, char_width, widget_type="entry", widget_params=None):
+    6     frame = ctk.CTkFrame(p, fg_color="transparent")
+    7     ctk.CTkLabel(frame, text=f"{label_text}:").pack(side="left", padx=(0, 3), pady=5)
+    8     pixel_width = char_width * 9
+    9     if pixel_width < 80 and widget_type in ["combo", "dropbox"]:
+   10         pixel_width = 80
+   11
+   12     widget_params = widget_params or {}
+   13     if 'fg_color' not in widget_params:
+   14         widget_params['fg_color'] = config.COLOR_THEME["widget"]
+   15     if 'text_color' not in widget_params:
+   16         widget_params['text_color'] = config.COLOR_THEME["text"]
+   17
+   18     widget = None
+   19     if widget_type.lower() in ["combo", "dropbox"]:
+   20         widget = ctk.CTkComboBox(frame, width=pixel_width, **widget_params)
+   21     elif widget_type.lower() == "checkbox":
+   22         widget = ctk.CTkCheckBox(frame, text="", **widget_params)
+   23     else:
+   24         widget = ctk.CTkEntry(frame, width=pixel_width, **widget_params)
+   25
+   26     widget.pack(side="left", pady=5)
+   27     frame.pack(side="left", padx=(0,10))
+   28     return frame, widget
+
+  2. `src/pipeline/subtitle/text_renderer.py` (수정)
+  인라인 스타일링, 스마트 줄바꿈, 동적 설정 적용 로직이 포함됩니다.
+
+    1 import os
+    2 import re
+    3 from typing import Dict, Any, Optional, Tuple, List
+    4 from PIL import Image, ImageDraw, ImageFont
+    5 import textwrap
+    6 from src import config
+    7
+    8 class TextRenderer:
+    9     def __init__(self, settings: Dict[str, Any]):
+   10         self.config = self._load_config(settings)
+   11         self.fonts = {}
+   12
+   13     def _load_config(self, settings: Dict[str, Any]) -> Dict[str, Any]:
+   14         default_config = {
+   15             "fonts": {
+   16                 "Noto Sans KR": "~/Library/Fonts/NotoSansKR-Regular.ttf",
+   17                 "KoPubWorld돋움체": "~/Library/Fonts/KoPubWorld Dotum Medium.ttf",
+   18                 "KoPubWorld바탕체": "~/Library/Fonts/KoPubWorld Batang Medium.ttf"
+   19             }
+   20         }
+   21         self._merge_configs(default_config, settings)
+   22         return default_config
+   23
+   24     def _merge_configs(self, base, user):
+   25         for key, value in user.items():
+   26             if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+   27                 self._merge_configs(base[key], value)
+   28             else:
+   29                 base[key] = value
+   30
+   31     def _get_font(self, font_name: str, size: int) -> ImageFont.FreeTypeFont:
+   32         if font_name in self.fonts:
+   33             return ImageFont.truetype(self.fonts[font_name], size)
+   34
+   35         font_path = self.config.get("fonts", {}).get(font_name)
+   36         if font_path:
+   37             font_path = os.path.expanduser(font_path)
+   38             if os.path.exists(font_path):
+   39                 self.fonts[font_name] = font_path
+   40                 return ImageFont.truetype(font_path, size)
+   41
+   42         print(f"⚠️ 폰트 파일을 찾을 수 없습니다:{font_name}. 기본 폰트를 사용합니다.")
+   43         return ImageFont.load_default()
+   44
+   45     def render_styled_text(self, draw: ImageDraw.ImageDraw, text_segments: List[Dict], x: int, y: int, settings: Dict):
+   46         current_x = x
+   47         for segment in text_segments:
+   48             text = segment.get("text", "")
+   49             font_name = segment.get("font", settings.get("폰트(pt)"))
+   50             size = int(segment.get("size", settings.get("크기(pt)", 48)))
+   51             color = segment.get("color", settings.get("색상", "#FFFFFF"))
+   52
+   53             font = self._get_font(font_name, size)
+   54             draw.text((current_x, y), text, font=font, fill=color)
+   55             current_x += draw.textbbox((0,0), text, font=font)[2]
+   56
+   57     def render_multiline_text(self, lines: List[str], width: int, height: int, line_settings: List[Dict]):
+   58         # ... (이전 제안서의 `render_multiline_text` 구현) ...
+   59         # 이 부분은 스타일 조각을 처리하도록 `render_styled_text`를 호출하는 로직으로 변경됩니다.
+   60         pass # 상세 구현은 생략
+   61
+   62     # ... conversation, intro, ending 렌더링 메서드들 ...
+
+  3. `src/pipeline/subtitle/generator.py` (수정)
+  Manifest와 설정을 받아 TextRenderer를 제어합니다.
+
+    1 import os
+    2 from typing import Dict, Any, Optional, List
+    3 from .text_renderer import TextRenderer
+    4
+    5 class SubtitleGenerator:
+    6     def __init__(self, settings: Dict[str, Any], identifier: str):
+    7         self.text_renderer = TextRenderer(settings)
+    8         self.identifier = identifier
+    9         self.frames = []
+   10         self.output_dir = ""
+   11         self.resolution = (1920, 1080)
+   12
+   13     def generate_from_manifest(self, manifest_data: Dict, output_dir: str):
+   14         # ...
+   15         # scene type에 따라 _generate_..._frames 메서드 호출
+   16         pass
+   17
+   18     def _generate_intro_frames(self, scene: Dict, start_frame: int, fps: int):
+   19         # 1. 스크립트에서 스타일 파싱
+   20         # 2. textwrap으로 스마트 줄바꿈
+   21         # 3. TextRenderer 호출하여 이미지 생성
+   22         # 4. 파일 저장: os.path.join(self.output_dir, f"{self.identifier}_{start_frame:03d}.png")
+   23         pass
+   24
+   25     # ... conversation, ending, dialogue 프레임 생성 메서드들 ...
+
+  4. `src/pipeline/ffmpeg/renderer.py` (신규 또는 수정)
+  모든 에셋을 최종 비디오로 결합합니다.
+
+    1 import ffmpeg
+    2
+    3 class FFmpegRenderer:
+    4     def render_video(self, manifest: Dict, segments: Dict, master_audio_path: str, image_sequence_paths: Dict):
+    5         bg_path = manifest.get("default_background")
+    6         resolution = manifest.get("resolution", "1920x1080").split('x')
+    7         width, height = int(resolution[0]), int(resolution[1])
+    8
+    9         video_stream = ffmpeg.input(bg_path, loop=1, t=segments['total_duration'])
+   10         audio_stream = ffmpeg.input(master_audio_path)
+   11
+   12         for scene_id, scene_images in image_sequence_paths.items():
+   13             for img_info in scene_images:
+   14                 img_path = img_info['path']
+   15                 start = img_info['start']
+   16                 end = img_info['end']
+   17                 subtitle_stream = ffmpeg.input(img_path)
+   18                 video_stream = video_stream.overlay(subtitle_stream, enable=f'between(t,{start},{end})')
+   19
+   20         output_path = f"./output/{manifest['project_name']}_final.mp4"
+   21         (
+   22             ffmpeg
+   23             .output(video_stream, audio_stream, output_path, vcodec='libx264', acodec='aac', strict='experimental', shortest=None)
+   24             .run(overwrite_output=True)
+   25         )
+   26         print(f"✅ 최종 비디오 생성 완료: {output_path}")
+
+  ---
+
+  [4단계] 실행 및 검증
+
+  위와 같이 핵심 모듈들이 수정되면, PipelineTabView의 각 버튼(_create_audio, _create_subtitles, _render_video)은 이 모듈들을 순서대로 호출하여 최종 결과물을
+  만들어냅니다.
+
+
+
+============================================
 
 그러면 이제는 이 파이프라인과 ui에 입력된 데이터와 연동하는 프로그램 통합의 과장이 필요한 것 같애. 
 이에 대한 접근 방법을 제시하고, 모든 출력물은 프로젝트 폴더에 정해진 파일명 규칙을 사용하여 출력하도록 수정해야해. 
@@ -772,58 +691,15 @@ SSML	{project_name}_ssml.txt	중국어_기초_회화_일상_인사말_ssml.txt
 파이프라인 탭 UI와 기능 정의
 
 프로젝트 이름은 데이터 생성의 프로젝트 명을 사용하고, 데이터는 AI 데이터 생성에서 만든 파일을 파싱하여 사용한다. 
-파이프라인 UI는 다음과 같이 수정한다.
-    1. 해상도는 이미지 설정에서 설정된 해상도를 사용(삭제)
-    2. FPS는 기본값으로 30FPS를 사용(삭제)
-    3. 프로젝트 이름, 해상도, FPS는 삭제
-    4. 스크립트 선택 Dropbox(40) : 생성할 스크립트 선택(회화, 인트로, 엔딩, 대화)
-    5. 스크립트 창을 만들어 파이프라인 탭이 선택되면 자동으로 파싱된 내용을 디스플레이 한다.(추가)
-    6. 출력 창을 만들어 콘트롤 버튼이 눌리면 출력 내용을 디스플레이 한다.
-    5. 콘트롤 버튼을 Manifest 생성, 오디오 생성, 자막 이미지 생성, 비디오 렌더링으로한다.
-    7. Manifest 생성 버튼 :
-        인트로, 회화, 엔딩을 하나에 Manifest 파일 만들지 말고, 각각 생성할 스크립트의 관해서만 만들어 줘 
-        선택된 스크립트와 정해진 출력 방법에 따라 파일명 형식의 json 파일을 만든다.
-            예 : manifest_dialog.json 
-        json 파일을 출력 창에 디스플레이 한다.
-    8. 오디오 생성 버튼 : 파일명.json의 `scenes` 배열을 반복합니다. SSML을 만들어 디스플레이 한다. 
-        1.  `timeline_manifest.json`의 `scenes` 배열을 반복합니다.
-        2.  각 scene의 `type`에 따라 다른 SSML을 구성하여 TTS API에 요청합니다.
-            `intro`, `ending`, `dialogue`: 문장 단위로 `<mark>` 태그를 삽입합니다.
-            conversation`: 원어, 학습어(4회 반복) 음성을 각각 생성하고, 화자 사이에 1초 무음을 
-                프로그래밍 방식으로 추가할 오디오 리스트를 준비합니다.
-        3.  결과로 마스터 오디오 파일(`intro`, `ending`, `dialogue`.mp3`)과 
-            각 `<mark>`의 정확한 시간이 기록된 타이밍 파일(`_segments.json`)을 저장합니다.
+           
     8. 자막 이미지 생성 버튼 (추후 기능 정의)
     9. 비디오 렌더링 버튼 (추후 기능 정의)
     
 
     수정
-    1. 프로젝트 폴더열기 버튼 삭제
     2. 스크립트 선택 탭과 창으로 만들어 선택된 스크립트를 창에 디스플레이 한다.
-    3. 스크립트 새로고침, 스크립트 저장 버튼 삭제
-    4. 출력 지우기, 출력 저장 버튼 삭제
-    5. 콘트롤 버튼 'Manifest 생성', '오디오 생성', '자막 이미지 생성', '비디오 렌더링'은 맨 아래로 배치한다.
-    6. 데이터 생성 탭의 스크립트 선택 기능과 동일하게 파이프라인 탭의 스크립트 데이터 창의 데이터를 디스플레이한다.
-        - 회화 스크립트 창 : 읽어온 CSV 파일을 그리드 형식으로 표시한다.
-        - 인트로/ 엔딩 스크립트 창 : 문장 단위로 줄바꿈을 한다.
+    
     7. 디스플레이 창을 각 섹션의 크기에 맞춰 키워준다.
     8. '선택된 스크립트 내용', '파이프라인 출력' 라벨을 삭제
     9. 인트로,엔딩의 Manafest 파일은 문장 단위로 읽어서 만드는 걸로 수정해 줘야 돼
-    10 오디오 생성: 
-        SSML `<mark>` 태그를 사용하여 정확한 타이밍이 있는 '오디오 생성'과 같은 방법으로 mp3 파일을 만든다.
-        SSML 파일을 출력창에 디스플레이한다.
-        1. 회화 :
-        타이밍과 자막 매칭 방법
-            화자 : 원어화자, 학습어 화자 1,2,3,4 
-            대화 순번 : 다음과 같이 재생하며 화자간, 행간에는 1초의 무음을 넣어준다.
-                1. 원어화자 - 원어             화면 1   원어 화자 시작 시간 ~ 종료 시간 + 1초
-                2. 학습어 화자 1 - 학습어       화면 2   학습어 화자 1 시작 시간 ~ 학습어 화자 4 종료시간 + 1초
-                3. 학습어 화자 2 - 학습어       화면 2
-                4. 학습어 화자 3 - 학습어       화면 2
-                3. 학습어 화자 4 - 학습어       화면 2
-            화자간 1초 무음 자동 추가
-        2. 인트로/엔딩 : 각 문장별 실제 오디오 길이 측정 + 문장간 1초 무음 자동 추가
-
-        SSML: ./output/kor-chn/kor-chn/SSML/kor-chn.ssml
-        MP3: ./output/kor-chn/kor-chn/kor-chn.mp3
-        파일명 : {파일식별자}_dialog.ssml, _intro.ssml, _endin.ssml 형식
+   

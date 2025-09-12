@@ -6,6 +6,7 @@ import json
 import tempfile
 import subprocess
 import threading
+from src.ui.ui_utils import create_labeled_widget
 
 PREVIEW_TEXTS = {
     "ko-KR": "안녕하세요. 만나서 반갑습니다.",
@@ -65,7 +66,7 @@ class SpeakerTabView(ctk.CTkFrame):
         num_speaker_frame.pack(fill="x", padx=5, pady=5, anchor="w")
 
         self.num_speakers_var = tk.StringVar(value="4")
-        _, self.num_speakers_dropdown = self.create_labeled_widget(num_speaker_frame, "화자 수", 6, "combo", 
+        _, self.num_speakers_dropdown = create_labeled_widget(num_speaker_frame, "화자 수", 6, "combo", 
             {"values": [str(i) for i in range(1, 6)], "variable": self.num_speakers_var, "command": self._on_num_speakers_changed})
         self.num_speakers_dropdown.master.pack(side="left")
 
@@ -236,17 +237,4 @@ class SpeakerTabView(ctk.CTkFrame):
         except Exception as e:
             print(f"화자 설정 파일 로드 중 오류 발생: {e}")
 
-    def create_labeled_widget(self, p, label_text, char_width, widget_type="combo", widget_params=None):
-        frame = ctk.CTkFrame(p, fg_color="transparent")
-        ctk.CTkLabel(frame, text=f"{label_text}:").pack(side="left", padx=10, pady=10)
-        pixel_width = char_width * 9
-        
-        widget_params = widget_params or {}
-        if 'fg_color' not in widget_params:
-            widget_params['fg_color'] = config.COLOR_THEME["widget"]
-        if 'text_color' not in widget_params:
-            widget_params['text_color'] = config.COLOR_THEME["text"]
-            
-        widget = ctk.CTkComboBox(frame, width=pixel_width, **widget_params)
-        widget.pack(side="left", padx=10, pady=10)
-        return frame, widget
+    from src.ui.ui_utils import create_labeled_widget

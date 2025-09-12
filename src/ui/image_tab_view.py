@@ -3,7 +3,12 @@ from src import config
 import tkinter as tk
 import os
 import json
+import glob
 from tkinter import filedialog
+from src.ui.ui_utils import create_labeled_widget
+
+
+
 
 class ImageTabView(ctk.CTkFrame):
     def __init__(self, parent, root=None):
@@ -106,23 +111,7 @@ class ImageTabView(ctk.CTkFrame):
 
     def _create_common_settings_widgets(self, parent):
         
-        def create_labeled_widget(p, label_text, char_width, widget_type="entry", widget_params=None):
-            frame = ctk.CTkFrame(p, fg_color="transparent")
-            ctk.CTkLabel(frame, text=f"{label_text}:").pack(side="left", padx=(0, 3), pady=2)
-            pixel_width = char_width * 9 
-            widget = None
-            widget_params = widget_params or {}
-            if 'fg_color' not in widget_params:
-                widget_params['fg_color'] = config.COLOR_THEME["widget"]
-            if 'text_color' not in widget_params:
-                widget_params['text_color'] = config.COLOR_THEME["text"]
-            if widget_type == "combo":
-                widget = ctk.CTkComboBox(frame, width=pixel_width, **widget_params)
-            else:
-                widget = ctk.CTkEntry(frame, width=pixel_width, **widget_params)
-            widget.pack(side="left", pady=2)
-            frame.pack(side="left", padx=(0,10))
-            return widget
+        from src.ui.ui_utils import create_labeled_widget
 
         # 1행
         row1 = ctk.CTkFrame(parent, fg_color="transparent")
@@ -132,7 +121,7 @@ class ImageTabView(ctk.CTkFrame):
         ctk.CTkRadioButton(row1, text="색상", variable=self.bg_type_var, value="색상").pack(side="left", padx=5)
         ctk.CTkRadioButton(row1, text="이미지", variable=self.bg_type_var, value="이미지").pack(side="left", padx=5)
         ctk.CTkRadioButton(row1, text="동영상", variable=self.bg_type_var, value="동영상").pack(side="left", padx=5)
-        self.w_bg_value = create_labeled_widget(row1, "배경값", 16)
+        _, self.w_bg_value = create_labeled_widget(row1, "배경값", 16)
         button_kwargs = {"fg_color": config.COLOR_THEME["button"], "hover_color": config.COLOR_THEME["button_hover"], "text_color": config.COLOR_THEME["text"]}
         self.btn_browse = ctk.CTkButton(row1, text="찾아보기", width=80, command=self._on_click_browse, **button_kwargs)
         self.btn_browse.pack(side="left", padx=(0,5))
@@ -147,11 +136,13 @@ class ImageTabView(ctk.CTkFrame):
         row2 = ctk.CTkFrame(parent, fg_color="transparent")
         row2.pack(fill="x", padx=10, pady=2, anchor="w")
         ctk.CTkLabel(row2, text="바탕 설정:").pack(side="left", padx=(0, 10))
-        self.w_bg = create_labeled_widget(row2, "바탕색", 15)
-        self.w_bg.insert(0, "#808080")
-        self.w_alpha = create_labeled_widget(row2, "투명도", 10)
+        self.section_checkbox_var = tk.BooleanVar(value=False)
+        _, self.section_checkbox = create_labeled_widget(row2, "구간", 5, "checkbox", {"variable": self.section_checkbox_var})
+        _, self.w_bg = create_labeled_widget(row2, "바탕색", 15)
+        self.w_bg.insert(0, "#000000")
+        _, self.w_alpha = create_labeled_widget(row2, "투명도", 10)
         self.w_alpha.insert(0, "1.0")
-        self.w_margin = create_labeled_widget(row2, "여백", 10, "combo", {"values": ["0", "2", "5", "10"]})
+        _, self.w_margin = create_labeled_widget(row2, "여백", 10, "combo", {"values": ["0", "2", "5", "10"]})
         self.w_margin.set("2")
 
         # 3행
@@ -161,17 +152,17 @@ class ImageTabView(ctk.CTkFrame):
         # 블러 사용 여부 체크박스
         self.shadow_blur_enabled = tk.BooleanVar(value=True)
         ctk.CTkCheckBox(row3, text="블러", variable=self.shadow_blur_enabled, command=lambda: [self._on_shadow_blur_toggle(), self._update_common_states()]).pack(side="left", padx=(0,8))
-        self.w_shadow_thick = create_labeled_widget(row3, "두께", 6)
+        _, self.w_shadow_thick = create_labeled_widget(row3, "두께", 6)
         self.w_shadow_thick.insert(0, "2")
-        self.w_shadow_color = create_labeled_widget(row3, "쉐도우 색상", 10)
+        _, self.w_shadow_color = create_labeled_widget(row3, "쉐도우 색상", 10)
         self.w_shadow_color.insert(0, "#000000")
-        self.w_shadow_blur = create_labeled_widget(row3, "블러", 4)
+        _, self.w_shadow_blur = create_labeled_widget(row3, "블러", 4)
         self.w_shadow_blur.insert(0, "8")
-        self.w_shadow_offx = create_labeled_widget(row3, "오프셋X", 4)
+        _, self.w_shadow_offx = create_labeled_widget(row3, "오프셋X", 4)
         self.w_shadow_offx.insert(0, "2")
-        self.w_shadow_offy = create_labeled_widget(row3, "오프셋Y", 4)
+        _, self.w_shadow_offy = create_labeled_widget(row3, "오프셋Y", 4)
         self.w_shadow_offy.insert(0, "2")
-        self.w_shadow_alpha = create_labeled_widget(row3, "불투명도", 5)
+        _, self.w_shadow_alpha = create_labeled_widget(row3, "불투명도", 5)
         self.w_shadow_alpha.insert(0, "0.6")
         # 두께 변경 시 블러 기본값 재추천
         try:
@@ -183,9 +174,9 @@ class ImageTabView(ctk.CTkFrame):
         row4 = ctk.CTkFrame(parent, fg_color="transparent")
         row4.pack(fill="x", padx=10, pady=2, anchor="w")
         ctk.CTkLabel(row4, text="외곽선 설정:").pack(side="left", padx=(0, 10))
-        self.w_border_thick = create_labeled_widget(row4, "두께", 6)
+        _, self.w_border_thick = create_labeled_widget(row4, "두께", 6)
         self.w_border_thick.insert(0, "2")
-        self.w_border_color = create_labeled_widget(row4, "외곽선 색상", 10)
+        _, self.w_border_color = create_labeled_widget(row4, "외곽선 색상", 10)
         self.w_border_color.insert(0, "#000000")
 
         # 초기 상태 반영
@@ -307,6 +298,8 @@ class ImageTabView(ctk.CTkFrame):
             "common": self._collect_common_settings(),
             "tabs": tabs_payload,
         }
+
+    
 
     def apply_all_settings(self, data: dict):
         if not isinstance(data, dict):
@@ -510,7 +503,9 @@ class ImageTabView(ctk.CTkFrame):
                 cfg = row_map.get(k, {})
                 print(f"  - {k}: x={cfg.get('x')} y={cfg.get('y')} w={cfg.get('w')} size={cfg.get('크기(pt)')} font={cfg.get('폰트(pt)')} color={cfg.get('색상')} align=({cfg.get('좌우 정렬')},{cfg.get('상하 정렬')})")
 
-            def draw_label(img, draw, label_name, text):
+            use_section_background = self.section_checkbox_var.get()
+
+            def draw_label(img, draw, label_name, text, use_section_background):
                 cfg = row_map.get(label_name, {})
                 # 좌표/폭/크기/색상/정렬
                 try:
@@ -590,10 +585,18 @@ class ImageTabView(ctk.CTkFrame):
                         margin_px = int(self.w_margin.get())
                     except Exception:
                         margin_px = 0
-                    left = max(0, bbox_l - margin_px)
-                    top = max(0, bbox_t - margin_px)
-                    right = min(width, bbox_r + margin_px)
-                    bottom = min(height, bbox_b + margin_px)
+                    
+                    if use_section_background:
+                        left = x
+                        top = y
+                        right = x + w
+                        bottom = y + size
+                    else:
+                        left = max(0, bbox_l - margin_px)
+                        top = max(0, bbox_t - margin_px)
+                        right = min(width, bbox_r + margin_px)
+                        bottom = min(height, bbox_b + margin_px)
+
                     rect = (int(left), int(top), int(right), int(bottom))
                     # RGBA 이미지 전제: 오버레이에 그리고 합성
                     overlay = Image.new('RGBA', (width, height), (0,0,0,0))
@@ -655,17 +658,17 @@ class ImageTabView(ctk.CTkFrame):
                 print(f"[공통] bg_color={self.w_bg.get()} alpha={self.w_alpha.get()} margin={self.w_margin.get()} shadow_thick={self.w_shadow_thick.get()} shadow_color={self.w_shadow_color.get()} border_thick={self.w_border_thick.get()} border_color={self.w_border_color.get()}")
                 img1 = self._make_base_canvas(width, height)
                 d1 = ImageDraw.Draw(img1)
-                draw_label(img1, d1, "순번", f"{seq}")
-                draw_label(img1, d1, "원어", native)
+                draw_label(img1, d1, "순번", f"{seq}", use_section_background)
+                draw_label(img1, d1, "원어", native, use_section_background)
                 save1 = os.path.join(dialog_dir, f"{identifier}_{idx:03d}_a.png")
                 img1.save(save1)
                 print(f"[save] {save1}")
                 img2 = self._make_base_canvas(width, height)
                 d2 = ImageDraw.Draw(img2)
-                draw_label(img2, d2, "순번", f"{seq}")
-                draw_label(img2, d2, "원어", native)
-                draw_label(img2, d2, "학습어", learning)
-                draw_label(img2, d2, "읽기", reading)
+                draw_label(img2, d2, "순번", f"{seq}", use_section_background)
+                draw_label(img2, d2, "원어", native, use_section_background)
+                draw_label(img2, d2, "학습어", learning, use_section_background)
+                draw_label(img2, d2, "읽기", reading, use_section_background)
                 save2 = os.path.join(dialog_dir, f"{identifier}_{idx:03d}_b.png")
                 img2.save(save2)
                 print(f"[save] {save2}")
@@ -1690,7 +1693,7 @@ class TextSettingsTab(ctk.CTkFrame):
             hdr_cell = ctk.CTkLabel(grid_frame, text=header_text, justify="center", anchor="center")
             hdr_cell.grid(row=0, column=col, padx=2, pady=5, sticky="nsew")
 
-        font_options = ["Noto Sans KR", "KoPubWorldDotum", "KoPubWorldBatang"]
+        font_options = ["Noto Sans KR", "KoPubWorld돋움체", "KoPubWorld바탕체"]
         weight_options = ["Light", "Medium", "Bold"]
         h_align_options = ["Left", "Center", "Right"]
         v_align_options = ["Top", "Middle", "Bottom"]

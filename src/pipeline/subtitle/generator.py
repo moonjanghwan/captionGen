@@ -30,14 +30,14 @@ class SubtitleFrame:
 class SubtitleGenerator:
     """자막 이미지 생성 클래스"""
     
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, settings: Dict[str, Any]):
         """
         자막 생성기 초기화
         
         Args:
-            config_path: 텍스트 설정 파일 경로
+            settings: UI에서 전달된 전체 설정
         """
-        self.text_renderer = TextRenderer(config_path)
+        self.text_renderer = TextRenderer(settings)
         self.frames = []
         self.output_dir = ""
         self.resolution = (1920, 1080)
@@ -125,9 +125,15 @@ class SubtitleGenerator:
         # 예상 지속 시간 (원어 발음 + 1초 무음)
         duration = self._estimate_speech_duration(native_script) + 1.0
         
+        # Get line settings from config
+        rows_cfg = self.text_renderer.config.get("tabs", {}).get("회화 설정", {}).get("rows", [])
+        seq_cfg = next((row for row in rows_cfg if row.get("행") == "순번"), {})
+        native_cfg = next((row for row in rows_cfg if row.get("행") == "원어"), {})
+        line_settings = [seq_cfg, native_cfg]
+
         # 이미지 생성
         image = self.text_renderer.render_conversation_screen1(
-            sequence, native_script, self.resolution[0], self.resolution[1]
+            sequence, native_script, self.resolution[0], self.resolution[1], line_settings
         )
         
         # 파일 저장
@@ -157,10 +163,18 @@ class SubtitleGenerator:
         # 예상 지속 시간 (4명의 학습어 발음 + 3초 무음)
         duration = self._estimate_speech_duration(learning_script) * 4 + 3.0
         
+        # Get line settings from config
+        rows_cfg = self.text_renderer.config.get("tabs", {}).get("회화 설정", {}).get("rows", [])
+        seq_cfg = next((row for row in rows_cfg if row.get("행") == "순번"), {})
+        native_cfg = next((row for row in rows_cfg if row.get("행") == "원어"), {})
+        learning_cfg = next((row for row in rows_cfg if row.get("행") == "학습어"), {})
+        reading_cfg = next((row for row in rows_cfg if row.get("행") == "읽기"), {})
+        line_settings = [seq_cfg, native_cfg, learning_cfg, reading_cfg]
+
         # 이미지 생성
         image = self.text_renderer.render_conversation_screen2(
             sequence, native_script, learning_script, reading_script,
-            self.resolution[0], self.resolution[1]
+            self.resolution[0], self.resolution[1], line_settings
         )
         
         # 파일 저장
@@ -187,9 +201,13 @@ class SubtitleGenerator:
         # 예상 지속 시간
         duration = self._estimate_speech_duration(full_script)
         
+        # Get line settings from config
+        rows_cfg = self.text_renderer.config.get("tabs", {}).get("인트로 설정", {}).get("rows", [])
+        line_settings = rows_cfg
+
         # 이미지 생성
         image = self.text_renderer.render_intro_ending(
-            full_script, self.resolution[0], self.resolution[1], "intro"
+            full_script, self.resolution[0], self.resolution[1], "intro", line_settings
         )
         
         # 파일 저장
@@ -218,9 +236,13 @@ class SubtitleGenerator:
         # 예상 지속 시간
         duration = self._estimate_speech_duration(full_script)
         
+        # Get line settings from config
+        rows_cfg = self.text_renderer.config.get("tabs", {}).get("엔딩 설정", {}).get("rows", [])
+        line_settings = rows_cfg
+
         # 이미지 생성
         image = self.text_renderer.render_intro_ending(
-            full_script, self.resolution[0], self.resolution[1], "ending"
+            full_script, self.resolution[0], self.resolution[1], "ending", line_settings
         )
         
         # 파일 저장

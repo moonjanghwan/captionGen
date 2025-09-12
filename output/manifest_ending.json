@@ -1,23 +1,23 @@
 {
   "metadata": {
-    "script_type": "인트로",
-    "created_at": "2025-09-10 14:09:26",
+    "script_type": "엔딩",
+    "created_at": "2025-09-10 14:25:11",
     "version": "1.0"
   },
   "project_config": {
-    "project_name": "중국어_학습_인트로",
+    "project_name": "중국어_학습_엔딩",
     "resolution": "1920x1080",
     "fps": 30,
     "default_background": "#000000"
   },
   "scenes": [
     {
-      "id": "intro_01",
-      "type": "intro",
+      "id": "ending_01",
+      "type": "ending",
       "sequence": 1,
       "duration": null,
       "content": {
-        "sentence": "여러분, 안녕하세요",
+        "sentence": "오늘 준비한 '일상 중국어 회화 5가지' 어떠셨나요",
         "sentence_number": 1,
         "total_sentences": 7
       },
@@ -25,33 +25,33 @@
         "smart_wrapping": true,
         "max_lines": 3,
         "background_color": "#000000",
-        "alignment": "top",
+        "alignment": "bottom",
         "text_settings": {
           "font": "KoPubWorldDotum",
-          "size": 90,
+          "size": 100,
           "color": "#FFFFFF",
           "weight": "Bold",
           "alignment": "Center",
-          "vertical_alignment": "Bottom"
+          "vertical_alignment": "Middle"
         }
       },
       "audio_config": {
         "speakers": [
           {
             "type": "native",
-            "script": "여러분, 안녕하세요",
+            "script": "오늘 준비한 '일상 중국어 회화 5가지' 어떠셨나요",
             "duration": null
           }
         ]
       }
     },
     {
-      "id": "intro_02",
-      "type": "intro",
+      "id": "ending_02",
+      "type": "ending",
       "sequence": 2,
       "duration": null,
       "content": {
-        "sentence": "중국어 왕초보 탈출을 위한 필수 채널, '차이나톡'에 오신 걸 환영합니다",
+        "sentence": "매일매일 꾸준히 연습하면 분명 실력이 쑥쑥 늘 거예요",
         "sentence_number": 2,
         "total_sentences": 7
       },
@@ -59,33 +59,33 @@
         "smart_wrapping": true,
         "max_lines": 3,
         "background_color": "#000000",
-        "alignment": "top",
+        "alignment": "bottom",
         "text_settings": {
           "font": "KoPubWorldDotum",
-          "size": 90,
+          "size": 100,
           "color": "#FFFFFF",
           "weight": "Bold",
           "alignment": "Center",
-          "vertical_alignment": "Bottom"
+          "vertical_alignment": "Middle"
         }
       },
       "audio_config": {
         "speakers": [
           {
             "type": "native",
-            "script": "중국어 왕초보 탈출을 위한 필수 채널, '차이나톡'에 오신 걸 환영합니다",
+            "script": "매일매일 꾸준히 연습하면 분명 실력이 쑥쑥 늘 거예요",
             "duration": null
           }
         ]
       }
     },
     {
-      "id": "intro_03",
-      "type": "intro",
+      "id": "ending_03",
+      "type": "ending",
       "sequence": 3,
       "duration": null,
       "content": {
-        "sentence": "오늘은 여러분이 중국 현지에서 바로 쓸 수 있는 '일상생활 필수 중국어 회화' 5가지를 배워볼 거예요",
+        "sentence": "오늘 배운 표현들을 꼭 복습하시고, 댓글로 여러분이 가장 유용하다고 생각하는 표현을 남겨주세요",
         "sentence_number": 3,
         "total_sentences": 7
       },
@@ -93,33 +93,33 @@
         "smart_wrapping": true,
         "max_lines": 3,
         "background_color": "#000000",
-        "alignment": "top",
+        "alignment": "bottom",
         "text_settings": {
           "font": "KoPubWorldDotum",
-          "size": 90,
+          "size": 100,
           "color": "#FFFFFF",
           "weight": "Bold",
           "alignment": "Center",
-          "vertical_alignment": "Bottom"
+          "vertical_alignment": "Middle"
         }
       },
       "audio_config": {
         "speakers": [
           {
             "type": "native",
-            "script": "오늘은 여러분이 중국 현지에서 바로 쓸 수 있는 '일상생활 필수 중국어 회화' 5가지를 배워볼 거예요",
+            "script": "오늘 배운 표현들을 꼭 복습하시고, 댓글로 여러분이 가장 유용하다고 생각하는 표현을 남겨주세요",
             "duration": null
           }
         ]
       }
     },
     {
-      "id": "intro_04",
-      "type": "intro",
+      "id": "ending_04",
+      "type": "ending",
       "sequence": 4,
       "duration": null,
       "content": {
-        "sentence": "카페에서 주문할 때, 길을 물어볼 때, 인사할 때 등 정말 유용하게 쓰일 표현들이 가득하니까요",
+        "sentence": "영상에 좋아요와 구독, 알림 설정 잊지 마시고요",
         "sentence_number": 4,
         "total_sentences": 7
       },
@@ -127,33 +127,33 @@
         "smart_wrapping": true,
         "max_lines": 3,
         "background_color": "#000000",
-        "alignment": "top",
+        "alignment": "bottom",
         "text_settings": {
           "font": "KoPubWorldDotum",
-          "size": 90,
+          "size": 100,
           "color": "#FFFFFF",
           "weight": "Bold",
           "alignment": "Center",
-          "vertical_alignment": "Bottom"
+          "vertical_alignment": "Middle"
         }
       },
       "audio_config": {
         "speakers": [
           {
             "type": "native",
-            "script": "카페에서 주문할 때, 길을 물어볼 때, 인사할 때 등 정말 유용하게 쓰일 표현들이 가득하니까요",
+            "script": "영상에 좋아요와 구독, 알림 설정 잊지 마시고요",
             "duration": null
           }
         ]
       }
     },
     {
-      "id": "intro_05",
-      "type": "intro",
+      "id": "ending_05",
+      "type": "ending",
       "sequence": 5,
       "duration": null,
       "content": {
-        "sentence": "지금 바로 저와 함께 쉽고 재미있게 중국어 실력을 키워볼까요",
+        "sentence": "다음 시간에도 더 유익하고 재미있는 중국어 학습 콘텐츠로 찾아올게요",
         "sentence_number": 5,
         "total_sentences": 7
       },
@@ -161,33 +161,33 @@
         "smart_wrapping": true,
         "max_lines": 3,
         "background_color": "#000000",
-        "alignment": "top",
+        "alignment": "bottom",
         "text_settings": {
           "font": "KoPubWorldDotum",
-          "size": 90,
+          "size": 100,
           "color": "#FFFFFF",
           "weight": "Bold",
           "alignment": "Center",
-          "vertical_alignment": "Bottom"
+          "vertical_alignment": "Middle"
         }
       },
       "audio_config": {
         "speakers": [
           {
             "type": "native",
-            "script": "지금 바로 저와 함께 쉽고 재미있게 중국어 실력을 키워볼까요",
+            "script": "다음 시간에도 더 유익하고 재미있는 중국어 학습 콘텐츠로 찾아올게요",
             "duration": null
           }
         ]
       }
     },
     {
-      "id": "intro_06",
-      "type": "intro",
+      "id": "ending_06",
+      "type": "ending",
       "sequence": 6,
       "duration": null,
       "content": {
-        "sentence": "준비되셨나요",
+        "sentence": "다음 영상에서 만나요",
         "sentence_number": 6,
         "total_sentences": 7
       },
@@ -195,33 +195,33 @@
         "smart_wrapping": true,
         "max_lines": 3,
         "background_color": "#000000",
-        "alignment": "top",
+        "alignment": "bottom",
         "text_settings": {
           "font": "KoPubWorldDotum",
-          "size": 90,
+          "size": 100,
           "color": "#FFFFFF",
           "weight": "Bold",
           "alignment": "Center",
-          "vertical_alignment": "Bottom"
+          "vertical_alignment": "Middle"
         }
       },
       "audio_config": {
         "speakers": [
           {
             "type": "native",
-            "script": "준비되셨나요",
+            "script": "다음 영상에서 만나요",
             "duration": null
           }
         ]
       }
     },
     {
-      "id": "intro_07",
-      "type": "intro",
+      "id": "ending_07",
+      "type": "ending",
       "sequence": 7,
       "duration": null,
       "content": {
-        "sentence": "그럼 시작해볼까요",
+        "sentence": "짜이찌엔",
         "sentence_number": 7,
         "total_sentences": 7
       },
@@ -229,21 +229,21 @@
         "smart_wrapping": true,
         "max_lines": 3,
         "background_color": "#000000",
-        "alignment": "top",
+        "alignment": "bottom",
         "text_settings": {
           "font": "KoPubWorldDotum",
-          "size": 90,
+          "size": 100,
           "color": "#FFFFFF",
           "weight": "Bold",
           "alignment": "Center",
-          "vertical_alignment": "Bottom"
+          "vertical_alignment": "Middle"
         }
       },
       "audio_config": {
         "speakers": [
           {
             "type": "native",
-            "script": "그럼 시작해볼까요",
+            "script": "짜이찌엔",
             "duration": null
           }
         ]

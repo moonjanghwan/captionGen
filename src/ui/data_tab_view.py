@@ -12,6 +12,7 @@ import subprocess
 import threading
 import time
 from src import api_services
+from src.ui.ui_utils import create_labeled_widget
 
 class DataTabView(ctk.CTkFrame):
     def __init__(self, parent, on_language_change=None, root=None):
@@ -43,27 +44,7 @@ class DataTabView(ctk.CTkFrame):
 
     def _create_widgets(self):
         # --- 위젯 생성 헬퍼 ---
-        def create_labeled_widget(p, label_text, char_width, widget_type="entry", widget_params=None):
-            frame = ctk.CTkFrame(p, fg_color="transparent")
-            ctk.CTkLabel(frame, text=f"{label_text}:").pack(side="left", padx=(0, 3), pady=5)
-            pixel_width = char_width * 9
-            if pixel_width < 80 and widget_type == "combo":
-                pixel_width = 80
-            
-            widget_params = widget_params or {}
-            if 'fg_color' not in widget_params:
-                widget_params['fg_color'] = config.COLOR_THEME["widget"]
-            if 'text_color' not in widget_params:
-                widget_params['text_color'] = config.COLOR_THEME["text"]
-
-            widget = None
-            if widget_type == "combo":
-                widget = ctk.CTkComboBox(frame, width=pixel_width, **widget_params)
-            else:
-                widget = ctk.CTkEntry(frame, width=pixel_width, **widget_params)
-            
-            widget.pack(side="left", pady=5)
-            return frame, widget
+        from src.ui.ui_utils import create_labeled_widget
         
         # --- 1.1. 데이터 섹션 ---
         data_section_frame = ctk.CTkFrame(self, fg_color=config.COLOR_THEME["widget"])
@@ -284,24 +265,37 @@ class DataTabView(ctk.CTkFrame):
 
     def _on_click_read_data(self):
         try:
+            if self.load_generated_data():
+                project_name = self.project_name_var.get() or "project"
+                identifier = self.identifier_var.get() or project_name
+                json_path = os.path.join(config.OUTPUT_PATH, project_name, identifier, f"{identifier}_ai.json")
+                self.log_message(f"[데이터 읽기] 불러옴: {json_path}")
+                api_services.save_outputs_from_ai_data(self.generated_data, project_name, identifier)
+                self._render_selected_script()
+                self._update_audio_buttons_state()
+            else:
+                project_name = self.project_name_var.get() or "project"
+                identifier = self.identifier_var.get() or project_name
+                json_path = os.path.join(config.OUTPUT_PATH, project_name, identifier, f"{identifier}_ai.json")
+                self.log_message(f"[데이터 읽기] 파일이 없습니다: {json_path}")
+        except Exception as e:
+            self.log_message(f"[오류] 데이터 읽기 실패: {e}")
+
+    def load_generated_data(self):
+        """Loads the generated AI data from the JSON file without logging to the UI."""
+        try:
             project_name = self.project_name_var.get() or "project"
             identifier = self.identifier_var.get() or project_name
             out_dir = os.path.join(config.OUTPUT_PATH, project_name, identifier)
             json_path = os.path.join(out_dir, f"{identifier}_ai.json")
             if not os.path.exists(json_path):
-                self.log_message(f"[데이터 읽기] 파일이 없습니다: {json_path}")
-                return
+                return False
             with open(json_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             self.generated_data = data
-            self.log_message(f"[데이터 읽기] 불러옴: {json_path}")
-            # 스크립트별 텍스트 저장 (동기화)
-            api_services.save_outputs_from_ai_data(self.generated_data, project_name, identifier)
-            self._render_selected_script()
-            # 버튼 활성화
-            self._update_audio_buttons_state()
-        except Exception as e:
-            self.log_message(f"[오류] 데이터 읽기 실패: {e}")
+            return True
+        except Exception:
+            return False
 
     # --- AI 데이터 생성 핸들러 ---
     def _on_click_generate_ai_data(self):
@@ -634,7 +628,9 @@ class DataTabView(ctk.CTkFrame):
             identifier = self.identifier_var.get() or project_name
             out_dir = os.path.join(config.OUTPUT_PATH, project_name, identifier)
             os.makedirs(out_dir, exist_ok=True)
-            out_mp3 = os.path.join(out_dir, f"{identifier}.mp3")
+            mp3_dir = os.path.join(out_dir, "mp3")
+            os.makedirs(mp3_dir, exist_ok=True)
+            out_mp3 = os.path.join(mp3_dir, f"{identifier}.mp3")
             self._encode_wav_to_mp3(combined_wav, out_mp3)
             self.log_message(f"[오디오 생성] 저장 완료: {out_mp3}")
         except Exception as e:

@@ -13,7 +13,7 @@ class TextRenderer:
     def _load_config(self, settings: Dict[str, Any]) -> Dict[str, Any]:
         default_config = {
             "fonts": {
-                "Noto Sans KR": os.path.expanduser("~/Library/Fonts/NotoSansKR-Regular.otf"),
+                "Noto Sans KR": os.path.expanduser("~/Library/Fonts/NotoSansKR-Regular.ttf"),
                 "KoPubWorld돋움체": os.path.expanduser("~/Library/Fonts/KoPubWorld Dotum Medium.ttf"),
                 "KoPubWorld바탕체": os.path.expanduser("~/Library/Fonts/KoPubWorld Batang Medium.ttf")
             }
@@ -107,6 +107,47 @@ class TextRenderer:
             lines.append(' '.join(current_line))
         return lines
 
+    def _smart_wrap(self, text: str, font: ImageFont.FreeTypeFont, max_width: int) -> str:
+        print(f"--- Smart wrapping text ---")
+        print(f"Input text: {text}")
+        print(f"Max width: {max_width}")
+        if not max_width:
+            return text
+
+        words = text.split(' ')
+        lines = []
+        current_line = []
+
+        while words:
+            word = words.pop(0)
+            test_line = ' '.join(current_line + [word])
+            width, _ = self._get_text_dimensions(test_line, font)
+
+            if width <= max_width:
+                current_line.append(word)
+            else:
+                if current_line:
+                    lines.append(' '.join(current_line))
+                current_line = [word]
+        if current_line:
+            lines.append(' '.join(current_line))
+
+        if len(lines) > 3:
+            lines = lines[:3]
+
+        if len(lines) == 2:
+            line1 = lines[0]
+            line2 = lines[1]
+            if len(line1) > len(line2) * 1.5:
+                # Try to balance the lines
+                all_words = (line1 + ' ' + line2).split(' ')
+                best_split = len(all_words) // 2
+                line1 = ' '.join(all_words[:best_split])
+                line2 = ' '.join(all_words[best_split:])
+                lines = [line1, line2]
+
+        return '\n'.join(lines)
+
     def render_text_to_image(self,
                              image: Image.Image,
                              text: str,
@@ -121,6 +162,7 @@ class TextRenderer:
                              stroke_color: str = "#000000",
                              shadow_offset: Tuple[int, int] = (0, 0),
                              shadow_color: str = "#000000") -> Image.Image:
+        print("--- render_text_to_image called ---")
         """
         Renders text onto an image with various styling and alignment options.
         :param image: PIL Image object to draw on.
@@ -138,6 +180,7 @@ class TextRenderer:
         :param shadow_color: Color of the text shadow.
         :return: The modified PIL Image object.
         """
+        print(f"Rendering text with settings: align={align}, vertical_align={vertical_align}, stroke_width={stroke_width}, stroke_color={stroke_color}, shadow_offset={shadow_offset}, shadow_color={shadow_color}")
         draw = ImageDraw.Draw(image)
         font = self._get_font(font_name, font_size)
 

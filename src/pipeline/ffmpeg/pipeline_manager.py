@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from ..manifest import ManifestParser
 from ..audio import AudioGenerator, SSMLBuilder
 from ..subtitle import SubtitleGenerator
+from ..steps.create_subtitles import run as create_subtitles_run
+from ..core.context import PipelineContext
 from .renderer import FFmpegRenderer
 
 
@@ -52,14 +54,206 @@ class PipelineManager:
         Args:
             config: 파이프라인 설정
         """
-        self.config = config or PipelineConfig()
+        # config가 PipelineConfig 인스턴스가 아닌 경우 기본값 사용
+        if isinstance(config, PipelineConfig):
+            self.config = config
+        else:
+            self.config = PipelineConfig()
         self.manifest_parser = ManifestParser()
         self.audio_generator = AudioGenerator()
-        self.subtitle_generator = SubtitleGenerator()
+        self.subtitle_generator = None  # 나중에 초기화
         self.ffmpeg_renderer = FFmpegRenderer()
         
         # 출력 디렉토리 생성
         os.makedirs(self.config.output_directory, exist_ok=True)
+
+    def _log_to_widget(self, message: str, level: str = "INFO", widget: Optional[Any] = None):
+        """콘솔과 UI 텍스트 위젯에 로그를 출력합니다."""
+        log_message = f"[{level}] {message}"
+        print(log_message)
+        if widget:
+            try:
+                # tkinter 위젯의 thread-safety를 위해 after 사용 고려
+                widget.insert("end", f"{log_message}\n")
+                widget.see("end")
+            except Exception as e:
+                print(f"UI 위젯에 로깅 실패: {e}")
+    
+    def create_manifest(self, script_type: str, script_data: Dict[str, Any]) -> Tuple[Dict[str, Any], str]:
+        """
+        Manifest 생성
+        
+        Args:
+            script_type: 스크립트 타입 (conversation, intro, ending)
+            script_data: 스크립트 데이터
+            
+        Returns:
+            Tuple[Dict[str, Any], str]: (manifest_data, filepath)
+        """
+        try:
+            # Manifest 생성
+            manifest_data = self.manifest_parser.create_manifest(script_type, script_data)
+            
+            # 파일 저장 경로 생성
+            project_name = manifest_data.get("project_name", "untitled_project")
+            
+            # 스크립트 타입을 영문으로 변환
+            script_type_mapping = {
+                "회화": "conversation",
+                "대화": "dialogue", 
+                "인트로": "intro",
+                "엔딩": "ending"
+            }
+            english_script_type = script_type_mapping.get(script_type, script_type.lower())
+            filename = f"{project_name}_{english_script_type}.json"
+            
+            # 정확한 디렉토리 구조: ./output/{프로젝트명}/{식별자}/manifest/
+            project_name = manifest_data.get("project_name", "untitled_project")
+            identifier = manifest_data.get("identifier", project_name)
+            
+            manifest_dir = os.path.join(self.config.output_directory, project_name, identifier, "manifest")
+            os.makedirs(manifest_dir, exist_ok=True)
+            filepath = os.path.join(manifest_dir, filename)
+            
+            # 파일 저장
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(manifest_data, f, ensure_ascii=False, indent=2)
+            
+            # 상세한 저장 정보 출력
+            print(f"📁 저장 디렉토리: {manifest_dir}")
+            print(f"📄 파일명: {filename}")
+            print(f"💾 전체 경로: {filepath}")
+            print(f"✅ {filename} 생성 완료")
+            
+            return manifest_data, filepath
+            
+        except Exception as e:
+            print(f"❌ Manifest 생성 실패: {e}")
+            raise
+    
+    def create_audio(self, script_type: str, script_data: Dict[str, Any], output_text=None):
+        """
+        오디오 생성
+        
+        Args:
+            script_type: 스크립트 타입 (conversation, intro, ending)
+            script_data: 스크립트 데이터
+            output_text: 출력 텍스트 위젯 (선택사항)
+        """
+        try:
+            # 출력 콜백 함수 정의
+            def output_callback(message, level="INFO"):
+                print(f"[{level}] {message}")
+                if output_text:
+                    output_text.insert("end", f"[{level}] {message}\n")
+                    output_text.see("end")
+            
+            output_callback(f"🎵 오디오 생성 시작: {script_type}")
+            
+            # Manifest 생성
+            output_callback("📋 Manifest 생성 중...")
+            manifest_data = self.manifest_parser.create_manifest(script_type, script_data)
+            output_callback("✅ Manifest 생성 완료")
+            
+            # 프로젝트명과 식별자 가져오기
+            project_name = manifest_data.get("project_name", "untitled_project")
+            identifier = manifest_data.get("identifier", project_name)
+            output_callback(f"📁 프로젝트: {project_name}, 식별자: {identifier}")
+            
+            # 출력 디렉토리 설정: ./output/{프로젝트명}/{식별자}/mp3/
+            audio_output_dir = os.path.join(self.config.output_directory, project_name, identifier, "mp3")
+            os.makedirs(audio_output_dir, exist_ok=True)
+            output_callback(f"📂 출력 디렉토리 생성: {audio_output_dir}")
+            
+            # 오디오 생성
+            output_callback("🎤 오디오 생성 중...")
+            success, audio_path = self.audio_generator.generate_audio_from_manifest(
+                manifest_data, audio_output_dir, script_type
+            )
+            
+            if success:
+                message = f"✅ 오디오 생성 완료: {audio_path}"
+                output_callback(message, "SUCCESS")
+                output_callback(f"📄 생성된 파일: {os.path.basename(audio_path)}")
+            else:
+                message = "❌ 오디오 생성 실패"
+                output_callback(message, "ERROR")
+            
+        except Exception as e:
+            error_msg = f"❌ 오디오 생성 실패: {e}"
+            print(error_msg)
+            if output_text:
+                output_text.insert("end", f"{error_msg}\n")
+                output_text.see("end")
+    
+    def create_subtitles(self, script_type: str, output_text=None):
+        """
+        자막 이미지 생성
+        
+        Args:
+            script_type: 스크립트 타입 (conversation, intro, ending)
+            output_text: 출력 텍스트 위젯 (선택사항)
+        """
+        try:
+            # 출력 콜백 함수 정의
+            def output_callback(message, level="INFO"):
+                print(f"[{level}] {message}")
+                if output_text:
+                    output_text.insert("end", f"[{level}] {message}\n")
+                    output_text.see("end")
+            
+            output_callback(f"🎬 자막 이미지 생성 시작: {script_type}")
+            
+            # 임시 프로젝트 정보
+            project_name = "kor-chn"  # 임시값
+            identifier = "kor-chn"    # 임시값
+            
+            # Manifest 로드
+            manifest_path = os.path.join(self.config.output_directory, project_name, identifier, "manifest", f"{identifier}_conversation.json")
+            if not os.path.exists(manifest_path):
+                error_msg = f"Manifest 파일을 찾을 수 없습니다: {manifest_path}"
+                output_callback(error_msg, "ERROR")
+                return
+            
+            # Manifest 파싱
+            manifest_data = self.manifest_parser.parse_file(manifest_path)
+            if not manifest_data:
+                error_msg = "Manifest 파싱 실패"
+                output_callback(error_msg, "ERROR")
+                return
+            
+            output_callback("✅ Manifest 파싱 완료")
+            
+            # UI 설정 로드 (실제로는 UI에서 전달받아야 함)
+            settings_path = os.path.join(self.config.output_directory, project_name, identifier, "_text_settings.json")
+            settings = {}
+            if os.path.exists(settings_path):
+                with open(settings_path, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+                output_callback("✅ UI 설정 로드 완료")
+            
+            # PipelineContext 생성
+            context = PipelineContext.create(
+                project_name=project_name,
+                identifier=identifier,
+                manifest=manifest_data,
+                settings=settings
+            )
+            
+            output_callback("✅ PipelineContext 생성 완료")
+            
+            # 자막 이미지 생성 실행
+            create_subtitles_run(context)
+            
+            success_msg = f"✅ 자막 이미지 생성 완료: {script_type}"
+            output_callback(success_msg, "SUCCESS")
+                
+        except Exception as e:
+            error_msg = f"❌ 자막 이미지 생성 실패: {e}"
+            print(error_msg)
+            if output_text:
+                output_text.insert("end", f"{error_msg}\n")
+                output_text.see("end")
     
     def run_full_pipeline(self, manifest_path: str, 
                          project_name: Optional[str] = None) -> PipelineResult:
@@ -100,7 +294,10 @@ class PipelineManager:
             audio_path = None
             if self.config.enable_audio_generation:
                 print("\n🎵 2단계: 오디오 생성")
-                audio_path = self._generate_audio(manifest_data, project_output_dir)
+                # Manifest에서 첫 번째 장면의 타입을 사용하여 스크립트 타입 결정
+                scenes = manifest_data.get("scenes", [])
+                script_type = scenes[0].get("type", "conversation") if scenes else "conversation"
+                audio_path = self._generate_audio(manifest_data, project_output_dir, script_type)
                 if not audio_path:
                     errors.append("오디오 생성 실패")
                     warnings.append("오디오 없이 비디오 렌더링 진행")
@@ -174,28 +371,20 @@ class PipelineManager:
             return None
     
     def _generate_audio(self, manifest_data: Dict[str, Any], 
-                       output_dir: str) -> Optional[str]:
+                       output_dir: str, script_type: str = "conversation") -> Optional[str]:
         """오디오 생성"""
         try:
-            # SSML 생성
-            ssml_builder = SSMLBuilder()
-            ssml_content = ssml_builder.build_manifest_ssml(manifest_data)
+            # AudioGenerator를 사용하여 오디오 생성
+            success, audio_path = self.audio_generator.generate_audio_from_manifest(
+                manifest_data, output_dir, script_type
+            )
             
-            # SSML 파일 저장
-            ssml_path = os.path.join(output_dir, "manifest.ssml")
-            ssml_builder.create_ssml_file(ssml_content, ssml_path)
-            print(f"✅ SSML 파일 생성: {ssml_path}")
-            
-            # 오디오 생성 (실제 TTS가 없으므로 더미 파일 생성)
-            audio_path = os.path.join(output_dir, "manifest_audio.mp3")
-            
-            # 더미 오디오 파일 생성 (실제로는 TTS API 사용)
-            with open(audio_path, 'wb') as f:
-                # 간단한 더미 MP3 헤더
-                f.write(b'\xff\xfb\x90\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')
-            
-            print(f"✅ 오디오 파일 생성: {audio_path}")
-            return audio_path
+            if success:
+                print(f"✅ 오디오 생성 완료: {audio_path}")
+                return audio_path
+            else:
+                print("❌ 오디오 생성 실패")
+                return None
             
         except Exception as e:
             print(f"❌ 오디오 생성 실패: {e}")
@@ -205,6 +394,21 @@ class PipelineManager:
                            output_dir: str) -> Optional[str]:
         """자막 이미지 생성"""
         try:
+            # SubtitleGenerator 초기화 (필요한 경우)
+            if self.subtitle_generator is None:
+                # 기본 설정으로 초기화
+                default_settings = {
+                    "font_family": "Arial",
+                    "font_size": 24,
+                    "font_color": "#FFFFFF",
+                    "background_color": "#000000",
+                    "text_align": "center"
+                }
+                self.subtitle_generator = SubtitleGenerator(
+                    settings=default_settings,
+                    identifier="default"
+                )
+            
             subtitle_dir = os.path.join(output_dir, "subtitles")
             frames = self.subtitle_generator.generate_from_manifest(
                 manifest_data, subtitle_dir, fps=30
@@ -399,3 +603,60 @@ class PipelineManager:
             
         except Exception as e:
             print(f"⚠️ 파이프라인 보고서 저장 실패: {e}")
+    
+    def create_subtitles(self, script_type: str, output_text=None):
+        """자막 이미지 생성 (UI에서 호출)"""
+        try:
+            output_callback = lambda msg, level="INFO": self._log_to_widget(msg, level, output_text)
+            output_callback(f"🎬 자막 이미지 생성 시작: {script_type}")
+
+            # 프로젝트 정보 가져오기 (실제로는 UI에서 전달받아야 함)
+            project_name = "kor-chn"  # 임시값
+            identifier = "kor-chn"    # 임시값
+
+            # 스크립트 타입에 맞는 Manifest 파일명 동적 생성
+            script_type_mapping = {
+                "회화": "conversation",
+                "대화": "dialogue",
+                "인트로": "intro",
+                "엔딩": "ending"
+            }
+            english_script_type = script_type_mapping.get(script_type, script_type.lower())
+            manifest_filename = f"{identifier}_{english_script_type}.json"
+            manifest_path = os.path.join(self.config.output_directory, project_name, identifier, "manifest", manifest_filename)
+
+            if not os.path.exists(manifest_path):
+                error_msg = f"Manifest 파일을 찾을 수 없습니다: {manifest_path}"
+                output_callback(error_msg, "ERROR")
+                return
+
+            manifest_data = self.manifest_parser.parse_file(manifest_path)
+            if not manifest_data:
+                error_msg = f"Manifest 파싱 실패: {manifest_path}"
+                output_callback(error_msg, "ERROR")
+                return
+
+            settings_path = os.path.join(self.config.output_directory, project_name, identifier, "_text_settings.json")
+            settings = {}
+            if os.path.exists(settings_path):
+                with open(settings_path, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+
+            context = PipelineContext.create(
+                project_name=project_name,
+                identifier=identifier,
+                manifest=manifest_data,
+                settings=settings,
+                script_type=script_type,
+                log_callback=output_callback
+            )
+
+            create_subtitles_run(context)
+
+            success_msg = f"✅ 자막 이미지 생성 완료: {script_type}"
+            output_callback(success_msg, "SUCCESS")
+
+        except Exception as e:
+            import traceback
+            error_msg = f"❌ 자막 이미지 생성 실패: {e}\n{traceback.format_exc()}"
+            output_callback(error_msg, "ERROR")

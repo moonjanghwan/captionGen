@@ -2,26 +2,26 @@
 <speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ko-KR">
 <?xml version="1.0" encoding="UTF-8"?>
 <speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ko-KR">
-<voice name="ko-KR-Standard-A">
+<voice name="ko-KR-Standard-A" xml:lang="ko-KR">
 <mark name="scene_1_screen1_start"/>
 <prosody rate="medium" pitch="medium">안녕하세요!</prosody>
 <mark name="scene_1_screen1_end"/>
 </voice>
 <break time="1s"/>
 <mark name="scene_1_screen2_start"/>
-<voice name="cmn-CN-Standard-A">
+<voice name="cmn-CN-Standard-A" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">你好！</prosody>
 </voice>
 <break time="1s"/>
-<voice name="cmn-CN-Standard-B">
+<voice name="cmn-CN-Standard-B" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">你好！</prosody>
 </voice>
 <break time="1s"/>
-<voice name="cmn-CN-Standard-C">
+<voice name="cmn-CN-Standard-C" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">你好！</prosody>
 </voice>
 <break time="1s"/>
-<voice name="cmn-CN-Standard-D">
+<voice name="cmn-CN-Standard-D" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">你好！</prosody>
 </voice>
 <mark name="scene_1_screen2_end"/>
@@ -29,26 +29,26 @@
 <break time="1s"/>
 <?xml version="1.0" encoding="UTF-8"?>
 <speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ko-KR">
-<voice name="ko-KR-Standard-A">
+<voice name="ko-KR-Standard-A" xml:lang="ko-KR">
 <mark name="scene_2_screen1_start"/>
 <prosody rate="medium" pitch="medium">고맙습니다!</prosody>
 <mark name="scene_2_screen1_end"/>
 </voice>
 <break time="1s"/>
 <mark name="scene_2_screen2_start"/>
-<voice name="cmn-CN-Standard-A">
+<voice name="cmn-CN-Standard-A" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">谢谢！</prosody>
 </voice>
 <break time="1s"/>
-<voice name="cmn-CN-Standard-B">
+<voice name="cmn-CN-Standard-B" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">谢谢！</prosody>
 </voice>
 <break time="1s"/>
-<voice name="cmn-CN-Standard-C">
+<voice name="cmn-CN-Standard-C" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">谢谢！</prosody>
 </voice>
 <break time="1s"/>
-<voice name="cmn-CN-Standard-D">
+<voice name="cmn-CN-Standard-D" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">谢谢！</prosody>
 </voice>
 <mark name="scene_2_screen2_end"/>
@@ -56,26 +56,26 @@
 <break time="1s"/>
 <?xml version="1.0" encoding="UTF-8"?>
 <speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ko-KR">
-<voice name="ko-KR-Standard-A">
+<voice name="ko-KR-Standard-A" xml:lang="ko-KR">
 <mark name="scene_3_screen1_start"/>
 <prosody rate="medium" pitch="medium">천만에요!</prosody>
 <mark name="scene_3_screen1_end"/>
 </voice>
 <break time="1s"/>
 <mark name="scene_3_screen2_start"/>
-<voice name="cmn-CN-Standard-A">
+<voice name="cmn-CN-Standard-A" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">不客气！</prosody>
 </voice>
 <break time="1s"/>
-<voice name="cmn-CN-Standard-B">
+<voice name="cmn-CN-Standard-B" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">不客气！</prosody>
 </voice>
 <break time="1s"/>
-<voice name="cmn-CN-Standard-C">
+<voice name="cmn-CN-Standard-C" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">不客气！</prosody>
 </voice>
 <break time="1s"/>
-<voice name="cmn-CN-Standard-D">
+<voice name="cmn-CN-Standard-D" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">不客气！</prosody>
 </voice>
 <mark name="scene_3_screen2_end"/>
@@ -83,26 +83,26 @@
 <break time="1s"/>
 <?xml version="1.0" encoding="UTF-8"?>
 <speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ko-KR">
-<voice name="ko-KR-Standard-A">
+<voice name="ko-KR-Standard-A" xml:lang="ko-KR">
 <mark name="scene_4_screen1_start"/>
 <prosody rate="medium" pitch="medium">죄송합니다.</prosody>
 <mark name="scene_4_screen1_end"/>
 </voice>
 <break time="1s"/>
 <mark name="scene_4_screen2_start"/>
-<voice name="cmn-CN-Standard-A">
+<voice name="cmn-CN-Standard-A" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">对不起。</prosody>
 </voice>
 <break time="1s"/>
-<voice name="cmn-CN-Standard-B">
+<voice name="cmn-CN-Standard-B" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">对不起。</prosody>
 </voice>
 <break time="1s"/>
-<voice name="cmn-CN-Standard-C">
+<voice name="cmn-CN-Standard-C" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">对不起。</prosody>
 </voice>
 <break time="1s"/>
-<voice name="cmn-CN-Standard-D">
+<voice name="cmn-CN-Standard-D" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">对不起。</prosody>
 </voice>
 <mark name="scene_4_screen2_end"/>
@@ -110,26 +110,26 @@
 <break time="1s"/>
 <?xml version="1.0" encoding="UTF-8"?>
 <speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ko-KR">
-<voice name="ko-KR-Standard-A">
+<voice name="ko-KR-Standard-A" xml:lang="ko-KR">
 <mark name="scene_5_screen1_start"/>
 <prosody rate="medium" pitch="medium">괜찮습니다.</prosody>
 <mark name="scene_5_screen1_end"/>
 </voice>
 <break time="1s"/>
 <mark name="scene_5_screen2_start"/>
-<voice name="cmn-CN-Standard-A">
+<voice name="cmn-CN-Standard-A" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">没关系。</prosody>
 </voice>
 <break time="1s"/>
-<voice name="cmn-CN-Standard-B">
+<voice name="cmn-CN-Standard-B" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">没关系。</prosody>
 </voice>
 <break time="1s"/>
-<voice name="cmn-CN-Standard-C">
+<voice name="cmn-CN-Standard-C" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">没关系。</prosody>
 </voice>
 <break time="1s"/>
-<voice name="cmn-CN-Standard-D">
+<voice name="cmn-CN-Standard-D" xml:lang="cmn-CN">
 <prosody rate="medium" pitch="medium">没关系。</prosody>
 </voice>
 <mark name="scene_5_screen2_end"/>

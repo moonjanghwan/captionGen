@@ -1,0 +1,57 @@
+{
+  "export_time": "2025-09-14T13:23:48.351132",
+  "test_stats": {
+    "total_tests": 5,
+    "passed_tests": 2,
+    "failed_tests": 3,
+    "test_duration": 0.015774965286254883
+  },
+  "test_results": [
+    {
+      "test_name": "settings_sync_integration",
+      "passed": true,
+      "description": "설정 동기화 통합 테스트",
+      "timestamp": "2025-09-14T13:23:48.337580"
+    },
+    {
+      "test_name": "conversation_rendering_integration",
+      "passed": false,
+      "description": "회화 이미지 렌더링 통합 테스트",
+      "timestamp": "2025-09-14T13:23:48.342468"
+    },
+    {
+      "test_name": "intro_rendering_integration",
+      "passed": false,
+      "description": "인트로 이미지 렌더링 통합 테스트",
+      "timestamp": "2025-09-14T13:23:48.344520"
+    },
+    {
+      "test_name": "pipeline_context_integration",
+      "passed": true,
+      "description": "파이프라인 컨텍스트 통합 테스트",
+      "timestamp": "2025-09-14T13:23:48.344613"
+    },
+    {
+      "test_name": "end_to_end_integration",
+      "passed": false,
+      "description": "End-to-End 통합 테스트",
+      "timestamp": "2025-09-14T13:23:48.350708"
+    }
+  ],
+  "renderer_stats": {
+    "total_renders": 5,
+    "successful_renders": 2,
+    "failed_renders": 3,
+    "render_times": [
+      0.004745006561279297,
+      0.0019519329071044922,
+      0.005308866500854492,
+      0.0003178119659423828,
+      0.00029087066650390625
+    ],
+    "average_render_time": 0.002522897720336914,
+    "min_render_time": 0.00029087066650390625,
+    "max_render_time": 0.005308866500854492,
+    "success_rate": 40.0
+  }
+}

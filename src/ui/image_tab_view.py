@@ -53,7 +53,7 @@ class ImageTabView(ctk.CTkFrame):
 
         # Font map for TextRenderer
         self.font_map = {
-            "Noto Sans KR": os.path.expanduser("~/Library/Fonts/NotoSansKR-Regular.otf"),
+            "Noto Sans KR": os.path.expanduser("~/Library/Fonts/NotoSansKR-Regular.ttf"),
             "KoPubWorld돋움체": os.path.expanduser("~/Library/Fonts/KoPubWorld Dotum Medium.ttf"),
             "KoPubWorld바탕체": os.path.expanduser("~/Library/Fonts/KoPubWorld Batang Medium.ttf")
         }
@@ -75,34 +75,16 @@ class ImageTabView(ctk.CTkFrame):
         return SubtitleGenerator(settings=all_settings, identifier=identifier, log_callback=self._log_json)
 
         def _make_base_canvas(self, width: int, height: int):
-        try:
-            kind = (self.bg_type_var.get() or "").strip()
-            value = (self.w_bg_value.get() or "").strip()
-            base = None
-            # 배경 타입: 이미지/동영상/색상 처리
-            if kind == "이미지" and value and os.path.isfile(value):
-                from PIL import Image
-                img = Image.open(value).convert('RGBA')
-                iw, ih = img.size
-                # cover fit
-                scale = max(width / max(1, iw), height / max(1, ih))
-                new_w, new_h = int(iw * scale), int(ih * scale)
-                img = img.resize((new_w, new_h))
-                left = max(0, (new_w - width) // 2)
-                top = max(0, (new_h - height) // 2)
-                img = img.crop((left, top, left + width, top + height))
-                base = img
-            elif kind == "동영상" and value and os.path.isfile(value):
-                import tempfile, subprocess
-                from PIL import Image
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
-                    tmp_path = tmp.name
-                try:
-                    # 첫 프레임 추출
-                    cmd = ['ffmpeg', '-y', '-loglevel', 'error', '-ss', '0', '-i', value, '-frames:v', '1', tmp_path]
-                    subprocess.run(cmd, check=True)
-                    img = Image.open(tmp_path).convert('RGBA')
+            try:
+                kind = (self.bg_type_var.get() or "").strip()
+                value = (self.w_bg_value.get() or "").strip()
+                base = None
+                # 배경 타입: 이미지/동영상/색상 처리
+                if kind == "이미지" and value and os.path.isfile(value):
+                    from PIL import Image
+                    img = Image.open(value).convert('RGBA')
                     iw, ih = img.size
+                    # cover fit
                     scale = max(width / max(1, iw), height / max(1, ih))
                     new_w, new_h = int(iw * scale), int(ih * scale)
                     img = img.resize((new_w, new_h))
@@ -110,29 +92,47 @@ class ImageTabView(ctk.CTkFrame):
                     top = max(0, (new_h - height) // 2)
                     img = img.crop((left, top, left + width, top + height))
                     base = img
-                except Exception:
-                    base = None
-                finally:
+                elif kind == "동영상" and value and os.path.isfile(value):
+                    import tempfile, subprocess
+                    from PIL import Image
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
+                        tmp_path = tmp.name
                     try:
-                        os.remove(tmp_path)
+                        # 첫 프레임 추출
+                        cmd = ['ffmpeg', '-y', '-loglevel', 'error', '-ss', '0', '-i', value, '-frames:v', '1', tmp_path]
+                        subprocess.run(cmd, check=True)
+                        img = Image.open(tmp_path).convert('RGBA')
+                        iw, ih = img.size
+                        scale = max(width / max(1, iw), height / max(1, ih))
+                        new_w, new_h = int(iw * scale), int(ih * scale)
+                        img = img.resize((new_w, new_h))
+                        left = max(0, (new_w - width) // 2)
+                        top = max(0, (new_h - height) // 2)
+                        img = img.crop((left, top, left + width, top + height))
+                        base = img
                     except Exception:
-                        pass
-            elif kind == "색상":
-                # 색상 문자열로 RGBA 배경 생성
-                from PIL import Image, ImageColor
-                try:
-                    rgb = ImageColor.getrgb(value or "#000000")
-                except Exception:
-                    rgb = (0, 0, 0)
-                base = Image.new('RGBA', (width, height), (rgb[0], rgb[1], rgb[2], 255))
-            if base is None:
-                # 기본 회색 바탕
+                        base = None
+                    finally:
+                        try:
+                            os.remove(tmp_path)
+                        except Exception:
+                            pass
+                elif kind == "색상":
+                    # 색상 문자열로 RGBA 배경 생성
+                    from PIL import Image, ImageColor
+                    try:
+                        rgb = ImageColor.getrgb(value or "#000000")
+                    except Exception:
+                        rgb = (0, 0, 0)
+                    base = Image.new('RGBA', (width, height), (rgb[0], rgb[1], rgb[2], 255))
+                if base is None:
+                    # 기본 회색 바탕
+                    from PIL import Image
+                    base = Image.new('RGBA', (width, height), (128,128,128,255))
+                return base
+            except Exception:
                 from PIL import Image
-                base = Image.new('RGBA', (width, height), (128,128,128,255))
-            return base
-        except Exception:
-            from PIL import Image
-            return Image.new('RGBA', (width, height), (128,128,128,255))
+                return Image.new('RGBA', (width, height), (128,128,128,255))
 
     def _create_common_settings_widgets(self, parent):
         
@@ -167,8 +167,8 @@ class ImageTabView(ctk.CTkFrame):
         self.w_bg.insert(0, "#000000")
         _, self.w_alpha = create_labeled_widget(row2, "투명도", 10)
         self.w_alpha.insert(0, "1.0")
-        _, self.w_margin = create_labeled_widget(row2, "여백", 10, "combo", {"values": ["0", "2", "5", "10"]})
-        self.w_margin.set("2")
+        _, self.w_margin = create_labeled_widget(row2, "여백", 10, "entry", {"justify": "center"})
+        self.w_margin.insert(0, "5")
 
         # 3행
         row3 = ctk.CTkFrame(parent, fg_color="transparent")
@@ -278,23 +278,23 @@ class ImageTabView(ctk.CTkFrame):
         # Default 값: 제작 사양서 기반
         defaults = {
             "회화 설정": {"행수": "4", "비율": "16:9", "해상도": "1920x1080", "rows": [
-                {"행": "순번", "x": 50, "y": 50, "w": 1820, "크기(pt)": 80, "폰트(pt)": "KoPubWorldDotum", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "원어", "x": 50, "y": 150, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorldDotum", "색상": "#00FFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "순번", "x": 50, "y": 50, "w": 1820, "크기(pt)": 80, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "원어", "x": 50, "y": 150, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#00FFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
                 {"행": "학습어", "x": 50, "y": 450, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Noto Sans KR", "색상": "#FF00FF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "읽기", "x": 50, "y": 750, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorldDotum", "색상": "#FFFF00", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "읽기", "x": 50, "y": 750, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFF00", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
             ]},
             "썸네일 설정": {"행수": "4", "비율": "16:9", "해상도": "1920x1080", "rows": [
-                {"행": "1행", "x": 50, "y": 50, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorldDotum", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "2행", "x": 50, "y": 200, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorldDotum", "색상": "#00FFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "3행", "x": 50, "y": 350, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorldDotum", "색상": "#FF00FF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "4행", "x": 50, "y": 500, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorldDotum", "색상": "#FFFF00", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "1행", "x": 50, "y": 50, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "2행", "x": 50, "y": 200, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#00FFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "3행", "x": 50, "y": 350, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FF00FF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "4행", "x": 50, "y": 500, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFF00", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
             ]},
-            "인트로 설정": {"행수": "1", "비율": "16:9", "해상도": "1920x1080", "rows": [{"행": "1행", "x": 50, "y": 50, "w": 1820, "크기(pt)": 80, "폰트(pt)": "KoPubWorldDotum", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"}]},
-            "엔딩 설정": {"행수": "1", "비율": "16:9", "해상도": "1920x1080", "rows": [{"행": "1행", "x": 50, "y": 50, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorldDotum", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"}]},
+            "인트로 설정": {"행수": "1", "비율": "16:9", "해상도": "1920x1080", "rows": [{"행": "1행", "x": 50, "y": 980, "w": 1820, "크기(pt)": 80, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"}]},
+            "엔딩 설정": {"행수": "1", "비율": "16:9", "해상도": "1920x1080", "rows": [{"행": "1행", "x": 50, "y": 980, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"}]},
             "대화 설정": {"행수": "3", "비율": "16:9", "해상도": "1920x1080", "rows": [
-                {"행": "원어", "x": 50, "y": 250, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorldDotum", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "학습어1", "x": 50, "y": 550, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorldDotum", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "학습어2", "x": 50, "y": 850, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorldDotum", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "원어", "x": 50, "y": 250, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "학습어1", "x": 50, "y": 550, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "학습어2", "x": 50, "y": 850, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
             ]},
         }
         # 기본 텍스트 설정 저장 + 각 탭 위젯 인스턴스 보관
@@ -385,7 +385,8 @@ class ImageTabView(ctk.CTkFrame):
             self.w_alpha.delete(0, tk.END)
             self.w_alpha.insert(0, str(bg.get("alpha", "1.0")))
             try:
-                self.w_margin.set(str(bg.get("margin", "2")))
+                self.w_margin.delete(0, tk.END)
+                self.w_margin.insert(0, str(bg.get("margin", "2")))
             except Exception:
                 pass
             sh = (data or {}).get("shadow", {})
@@ -433,6 +434,11 @@ class ImageTabView(ctk.CTkFrame):
             self._log_json(f"[설정 저장] 완료: {path}")
             print(f"[설정 저장] {path}")
             self._log_json_object("[설정 저장 데이터]", payload)
+            
+            # 저장 후 자동으로 다시 로드하여 UI에 반영
+            self._auto_load_settings_if_available()
+            self._log_json("[설정 저장] 자동 재로드 완료")
+            
         except Exception as e:
             self._log_json(f"[설정 저장 오류] {e}")
             print(f"[설정 저장 오류] {e}")
@@ -610,9 +616,7 @@ class ImageTabView(ctk.CTkFrame):
             intro_scene = {
                 "id": "intro_scene",
                 "type": "intro",
-                "content": {
-                    "script": intro_text
-                }
+                "full_script": intro_text
             }
             # _generate_intro_ending_frames expects a scene dict
             subtitle_generator._generate_intro_ending_frames(intro_scene, 0, 30, os.path.join(out_dir, "intro"))
@@ -645,9 +649,7 @@ class ImageTabView(ctk.CTkFrame):
             ending_scene = {
                 "id": "ending_scene",
                 "type": "ending",
-                "content": {
-                    "script": ending_text
-                }
+                "full_script": ending_text
             }
             # _generate_intro_ending_frames expects a scene dict
             subtitle_generator._generate_intro_ending_frames(ending_scene, 0, 30, os.path.join(out_dir, "ending"))
@@ -1031,7 +1033,7 @@ class TextSettingsTab(ctk.CTkFrame):
         font_options = ["Noto Sans KR", "KoPubWorld돋움체", "KoPubWorld바탕체"]
         weight_options = ["Light", "Medium", "Bold"]
         h_align_options = ["Left", "Center", "Right"]
-        v_align_options = ["Top", "Middle", "Bottom"]
+        v_align_options = ["Top", "Center", "Bottom"]
 
         for row_idx, row_data in enumerate(default_data["rows"], start=1):
             for col_idx, key in enumerate(headers):

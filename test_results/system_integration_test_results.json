@@ -1,0 +1,54 @@
+{
+  "export_time": "2025-09-14T13:23:12.969813",
+  "test_stats": {
+    "total_tests": 5,
+    "passed_tests": 2,
+    "failed_tests": 3,
+    "test_duration": 0.008625984191894531
+  },
+  "test_results": [
+    {
+      "test_name": "settings_sync_integration",
+      "passed": true,
+      "description": "설정 동기화 통합 테스트",
+      "timestamp": "2025-09-14T13:23:12.962661"
+    },
+    {
+      "test_name": "conversation_rendering_integration",
+      "passed": false,
+      "description": "회화 이미지 렌더링 통합 테스트",
+      "timestamp": "2025-09-14T13:23:12.966852"
+    },
+    {
+      "test_name": "intro_rendering_integration",
+      "passed": false,
+      "description": "인트로 이미지 렌더링 통합 테스트",
+      "timestamp": "2025-09-14T13:23:12.968684"
+    },
+    {
+      "test_name": "pipeline_context_integration",
+      "passed": true,
+      "description": "파이프라인 컨텍스트 통합 테스트",
+      "timestamp": "2025-09-14T13:23:12.968897"
+    },
+    {
+      "test_name": "end_to_end_integration",
+      "passed": false,
+      "description": "End-to-End 테스트 실패: 'Scene' object has no attribute 'content'",
+      "timestamp": "2025-09-14T13:23:12.969023"
+    }
+  ],
+  "renderer_stats": {
+    "total_renders": 2,
+    "successful_renders": 1,
+    "failed_renders": 1,
+    "render_times": [
+      0.004054069519042969,
+      0.0016880035400390625
+    ],
+    "average_render_time": 0.0028710365295410156,
+    "min_render_time": 0.0016880035400390625,
+    "max_render_time": 0.004054069519042969,
+    "success_rate": 50.0
+  }
+}

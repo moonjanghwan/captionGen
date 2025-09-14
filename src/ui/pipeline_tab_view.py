@@ -26,7 +26,7 @@ except ImportError as e:
     print(f"⚠️ 파이프라인 모듈 import 실패: {e}")
     PIPELINE_AVAILABLE = False
 
-from src.pipeline.pipeline_manager import PipelineManager
+from src.pipeline.ffmpeg.pipeline_manager import PipelineManager
 
 class PipelineTabView(ctk.CTkFrame):
     """파이프라인 실행 탭 뷰"""
@@ -55,11 +55,12 @@ class PipelineTabView(ctk.CTkFrame):
 
     def _create_context_menu(self):
         """컨텍스트 메뉴 생성"""
-        # Textbox context menu
+        # Textbox context menu - 기본 기능 사용
         self.text_context_menu = tk.Menu(self, tearoff=0)
-        self.text_context_menu.add_command(label="Copy", command=self._copy_to_clipboard)
-        self.text_context_menu.add_command(label="Cut", command=self._cut_to_clipboard)
-        self.text_context_menu.add_command(label="Paste", command=self._paste_from_clipboard)
+        self.text_context_menu.add_command(label="Copy", command=lambda: self.focus_get().event_generate("<<Copy>>"))
+        self.text_context_menu.add_command(label="Cut", command=lambda: self.focus_get().event_generate("<<Cut>>"))
+        self.text_context_menu.add_command(label="Paste", command=lambda: self.focus_get().event_generate("<<Paste>>"))
+        self.text_context_menu.add_command(label="Select All", command=lambda: self.focus_get().tag_add("sel", "1.0", "end"))
 
         # Treeview context menu
         self.csv_context_menu = tk.Menu(self, tearoff=0)
@@ -71,26 +72,180 @@ class PipelineTabView(ctk.CTkFrame):
         """컨텍스트 메뉴 표시"""
         if event.widget == self.script_text:
             self.text_context_menu.post(event.x_root, event.y_root)
+        elif event.widget == self.output_text:
+            self.text_context_menu.post(event.x_root, event.y_root)
         elif event.widget == self.csv_tree:
             self.csv_context_menu.post(event.x_root, event.y_root)
 
     def _copy_to_clipboard(self):
         try:
-            self.focus_get().event_generate("<<Copy>>")
-        except:
-            pass
+            widget = self.focus_get()
+            if hasattr(widget, 'get'):
+                # CustomTkinter Textbox의 경우
+                if hasattr(widget, 'get'):
+                    selected_text = widget.get("sel.first", "sel.last")
+                    if selected_text:
+                        self.clipboard_clear()
+                        self.clipboard_append(selected_text)
+                else:
+                    widget.event_generate("<<Copy>>")
+        except Exception as e:
+            print(f"복사 실패: {e}")
 
     def _cut_to_clipboard(self):
         try:
-            self.focus_get().event_generate("<<Cut>>")
-        except:
-            pass
+            widget = self.focus_get()
+            if hasattr(widget, 'get'):
+                # CustomTkinter Textbox의 경우
+                if hasattr(widget, 'get'):
+                    selected_text = widget.get("sel.first", "sel.last")
+                    if selected_text:
+                        self.clipboard_clear()
+                        self.clipboard_append(selected_text)
+                        widget.delete("sel.first", "sel.last")
+                else:
+                    widget.event_generate("<<Cut>>")
+        except Exception as e:
+            print(f"잘라내기 실패: {e}")
 
     def _paste_from_clipboard(self):
         try:
-            self.focus_get().event_generate("<<Paste>>")
-        except:
-            pass
+            widget = self.focus_get()
+            if hasattr(widget, 'insert'):
+                # CustomTkinter Textbox의 경우
+                clipboard_content = self.clipboard_get()
+                if clipboard_content:
+                    widget.insert("insert", clipboard_content)
+            else:
+                widget.event_generate("<<Paste>>")
+        except Exception as e:
+            print(f"붙여넣기 실패: {e}")
+    
+    def _select_all(self):
+        try:
+            widget = self.focus_get()
+            if hasattr(widget, 'tag_add'):
+                widget.tag_add("sel", "1.0", "end")
+            elif hasattr(widget, 'select_range'):
+                widget.select_range(0, tk.END)
+        except Exception as e:
+            print(f"전체 선택 실패: {e}")
+    
+    # CustomTkinter Textbox 전용 메서드들
+    def _copy_text(self, text_widget):
+        """CustomTkinter Textbox에서 텍스트 복사"""
+        try:
+            selected_text = text_widget.get("sel.first", "sel.last")
+            if selected_text:
+                self.clipboard_clear()
+                self.clipboard_append(selected_text)
+                print(f"복사됨: {selected_text[:50]}...")
+        except Exception as e:
+            print(f"복사 실패: {e}")
+    
+    def _paste_text(self, text_widget):
+        """CustomTkinter Textbox에 텍스트 붙여넣기"""
+        try:
+            clipboard_content = self.clipboard_get()
+            if clipboard_content:
+                text_widget.insert("insert", clipboard_content)
+                print(f"붙여넣기됨: {clipboard_content[:50]}...")
+        except Exception as e:
+            print(f"붙여넣기 실패: {e}")
+    
+    def _cut_text(self, text_widget):
+        """CustomTkinter Textbox에서 텍스트 잘라내기"""
+        try:
+            selected_text = text_widget.get("sel.first", "sel.last")
+            if selected_text:
+                self.clipboard_clear()
+                self.clipboard_append(selected_text)
+                text_widget.delete("sel.first", "sel.last")
+                print(f"잘라내기됨: {selected_text[:50]}...")
+        except Exception as e:
+            print(f"잘라내기 실패: {e}")
+    
+    def _select_all_text(self, text_widget):
+        """CustomTkinter Textbox에서 전체 텍스트 선택"""
+        try:
+            text_widget.tag_add("sel", "1.0", "end")
+            print("전체 텍스트 선택됨")
+        except Exception as e:
+            print(f"전체 선택 실패: {e}")
+    
+    # 컨텍스트 메뉴용 메서드들
+    def _context_copy(self):
+        """컨텍스트 메뉴에서 복사"""
+        widget = self.focus_get()
+        if widget == self.script_text:
+            self._copy_text(self.script_text)
+        elif widget == self.output_text:
+            self._copy_text(self.output_text)
+    
+    def _context_cut(self):
+        """컨텍스트 메뉴에서 잘라내기"""
+        widget = self.focus_get()
+        if widget == self.script_text:
+            self._cut_text(self.script_text)
+        elif widget == self.output_text:
+            self._cut_text(self.output_text)
+    
+    def _context_paste(self):
+        """컨텍스트 메뉴에서 붙여넣기"""
+        widget = self.focus_get()
+        if widget == self.script_text:
+            self._paste_text(self.script_text)
+        elif widget == self.output_text:
+            self._paste_text(self.output_text)
+    
+    def _context_select_all(self):
+        """컨텍스트 메뉴에서 전체 선택"""
+        widget = self.focus_get()
+        if widget == self.script_text:
+            self._select_all_text(self.script_text)
+        elif widget == self.output_text:
+            self._select_all_text(self.output_text)
+    
+    # 키보드 이벤트 핸들러들
+    def _on_copy_key(self, event):
+        """Ctrl+C 키 이벤트 핸들러"""
+        print("🔍 Ctrl+C 키 감지됨!")
+        widget = event.widget
+        if widget == self.script_text:
+            self._copy_text(self.script_text)
+        elif widget == self.output_text:
+            self._copy_text(self.output_text)
+        return "break"  # 기본 이벤트 방지
+    
+    def _on_paste_key(self, event):
+        """Ctrl+V 키 이벤트 핸들러"""
+        print("🔍 Ctrl+V 키 감지됨!")
+        widget = event.widget
+        if widget == self.script_text:
+            self._paste_text(self.script_text)
+        elif widget == self.output_text:
+            self._paste_text(self.output_text)
+        return "break"  # 기본 이벤트 방지
+    
+    def _on_cut_key(self, event):
+        """Ctrl+X 키 이벤트 핸들러"""
+        print("🔍 Ctrl+X 키 감지됨!")
+        widget = event.widget
+        if widget == self.script_text:
+            self._cut_text(self.script_text)
+        elif widget == self.output_text:
+            self._cut_text(self.output_text)
+        return "break"  # 기본 이벤트 방지
+    
+    def _on_select_all_key(self, event):
+        """Ctrl+A 키 이벤트 핸들러"""
+        print("🔍 Ctrl+A 키 감지됨!")
+        widget = event.widget
+        if widget == self.script_text:
+            self._select_all_text(self.script_text)
+        elif widget == self.output_text:
+            self._select_all_text(self.output_text)
+        return "break"  # 기본 이벤트 방지
     
     def _copy_csv_cell(self):
         """CSV Treeview에서 선택된 셀의 내용을 클립보드에 복사"""
@@ -287,6 +442,9 @@ class PipelineTabView(ctk.CTkFrame):
         self.script_text.grid(row=0, column=0, sticky="nsew")
         self.script_text.bind("<Button-3>", self._show_context_menu)
         
+        # CustomTkinter Textbox는 기본적으로 복사/붙여넣기가 작동해야 함
+        # 추가 바인딩 없이 기본 기능 사용
+        
         self.csv_tree = ttk.Treeview(self.script_display_frame, columns=("순번", "원어", "학습어", "읽기"), show="headings")
         for col in ("순번", "원어", "학습어", "읽기"): self.csv_tree.heading(col, text=col)
         self.csv_tree.column("순번", width=50, minwidth=50, stretch=False, anchor="center")
@@ -308,6 +466,14 @@ class PipelineTabView(ctk.CTkFrame):
         self.output_text.pack(fill="both", expand=True, padx=10, pady=10)
         self.output_text.bind("<Button-3>", self._show_context_menu)
         
+        # 테스트용 텍스트 추가
+        self.output_text.insert("1.0", "테스트 텍스트입니다. 이 텍스트를 선택하고 Ctrl+C를 눌러보세요.\n")
+        self.output_text.insert("end", "또는 Ctrl+A로 전체 선택해보세요.\n")
+        self.output_text.insert("end", "우클릭 메뉴도 테스트해보세요.\n")
+        
+        # CustomTkinter Textbox는 기본적으로 복사/붙여넣기가 작동해야 함
+        # 추가 바인딩 없이 기본 기능 사용
+        
         # Context menu setup can be added here if needed
 
     def _update_ui_state(self):
@@ -323,6 +489,13 @@ class PipelineTabView(ctk.CTkFrame):
     
     def _get_current_script_data_from_ui(self, script_type: str) -> Optional[Any]:
         """현재 UI에 표시된 스크립트 데이터를 추출합니다."""
+        # 프로젝트명과 식별자 가져오기
+        project_name = "kor-chn"  # 기본값
+        identifier = "kor-chn"    # 기본값
+        if hasattr(self, 'root') and hasattr(self.root, 'data_page'):
+            project_name = self.root.data_page.project_name_var.get() or "kor-chn"
+            identifier = self.root.data_page.identifier_var.get() or project_name
+        
         if script_type in ["회화", "대화"]:
             scenes = []
             for item_id in self.csv_tree.get_children():
@@ -335,9 +508,18 @@ class PipelineTabView(ctk.CTkFrame):
                     "learning_script": padded_values[2],
                     "reading_script": padded_values[3]
                 })
-            return {"scenes": scenes}
+            return {
+                "project_name": project_name,
+                "identifier": identifier,
+                "scenes": scenes
+            }
         elif script_type in ["인트로", "엔딩"]:
-            return self.script_text.get("1.0", tk.END).strip()
+            script_text = self.script_text.get("1.0", tk.END).strip()
+            return {
+                "project_name": project_name,
+                "identifier": identifier,
+                "script_text": script_text
+            }
         return None
 
     def _create_manifest(self):
@@ -352,11 +534,20 @@ class PipelineTabView(ctk.CTkFrame):
                 return
 
             manifest_data, filepath = self.pipeline_manager.create_manifest(script_type, current_script_data)
+            
+            # 출력 창에 상세 정보 표시
             self.output_text.delete("1.0", tk.END)
-            self.output_text.insert("end", f"📋 {os.path.basename(filepath)} 생성 완료!\n\n")
+            self.output_text.insert("end", f"📋 Manifest 생성 완료!\n\n")
+            self.output_text.insert("end", "=== 저장 정보 ===\n")
+            self.output_text.insert("end", f"📁 저장 디렉토리: {os.path.dirname(filepath)}\n")
+            self.output_text.insert("end", f"📄 파일명: {os.path.basename(filepath)}\n")
+            self.output_text.insert("end", f"💾 전체 경로: {filepath}\n")
+            self.output_text.insert("end", f"🏷️ 프로젝트명: {manifest_data.get('project_name', 'N/A')}\n")
+            self.output_text.insert("end", f"📝 스크립트 타입: {script_type}\n\n")
+            
             self.output_text.insert("end", "=== Manifest JSON 내용 ===\n")
             self.output_text.insert("end", json.dumps(manifest_data, ensure_ascii=False, indent=2))
-            self.output_text.insert("end", f"\n\n💾 파일 저장 완료: {filepath}")
+            
             self._add_output_message(f"✅ {os.path.basename(filepath)} 생성 완료", "INFO")
         except Exception as e:
             error_msg = f"Manifest 생성 실패: {e}"

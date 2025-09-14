@@ -1,0 +1,939 @@
+{
+  "export_time": "2025-09-14T13:23:12.959930",
+  "test_stats": {
+    "total_tests": 4,
+    "passed_tests": 4,
+    "failed_tests": 0,
+    "test_duration": 0.0008902549743652344
+  },
+  "test_results": [
+    {
+      "test_name": "회화_기본_설정_테스트",
+      "script_type": "회화",
+      "passed": true,
+      "expected": {
+        "common": {
+          "bg": {
+            "enabled": true,
+            "color": "#000000",
+            "alpha": 0.2,
+            "margin": 2,
+            "type": "이미지",
+            "value": ""
+          },
+          "shadow": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000",
+            "blur": 4,
+            "offx": 3,
+            "offy": 3,
+            "alpha": 1.0,
+            "useBlur": true
+          },
+          "border": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000"
+          }
+        },
+        "tabs": {
+          "회화 설정": {
+            "행수": 4,
+            "비율": "16:9",
+            "해상도": "1920x1080",
+            "rows": [
+              {
+                "행": "순번",
+                "x": 100,
+                "y": 200,
+                "w": 100,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": true,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "원어",
+                "x": 100,
+                "y": 400,
+                "w": 1800,
+                "크기(pt)": 80,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": false,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "학습어",
+                "x": 100,
+                "y": 600,
+                "w": 1800,
+                "크기(pt)": 80,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFF00",
+                "굵기": false,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "읽기",
+                "x": 100,
+                "y": 800,
+                "w": 1800,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#00FF00",
+                "굵기": false,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              }
+            ]
+          }
+        }
+      },
+      "actual": {
+        "common": {
+          "bg": {
+            "enabled": true,
+            "color": "#000000",
+            "alpha": 0.2,
+            "margin": 2,
+            "type": "이미지",
+            "value": ""
+          },
+          "shadow": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000",
+            "blur": 4,
+            "offx": 3,
+            "offy": 3,
+            "alpha": 1.0,
+            "useBlur": true
+          },
+          "border": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000"
+          }
+        },
+        "tabs": {
+          "회화 설정": {
+            "행수": 4,
+            "비율": "16:9",
+            "해상도": "1920x1080",
+            "rows": [
+              {
+                "행": "순번",
+                "x": 100,
+                "y": 200,
+                "w": 100,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": true,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "원어",
+                "x": 100,
+                "y": 400,
+                "w": 1800,
+                "크기(pt)": 80,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": false,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "학습어",
+                "x": 100,
+                "y": 600,
+                "w": 1800,
+                "크기(pt)": 80,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFF00",
+                "굵기": false,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "읽기",
+                "x": 100,
+                "y": 800,
+                "w": 1800,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#00FF00",
+                "굵기": false,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              }
+            ]
+          }
+        }
+      },
+      "timestamp": "2025-09-14T13:23:12.959282"
+    },
+    {
+      "test_name": "인트로_기본_설정_테스트",
+      "script_type": "인트로",
+      "passed": true,
+      "expected": {
+        "common": {
+          "bg": {
+            "enabled": true,
+            "color": "#000000",
+            "alpha": 0.2,
+            "margin": 2,
+            "type": "이미지",
+            "value": ""
+          },
+          "shadow": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000",
+            "blur": 4,
+            "offx": 3,
+            "offy": 3,
+            "alpha": 1.0,
+            "useBlur": true
+          },
+          "border": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000"
+          }
+        },
+        "tabs": {
+          "인트로 설정": {
+            "행수": 1,
+            "비율": "16:9",
+            "해상도": "1920x1080",
+            "rows": [
+              {
+                "행": "1행",
+                "x": 100,
+                "y": 500,
+                "w": 1820,
+                "크기(pt)": 80,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": false,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              }
+            ]
+          }
+        }
+      },
+      "actual": {
+        "common": {
+          "bg": {
+            "enabled": true,
+            "color": "#000000",
+            "alpha": 0.2,
+            "margin": 2,
+            "type": "이미지",
+            "value": ""
+          },
+          "shadow": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000",
+            "blur": 4,
+            "offx": 3,
+            "offy": 3,
+            "alpha": 1.0,
+            "useBlur": true
+          },
+          "border": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000"
+          }
+        },
+        "tabs": {
+          "인트로 설정": {
+            "행수": 1,
+            "비율": "16:9",
+            "해상도": "1920x1080",
+            "rows": [
+              {
+                "행": "1행",
+                "x": 100,
+                "y": 500,
+                "w": 1820,
+                "크기(pt)": 80,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": false,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              }
+            ]
+          }
+        }
+      },
+      "timestamp": "2025-09-14T13:23:12.959466"
+    },
+    {
+      "test_name": "엔딩_기본_설정_테스트",
+      "script_type": "엔딩",
+      "passed": true,
+      "expected": {
+        "common": {
+          "bg": {
+            "enabled": true,
+            "color": "#000000",
+            "alpha": 0.2,
+            "margin": 2,
+            "type": "이미지",
+            "value": ""
+          },
+          "shadow": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000",
+            "blur": 4,
+            "offx": 3,
+            "offy": 3,
+            "alpha": 1.0,
+            "useBlur": true
+          },
+          "border": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000"
+          }
+        },
+        "tabs": {
+          "엔딩 설정": {
+            "행수": 1,
+            "비율": "16:9",
+            "해상도": "1920x1080",
+            "rows": [
+              {
+                "행": "1행",
+                "x": 100,
+                "y": 1000,
+                "w": 1820,
+                "크기(pt)": 90,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": false,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              }
+            ]
+          }
+        }
+      },
+      "actual": {
+        "common": {
+          "bg": {
+            "enabled": true,
+            "color": "#000000",
+            "alpha": 0.2,
+            "margin": 2,
+            "type": "이미지",
+            "value": ""
+          },
+          "shadow": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000",
+            "blur": 4,
+            "offx": 3,
+            "offy": 3,
+            "alpha": 1.0,
+            "useBlur": true
+          },
+          "border": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000"
+          }
+        },
+        "tabs": {
+          "엔딩 설정": {
+            "행수": 1,
+            "비율": "16:9",
+            "해상도": "1920x1080",
+            "rows": [
+              {
+                "행": "1행",
+                "x": 100,
+                "y": 1000,
+                "w": 1820,
+                "크기(pt)": 90,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": false,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              }
+            ]
+          }
+        }
+      },
+      "timestamp": "2025-09-14T13:23:12.959614"
+    },
+    {
+      "test_name": "썸네일_기본_설정_테스트",
+      "script_type": "썸네일",
+      "passed": true,
+      "expected": {
+        "common": {
+          "bg": {
+            "enabled": true,
+            "color": "#000000",
+            "alpha": 0.2,
+            "margin": 2,
+            "type": "이미지",
+            "value": ""
+          },
+          "shadow": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000",
+            "blur": 4,
+            "offx": 3,
+            "offy": 3,
+            "alpha": 1.0,
+            "useBlur": true
+          },
+          "border": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000"
+          }
+        },
+        "tabs": {
+          "썸네일 설정": {
+            "행수": 4,
+            "비율": "16:9",
+            "해상도": "1920x1080",
+            "rows": [
+              {
+                "행": "1행",
+                "x": 100,
+                "y": 200,
+                "w": 1800,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": true,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "2행",
+                "x": 100,
+                "y": 400,
+                "w": 1800,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": true,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "3행",
+                "x": 100,
+                "y": 600,
+                "w": 1800,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": true,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "4행",
+                "x": 100,
+                "y": 800,
+                "w": 1800,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": true,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              }
+            ]
+          }
+        }
+      },
+      "actual": {
+        "common": {
+          "bg": {
+            "enabled": true,
+            "color": "#000000",
+            "alpha": 0.2,
+            "margin": 2,
+            "type": "이미지",
+            "value": ""
+          },
+          "shadow": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000",
+            "blur": 4,
+            "offx": 3,
+            "offy": 3,
+            "alpha": 1.0,
+            "useBlur": true
+          },
+          "border": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000"
+          }
+        },
+        "tabs": {
+          "썸네일 설정": {
+            "행수": 4,
+            "비율": "16:9",
+            "해상도": "1920x1080",
+            "rows": [
+              {
+                "행": "1행",
+                "x": 100,
+                "y": 200,
+                "w": 1800,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": true,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "2행",
+                "x": 100,
+                "y": 400,
+                "w": 1800,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": true,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "3행",
+                "x": 100,
+                "y": 600,
+                "w": 1800,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": true,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "4행",
+                "x": 100,
+                "y": 800,
+                "w": 1800,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": true,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              }
+            ]
+          }
+        }
+      },
+      "timestamp": "2025-09-14T13:23:12.959777"
+    }
+  ],
+  "test_cases": [
+    {
+      "test_name": "회화_기본_설정_테스트",
+      "script_type": "회화",
+      "expected": {
+        "common": {
+          "bg": {
+            "enabled": true,
+            "color": "#000000",
+            "alpha": 0.2,
+            "margin": 2,
+            "type": "이미지",
+            "value": ""
+          },
+          "shadow": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000",
+            "blur": 4,
+            "offx": 3,
+            "offy": 3,
+            "alpha": 1.0,
+            "useBlur": true
+          },
+          "border": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000"
+          }
+        },
+        "tabs": {
+          "회화 설정": {
+            "행수": 4,
+            "비율": "16:9",
+            "해상도": "1920x1080",
+            "rows": [
+              {
+                "행": "순번",
+                "x": 100,
+                "y": 200,
+                "w": 100,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": true,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "원어",
+                "x": 100,
+                "y": 400,
+                "w": 1800,
+                "크기(pt)": 80,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": false,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "학습어",
+                "x": 100,
+                "y": 600,
+                "w": 1800,
+                "크기(pt)": 80,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFF00",
+                "굵기": false,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "읽기",
+                "x": 100,
+                "y": 800,
+                "w": 1800,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#00FF00",
+                "굵기": false,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              }
+            ]
+          }
+        }
+      },
+      "created_at": "2025-09-14T13:23:12.958670"
+    },
+    {
+      "test_name": "인트로_기본_설정_테스트",
+      "script_type": "인트로",
+      "expected": {
+        "common": {
+          "bg": {
+            "enabled": true,
+            "color": "#000000",
+            "alpha": 0.2,
+            "margin": 2,
+            "type": "이미지",
+            "value": ""
+          },
+          "shadow": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000",
+            "blur": 4,
+            "offx": 3,
+            "offy": 3,
+            "alpha": 1.0,
+            "useBlur": true
+          },
+          "border": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000"
+          }
+        },
+        "tabs": {
+          "인트로 설정": {
+            "행수": 1,
+            "비율": "16:9",
+            "해상도": "1920x1080",
+            "rows": [
+              {
+                "행": "1행",
+                "x": 100,
+                "y": 500,
+                "w": 1820,
+                "크기(pt)": 80,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": false,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              }
+            ]
+          }
+        }
+      },
+      "created_at": "2025-09-14T13:23:12.958773"
+    },
+    {
+      "test_name": "엔딩_기본_설정_테스트",
+      "script_type": "엔딩",
+      "expected": {
+        "common": {
+          "bg": {
+            "enabled": true,
+            "color": "#000000",
+            "alpha": 0.2,
+            "margin": 2,
+            "type": "이미지",
+            "value": ""
+          },
+          "shadow": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000",
+            "blur": 4,
+            "offx": 3,
+            "offy": 3,
+            "alpha": 1.0,
+            "useBlur": true
+          },
+          "border": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000"
+          }
+        },
+        "tabs": {
+          "엔딩 설정": {
+            "행수": 1,
+            "비율": "16:9",
+            "해상도": "1920x1080",
+            "rows": [
+              {
+                "행": "1행",
+                "x": 100,
+                "y": 1000,
+                "w": 1820,
+                "크기(pt)": 90,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": false,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              }
+            ]
+          }
+        }
+      },
+      "created_at": "2025-09-14T13:23:12.958829"
+    },
+    {
+      "test_name": "썸네일_기본_설정_테스트",
+      "script_type": "썸네일",
+      "expected": {
+        "common": {
+          "bg": {
+            "enabled": true,
+            "color": "#000000",
+            "alpha": 0.2,
+            "margin": 2,
+            "type": "이미지",
+            "value": ""
+          },
+          "shadow": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000",
+            "blur": 4,
+            "offx": 3,
+            "offy": 3,
+            "alpha": 1.0,
+            "useBlur": true
+          },
+          "border": {
+            "enabled": true,
+            "thick": 4,
+            "color": "#000000"
+          }
+        },
+        "tabs": {
+          "썸네일 설정": {
+            "행수": 4,
+            "비율": "16:9",
+            "해상도": "1920x1080",
+            "rows": [
+              {
+                "행": "1행",
+                "x": 100,
+                "y": 200,
+                "w": 1800,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": true,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "2행",
+                "x": 100,
+                "y": 400,
+                "w": 1800,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": true,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "3행",
+                "x": 100,
+                "y": 600,
+                "w": 1800,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": true,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              },
+              {
+                "행": "4행",
+                "x": 100,
+                "y": 800,
+                "w": 1800,
+                "크기(pt)": 60,
+                "폰트(pt)": "Noto Sans KR",
+                "색상": "#FFFFFF",
+                "굵기": true,
+                "좌우 정렬": "center",
+                "상하 정렬": "center",
+                "바탕": false,
+                "쉐도우": true,
+                "외곽선": true
+              }
+            ]
+          }
+        }
+      },
+      "created_at": "2025-09-14T13:23:12.958875"
+    }
+  ]
+}

@@ -46,11 +46,14 @@ class SubtitleGenerator:
             scene_output_dir = os.path.join(self.output_dir, self.identifier, "dialog" if scene_type == "conversation" else scene_type)
             os.makedirs(scene_output_dir, exist_ok=True)
 
-            if scene_type == "intro" or scene_type == "ending":
-                # Modified to generate a single image for the entire script
-                frames = self._generate_intro_ending_frames(scene, frame_counter, fps, scene_output_dir)
+            if scene_type == "intro":
+                frames = self._generate_intro_frames(scene, frame_counter, fps, scene_output_dir)
                 self.frames.extend(frames)
-                frame_counter += len(frames) # Should be 1 frame per intro/ending scene
+                frame_counter += len(frames)
+            elif scene_type == "ending":
+                frames = self._generate_ending_frames(scene, frame_counter, fps, scene_output_dir)
+                self.frames.extend(frames)
+                frame_counter += len(frames)
             elif scene_type == "dialogue":
                 frames = self._generate_dialogue_frames(scene, frame_counter, fps, scene_output_dir)
                 self.frames.extend(frames)
@@ -73,9 +76,39 @@ class SubtitleGenerator:
         except:
             return (1920, 1080)
 
-    def _generate_intro_ending_frames(self, scene: Dict[str, Any], start_frame: int, fps: int, scene_output_dir: str) -> List[SubtitleFrame]:
+    def _create_base_image(self) -> Image.Image:
+        width, height = self.resolution
+        common_settings = self.text_renderer.config.get("common", {})
+        bg_settings = common_settings.get("bg", {})
+        bg_type = bg_settings.get("type", "색상")
+        bg_value = bg_settings.get("value", "#000000")
+        bg_alpha = float(bg_settings.get("alpha", 1.0))
+
+        if bg_type == "색상":
+            from PIL import Image, ImageColor
+            try:
+                rgb = ImageColor.getrgb(bg_value)
+            except:
+                rgb = (0, 0, 0)
+            return Image.new("RGBA", (width, height), (rgb[0], rgb[1], rgb[2], int(bg_alpha * 255)))
+        elif bg_type == "이미지" and bg_value and os.path.isfile(bg_value):
+            from PIL import Image
+            img = Image.open(bg_value).convert('RGBA')
+            iw, ih = img.size
+            scale = max(width / max(1, iw), height / max(1, ih))
+            new_w, new_h = int(iw * scale), int(ih * scale)
+            img = img.resize((new_w, new_h))
+            left = max(0, (new_w - width) // 2)
+            top = max(0, (new_h - height) // 2)
+            img = img.crop((left, top, left + width, top + height))
+            img.putalpha(int(bg_alpha * 255))
+            return img
+        else:
+            return Image.new("RGBA", (width, height), (0, 0, 0, 0))
+
+    def _generate_intro_frames(self, scene: Dict[str, Any], start_frame: int, fps: int, scene_output_dir: str) -> List[SubtitleFrame]:
         self._log(f"Generating frames for scene: {scene.get('id')}")
-        full_script = scene.get("content", {}).get("script", "")
+        full_script = scene.get("full_script", "")
         
         frames = []
         if not full_script.strip():
@@ -86,14 +119,19 @@ class SubtitleGenerator:
         # Get settings for intro/ending
         settings_key = f"{scene.get('type')} 설정"
         text_settings = self.text_renderer.config.get("tabs", {}).get(settings_key, {})
-        
-        font_name = text_settings.get("폰트(pt)", "KoPubWorld돋움체")
-        font_size = int(text_settings.get("크기(pt)", 48))
-        font_color = text_settings.get("색상", "#FFFFFF")
-        max_width = self.resolution[0] - 100 # Example max width
-        align = text_settings.get("정렬", "center") # Default to center
-        vertical_align = text_settings.get("수직정렬", "top") # Default to top
-        position = (self.resolution[0] // 2, 50) # Example position, will be adjusted by align/vertical_align
+        row_settings = text_settings.get("rows", [{}])[0]
+
+        font_name = row_settings.get("폰트(pt)", "KoPubWorld돋움체")
+        font_size = int(row_settings.get("크기(pt)", 48))
+        font_color = row_settings.get("색상", "#FFFFFF")
+        max_width = int(row_settings.get("w", self.resolution[0] - 100))
+        align = row_settings.get("좌우 정렬", "center").lower()
+        vertical_align = row_settings.get("상하 정렬", "top").lower()
+        position = (int(row_settings.get("x", self.resolution[0] // 2)), int(row_settings.get("y", 50)))
+
+        common_settings = self.text_renderer.config.get("common", {})
+        border_settings = common_settings.get("border", {})
+        shadow_settings = common_settings.get("shadow", {})
 
         # Render the entire script onto a single image
         self.text_renderer.render_text_to_image(
@@ -105,8 +143,74 @@ class SubtitleGenerator:
             font_color=font_color,
             max_width=max_width,
             align=align,
-            vertical_align=vertical_align
-            # Add stroke, shadow settings if available in text_settings
+            vertical_align=vertical_align,
+            stroke_width=int(border_settings.get("thick", 0)),
+            stroke_color=border_settings.get("color", "#000000"),
+            shadow_offset=(int(shadow_settings.get("offx", 0)), int(shadow_settings.get("offy", 0))),
+            shadow_color=shadow_settings.get("color", "#000000")
+        )
+        
+        output_path = os.path.join(scene_output_dir, f"{self.identifier}_{start_frame:04d}.png")
+        self.text_renderer.save_image(image, output_path)
+        
+        # Estimate duration for the entire script
+        duration = self._estimate_speech_duration(full_script) 
+
+        frame = SubtitleFrame(
+            frame_number=start_frame,
+            start_time=start_frame / fps,
+            end_time=(start_frame + duration * fps) / fps,
+            duration=duration,
+            scene_id=scene.get("id"),
+            text=full_script,
+            output_path=output_path
+        )
+        frames.append(frame)
+        return frames
+
+    def _generate_ending_frames(self, scene: Dict[str, Any], start_frame: int, fps: int, scene_output_dir: str) -> List[SubtitleFrame]:
+        self._log(f"--- Generating ending frame for scene: {scene.get('id')} ---")
+        self._log(f"Scene data: {scene}")
+        settings_key = f"{scene.get('type')} 설정"
+        text_settings = self.text_renderer.config.get("tabs", {}).get(settings_key, {})
+        self._log(f"Text settings: {text_settings}")
+        row_settings = text_settings.get("rows", [{}])[0]
+        self._log(f"Row settings: {row_settings}")
+
+        font_name = row_settings.get("폰트(pt)", "KoPubWorld돋움체")
+        font_size = int(row_settings.get("크기(pt)", 48))
+        font_color = row_settings.get("색상", "#FFFFFF")
+        max_width = int(row_settings.get("w", self.resolution[0] - 100))
+        align = row_settings.get("좌우 정렬", "center").lower()
+        vertical_align = row_settings.get("상하 정렬", "top").lower()
+        position = (int(row_settings.get("x", self.resolution[0] // 2)), int(row_settings.get("y", 50)))
+
+        # Smart line breaking
+        font = self.text_renderer._get_font(font_name, font_size)
+        wrapped_text = self.text_renderer._smart_wrap(full_script, font, max_width)
+        self._log(f"Smart wrapped text: {wrapped_text}")
+
+        common_settings = self.text_renderer.config.get("common", {})
+        border_settings = common_settings.get("border", {})
+        shadow_settings = common_settings.get("shadow", {})
+
+        self._log(f"Rendering ending with settings: position={position}, font_name={font_name}, font_size={font_size}, font_color={font_color}, max_width={max_width}, align={align}, vertical_align={vertical_align}, stroke_width={border_settings.get('thick', 0)}, stroke_color={border_settings.get('color', '#000000')}, shadow_offset={(int(shadow_settings.get('offx', 0)), int(shadow_settings.get('offy', 0)))}, shadow_color={shadow_settings.get('color', '#000000')}")
+
+        # Render the entire script onto a single image
+        self.text_renderer.render_text_to_image(
+            image=image,
+            text=wrapped_text,
+            position=position,
+            font_name=font_name,
+            font_size=font_size,
+            font_color=font_color,
+            max_width=max_width,
+            align=align,
+            vertical_align=vertical_align,
+            stroke_width=int(border_settings.get("thick", 0)),
+            stroke_color=border_settings.get("color", "#000000"),
+            shadow_offset=(int(shadow_settings.get("offx", 0)), int(shadow_settings.get("offy", 0))),
+            shadow_color=shadow_settings.get("color", "#000000")
         )
         
         output_path = os.path.join(scene_output_dir, f"{self.identifier}_{start_frame:04d}.png")

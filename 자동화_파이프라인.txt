@@ -1,0 +1,1760 @@
+자동화 파이프라인 전체 동작 정의
+=====================================
+
+v0.9 파이프라인 현재 상태 (2024-09-14)
+=====================================
+
+현재까지 수정된 내용
+-------------------
+
+1. 파일명 및 디렉토리 구조 개선
+   - Manifest 파일: kor-chn_conversation.json 형태로 저장
+     * 기능: 파이프라인의 전체 작업 흐름을 정의하는 중앙 설정 파일
+     * 용도: 
+       - 프로젝트 메타데이터 저장 (프로젝트명, 해상도, 배경 설정)
+       - 장면별 스크립트 데이터 구조화 (회화, 인트로, 엔딩)
+       - 각 장면의 순서, 타입, 텍스트 내용 관리
+       - UI에서 입력된 데이터를 파이프라인에서 사용할 수 있는 형태로 변환
+       - 오디오 생성, 자막 생성, 비디오 렌더링의 기준이 되는 마스터 파일
+     * 구조: JSON 형태로 프로젝트 정보, 장면 배열, 각 장면의 상세 데이터 포함
+     * 예시 파일명: kor-chn_conversation.json, kor-chn_intro.json, kor-chn_ending.json
+     * 상세 구조 예시:
+       {
+         "project_name": "kor-chn",
+         "resolution": "1920x1080",
+         "default_background": null,
+         "scenes": [
+           {
+             "id": "conversation_01",
+             "type": "conversation",
+             "sequence": 1,
+             "native_script": "안녕하세요",
+             "learning_script": "你好",
+             "reading_script": "nǐ hǎo",
+             "order": "1"
+           }
+         ]
+       }
+   - 저장 위치: output/kor-chn/kor-chn/manifest/ 디렉토리
+   - 타이밍 파일: kor-chn_conversation.json 형태로 저장
+     * 기능: 오디오 생성 시 추출된 타이밍 정보를 저장하는 파일
+     * 용도:
+       - SSML의 <mark> 태그에서 추출한 음성 타이밍 데이터
+       - 자막 이미지 생성 시 텍스트 표시 타이밍 결정
+       - 비디오 렌더링 시 오디오와 자막 동기화
+       - 각 장면별 시작/종료 시간, 텍스트별 표시 시간 관리
+     * 구조: JSON 형태로 장면별, 텍스트별 타이밍 정보 포함
+     * 예시 파일명: kor-chn_conversation.json, kor-chn_intro.json, kor-chn_ending.json
+     * 상세 구조 예시:
+       {
+         "total_duration": 15.5,
+         "scenes": [
+           {
+             "scene_id": "conversation_01",
+             "start_time": 0.0,
+             "end_time": 5.2,
+             "texts": [
+               {
+                 "text": "안녕하세요",
+                 "start_time": 0.0,
+                 "end_time": 2.1,
+                 "mark_id": "mark_001"
+               },
+               {
+                 "text": "你好",
+                 "start_time": 2.1,
+                 "end_time": 3.8,
+                 "mark_id": "mark_002"
+               }
+             ]
+           }
+         ]
+       }
+   - 저장 위치: output/kor-chn/kor-chn/timing/ 디렉토리
+
+2. 파이프라인 컴포넌트 수정
+   - PipelineManager: create_manifest 메서드 추가
+   - ManifestParser: create_manifest 메서드 추가
+   - AudioGenerator: script_type 매개변수 추가, 타이밍 파일 저장 구조 개선
+
+파이프라인 컴포넌트 상세 설명
+============================
+
+1. PipelineManager (src/pipeline/ffmpeg/pipeline_manager.py)
+   - 기능: 전체 파이프라인의 중앙 관리자 역할
+   - 용도:
+     * 파이프라인의 전체 워크플로우 조율 및 제어
+     * 각 단계별 컴포넌트 간 데이터 전달 및 동기화
+     * 에러 처리 및 로깅 관리
+     * UI와 백엔드 파이프라인 간의 인터페이스 역할
+   - 주요 메서드:
+     * create_manifest(): UI 데이터를 Manifest 파일로 변환
+     * run_full_pipeline(): 전체 파이프라인 실행
+     * _generate_audio(): 오디오 생성 단계 관리
+     * _generate_subtitles(): 자막 이미지 생성 단계 관리
+     * _render_video(): 비디오 렌더링 단계 관리
+
+2. ManifestParser (src/pipeline/manifest/parser.py)
+   - 기능: Manifest 파일의 생성, 파싱, 검증 담당
+   - 용도:
+     * UI에서 입력된 스크립트 데이터를 표준화된 Manifest 구조로 변환
+     * Manifest 파일의 유효성 검사 및 데이터 검증
+     * 스크립트 타입별(conversation, intro, ending) 다른 데이터 구조 처리
+     * 파이프라인에서 사용할 수 있는 형태로 데이터 정규화
+   - 주요 메서드:
+     * create_manifest(): 스크립트 타입별 Manifest 생성
+     * parse_manifest(): 기존 Manifest 파일 파싱
+     * validate_manifest(): Manifest 데이터 유효성 검사
+
+3. AudioGenerator (src/pipeline/audio/generator.py)
+   - 기능: TTS API를 통한 오디오 생성 및 타이밍 정보 추출
+   - 용도:
+     * Manifest 데이터를 SSML로 변환
+     * Google Cloud TTS API 호출하여 음성 파일 생성
+     * SSML의 <mark> 태그에서 타이밍 정보 추출
+     * 생성된 오디오 파일과 타이밍 정보를 저장
+   - 주요 메서드:
+     * generate_audio_from_manifest(): Manifest 기반 오디오 생성
+     * generate_audio_from_ssml(): SSML 기반 오디오 생성
+     * extract_timing_info(): 타이밍 정보 추출
+     * build_manifest_ssml(): Manifest를 SSML로 변환
+
+4. SSMLBuilder (src/pipeline/audio/ssml_builder.py)
+   - 기능: SSML(Speech Synthesis Markup Language) 생성 및 관리
+   - 용도:
+     * Manifest 데이터를 SSML 형식으로 변환
+     * 화자별 음성 설정 (언어, 성별, 속도 등)
+     * <mark> 태그를 통한 타이밍 포인트 설정
+     * TTS API에 전달할 최적화된 SSML 생성
+   - 주요 메서드:
+     * build_manifest_ssml(): Manifest 기반 SSML 생성
+     * create_ssml_file(): SSML 파일 저장
+     * add_timing_marks(): 타이밍 마크 추가
+
+5. SubtitleGenerator (src/pipeline/subtitle/generator.py)
+   - 기능: 자막 이미지 생성
+   - 용도:
+     * Manifest와 타이밍 정보를 기반으로 자막 이미지 생성
+     * UI 설정을 반영한 텍스트 렌더링
+     * FFmpeg를 통한 PNG 이미지 렌더링
+     * 장면별, 화면별 자막 이미지 시퀀스 생성
+   - 주요 메서드:
+     * generate_subtitles_from_manifest(): Manifest 기반 자막 생성
+     * render_subtitle_images(): 자막 이미지 렌더링
+     * create_text_images(): 텍스트 이미지 생성
+
+6. TextRenderer (src/pipeline/subtitle/text_renderer.py)
+   - 기능: 텍스트를 이미지로 렌더링하는 핵심 엔진
+   - 용도:
+     * 폰트, 색상, 위치 등 UI 설정을 적용한 텍스트 렌더링
+     * 배경, 그림자, 외곽선 등 텍스트 효과 처리
+     * 다양한 언어(한국어, 중국어, 영어) 텍스트 렌더링
+     * 고품질 자막 이미지 생성
+   - 주요 메서드:
+     * render_text(): 텍스트 렌더링
+     * apply_text_effects(): 텍스트 효과 적용
+     * create_text_image(): 텍스트 이미지 생성
+
+7. FFmpegRenderer (src/pipeline/ffmpeg/renderer.py)
+   - 기능: FFmpeg를 통한 비디오 렌더링 및 파일 처리
+   - 용도:
+     * 배경 이미지와 자막 이미지 합성
+     * 오디오와 비디오 동기화
+     * 최종 MP4 비디오 파일 생성
+     * 다양한 비디오 포맷 및 품질 설정 지원
+   - 주요 메서드:
+     * render_video(): 비디오 렌더링
+     * combine_audio_video(): 오디오-비디오 합성
+     * create_final_video(): 최종 비디오 생성
+
+8. PipelineConfig (src/pipeline/core/models.py)
+   - 기능: 파이프라인 전반의 설정 및 구성 정보 관리
+   - 용도:
+     * 출력 디렉토리, 파일 경로 등 기본 설정 관리
+     * 각 단계별 활성화/비활성화 설정
+     * 비디오 품질, 해상도 등 렌더링 설정
+     * API 키, 외부 서비스 설정 관리
+   - 주요 속성:
+     * output_directory: 출력 디렉토리 경로
+     * enable_audio_generation: 오디오 생성 활성화
+     * enable_subtitle_generation: 자막 생성 활성화
+     * enable_video_rendering: 비디오 렌더링 활성화
+
+9. UI 컴포넌트들 (src/ui/)
+    - PipelineTabView: 파이프라인 실행 UI
+      * 기능: 파이프라인 단계별 실행 버튼 및 진행 상황 표시
+      * 용도: 사용자가 파이프라인을 단계별로 실행할 수 있는 인터페이스
+    - TextSettingsTabView: 텍스트 설정 UI
+      * 기능: 자막 스타일, 폰트, 색상 등 설정
+      * 용도: 자막의 시각적 스타일을 사용자가 직접 설정
+    - DataTabView: 데이터 입력 UI
+      * 기능: 스크립트 데이터 입력 및 관리
+      * 용도: 회화, 인트로, 엔딩 텍스트 데이터 입력
+    - ImageTabView: 이미지 설정 UI
+      * 기능: 배경 이미지, 앵커 이미지 설정
+      * 용도: 비디오에 사용할 이미지 리소스 관리
+    - SpeakerTabView: 화자 설정 UI
+      * 기능: TTS 음성 설정 (언어, 성별, 속도 등)
+      * 용도: 오디오 생성 시 사용할 음성 설정
+
+10. 공통 함수 및 통합 관리 시스템 (src/pipeline/common/)
+    - ScriptTypeManager: 스크립트 타입 관리자
+      * 기능: 각 스크립트 타입(conversation, intro, ending, dialogue, thumbnail)별 설정 통합 관리
+      * 용도: 하나의 변경으로 모든 스크립트 타입에 적용할 수 있는 중앙 집중식 관리
+      * 주요 메서드:
+        - get_config(script_type): 스크립트 타입별 설정 반환
+        - update_config(script_type, updates): 특정 타입 설정 업데이트
+        - apply_global_changes(changes): 모든 타입에 전역 변경사항 적용
+        - get_ui_settings_format(script_type): UI 설정 형식으로 변환
+        - validate_script_data(script_type, data): 스크립트 데이터 검증
+    - CommonFunctions: 공통 함수 모음
+      * 기능: 파이프라인 전반에서 사용되는 공통 유틸리티 함수들
+      * 용도: 코드 중복 제거 및 일관된 처리 방식 제공
+      * 주요 메서드:
+        - ensure_directory_exists(directory_path): 디렉토리 생성
+        - save_json_file(file_path, data): JSON 파일 저장
+        - load_json_file(file_path): JSON 파일 로드
+        - create_timestamp(): 타임스탬프 생성
+        - sanitize_filename(filename): 파일명 정리
+        - parse_resolution(resolution_str): 해상도 파싱
+        - format_duration(seconds): 시간 형식 변환
+        - retry_operation(operation, max_retries): 작업 재시도
+        - create_progress_tracker(total_steps): 진행률 추적기 생성
+    - PipelineConfig: 파이프라인 설정 관리
+      * 기능: 파이프라인의 전역 설정과 스크립트 타입별 설정을 통합 관리
+      * 용도: 모든 설정을 중앙에서 관리하고 일관성 유지
+      * 주요 속성:
+        - project_name: 프로젝트 이름
+        - settings: 전역 설정 (PipelineSettings)
+        - script_type_manager: 스크립트 타입 관리자
+        - enabled_features: 활성화된 기능들
+        - custom_settings: 사용자 정의 설정
+      * 주요 메서드:
+        - get_script_type_config(script_type): 스크립트 타입별 설정 반환
+        - apply_global_script_changes(changes): 전역 스크립트 변경사항 적용
+        - get_ui_settings_for_all_types(): 모든 타입의 UI 설정 반환
+        - validate_config(): 설정 유효성 검사
+        - save_to_file(file_path): 설정 파일 저장
+        - load_from_file(file_path): 설정 파일 로드
+
+통합 관리 시스템의 장점 및 사용 예시
+=====================================
+
+1. 중앙 집중식 설정 관리
+   - 모든 스크립트 타입의 설정을 한 곳에서 관리
+   - 일관된 설정 구조와 검증 로직
+   - 설정 변경 시 자동으로 모든 관련 컴포넌트에 반영
+
+2. 전역 변경사항 적용
+   예시: 모든 스크립트 타입의 기본 폰트를 변경하려면
+   ```python
+   config = PipelineConfig()
+   changes = {
+       "default_font": "Noto Sans KR",
+       "default_font_size": 110
+   }
+   config.apply_global_script_changes(changes)
+   ```
+
+3. 스크립트 타입별 개별 설정
+   예시: 회화 설정만 변경하려면
+   ```python
+   config.update_script_type_config("conversation", {
+       "default_color": "#FF0000",
+       "row_configs": [새로운_행_설정들]
+   })
+   ```
+
+4. UI 설정 자동 생성
+   ```python
+   # 모든 타입의 UI 설정을 한 번에 생성
+   all_ui_settings = config.get_ui_settings_for_all_types()
+   
+   # 특정 타입의 UI 설정만 생성
+   conversation_ui = config.get_ui_settings_for_type("conversation")
+   ```
+
+5. 설정 검증 및 오류 방지
+   ```python
+   validation_result = config.validate_config()
+   if not validation_result["valid"]:
+       print("설정 오류:", validation_result["errors"])
+   ```
+
+6. 설정 파일 저장/로드
+   ```python
+   # 설정 저장
+   config.save_to_file("pipeline_config.json")
+   
+   # 설정 로드
+   loaded_config = PipelineConfig.load_from_file("pipeline_config.json")
+   ```
+
+7. 공통 함수 활용
+   ```python
+   from src.pipeline.common import CommonFunctions
+   
+   # 디렉토리 생성
+   CommonFunctions.ensure_directory_exists("/path/to/output")
+   
+   # JSON 파일 저장
+   CommonFunctions.save_json_file("data.json", {"key": "value"})
+   
+   # 파일명 정리
+   clean_name = CommonFunctions.sanitize_filename("특수문자 포함 파일명!")
+   
+   # 작업 재시도
+   result = CommonFunctions.retry_operation(risky_operation, max_retries=3)
+   ```
+
+8. 진행률 추적
+   ```python
+   tracker = CommonFunctions.create_progress_tracker(5)
+   
+   # 각 단계마다 업데이트
+   progress = CommonFunctions.update_progress(tracker, "Manifest 생성", "in_progress")
+   # ... 작업 수행 ...
+   progress = CommonFunctions.update_progress(tracker, "Manifest 생성", "completed")
+   ```
+
+현재 적용된 UI 설정 상세
+=======================
+
+1. 공통 설정 (common)
+   - 배경 설정:
+     * 활성화: true
+     * 색상: #000000 (검은색)
+     * 투명도: 0.2
+     * 여백: 2px
+     * 타입: 이미지
+     * 배경 이미지: pawel-czerwinski-IeRofQlthaY-unsplash.jpg
+   - 그림자 설정:
+     * 활성화: true
+     * 두께: 4px
+     * 색상: #000000 (검은색)
+     * 블러: 4px
+     * 오프셋 X: 3px, Y: 3px
+     * 투명도: 1.0
+     * 블러 사용: true
+   - 외곽선 설정:
+     * 활성화: true
+     * 두께: 4px
+     * 색상: #000000 (검은색)
+
+2. 회화 설정 (4행 구성)
+   - 해상도: 1920x1080, 비율: 16:9
+   - 행 구성:
+     * 순번 행: 
+       - 위치: x=150, y=50, w=1820
+       - 폰트: KoPubWorldDotum, 100pt, 굵게
+       - 색상: #FFFFFF (흰색)
+       - 정렬: 왼쪽 정렬, 상단 정렬
+       - 효과: 외곽선만 (True)
+     * 원어 행:
+       - 위치: x=50, y=150, w=1820
+       - 폰트: KoPubWorldDotum, 120pt, 굵게
+       - 색상: #FFFFFF (흰색)
+       - 정렬: 가운데 정렬, 상단 정렬
+       - 효과: 그림자만 (True)
+     * 학습어 행:
+       - 위치: x=50, y=450, w=1820
+       - 폰트: KoPubWorldDotum, 120pt, 굵게
+       - 색상: #FF00FF (자홍색)
+       - 정렬: 가운데 정렬, 상단 정렬
+       - 효과: 그림자+외곽선 (True)
+     * 읽기 행:
+       - 위치: x=50, y=750, w=1820
+       - 폰트: KoPubWorldDotum, 100pt, 굵게
+       - 색상: #FFFF00 (노란색)
+       - 정렬: 가운데 정렬, 상단 정렬
+       - 효과: 배경+외곽선 (True)
+
+3. 썸네일 설정 (4행 구성)
+   - 해상도: 1024x768, 비율: 16:9
+   - 행 구성:
+     * 1행:
+       - 위치: x=30, y=50, w=964
+       - 폰트: Noto Sans KR, 100pt, 굵게
+       - 색상: #FFFFFF (흰색)
+       - 정렬: 가운데 정렬, 상단 정렬
+       - 효과: 그림자+외곽선 (True)
+     * 2행:
+       - 위치: x=30, y=230, w=964
+       - 폰트: Noto Sans KR, 100pt, 굵게
+       - 색상: #00FFFF (청록색)
+       - 정렬: 가운데 정렬, 상단 정렬
+       - 효과: 그림자+외곽선 (True)
+     * 3행:
+       - 위치: x=30, y=410, w=964
+       - 폰트: KoPubWorldDotum, 100pt, 굵게
+       - 색상: #FF00FF (자홍색)
+       - 정렬: 가운데 정렬, 상단 정렬
+       - 효과: 그림자+외곽선 (True)
+     * 4행:
+       - 위치: x=30, y=590, w=964
+       - 폰트: KoPubWorldDotum, 100pt, 굵게
+       - 색상: #FFFF00 (노란색)
+       - 정렬: 가운데 정렬, 상단 정렬
+       - 효과: 그림자+외곽선 (True)
+
+4. 인트로 설정 (1행 구성)
+   - 해상도: 1920x1080, 비율: 16:9
+   - 행 구성:
+     * 1행:
+       - 위치: x=50, y=1000, w=1820
+       - 폰트: KoPubWorldDotum, 90pt, 굵게
+       - 색상: #FFFFFF (흰색)
+       - 정렬: 가운데 정렬, 하단 정렬
+       - 효과: 배경+그림자+외곽선 (True)
+
+5. 엔딩 설정 (1행 구성)
+   - 해상도: 1920x1080, 비율: 16:9
+   - 행 구성:
+     * 1행:
+       - 위치: x=50, y=1000, w=1820
+       - 폰트: KoPubWorldDotum, 90pt, 굵게
+       - 색상: #FFFFFF (흰색)
+       - 정렬: 가운데 정렬, 중앙 정렬
+       - 효과: 배경+그림자+외곽선 (True)
+
+6. 대화 설정 (3행 구성)
+   - 해상도: 1920x1080, 비율: 16:9
+   - 행 구성:
+     * 원어 행:
+       - 위치: x=50, y=250, w=1820
+       - 폰트: KoPubWorldDotum, 100pt, 굵게
+       - 색상: #FFFFFF (흰색)
+       - 정렬: 왼쪽 정렬, 상단 정렬
+       - 효과: 없음 (False)
+     * 학습어1 행:
+       - 위치: x=50, y=550, w=1820
+       - 폰트: KoPubWorldDotum, 100pt, 굵게
+       - 색상: #FFFFFF (흰색)
+       - 정렬: 왼쪽 정렬, 상단 정렬
+       - 효과: 없음 (False)
+     * 학습어2 행:
+       - 위치: x=50, y=850, w=1820
+       - 폰트: KoPubWorldDotum, 100pt, 굵게
+       - 색상: #FFFFFF (흰색)
+       - 정렬: 왼쪽 정렬, 상단 정렬
+       - 효과: 없음 (False)
+
+UI 설정 파일 구조
+================
+
+설정 파일: _text_settings.json
+- 위치: output/kor-chn/kor-chn/_text_settings.json
+- 형식: JSON
+- 자동 로드: 프로그램 시작 시 자동으로 로드됨
+- 버전: 1
+- 구조:
+  * version: 설정 파일 버전
+  * common: 공통 설정 (배경, 그림자, 외곽선)
+  * tabs: 탭별 설정 (회화, 썸네일, 인트로, 엔딩, 대화)
+    - 각 탭별로 행수, 비율, 해상도, 행별 상세 설정 포함
+
+최종 파일 구조 정의
+==================
+
+output/kor-chn/kor-chn/
+├── manifest/
+│   ├── kor-chn_conversation.json  # 회화 Manifest
+│   ├── kor-chn_intro.json         # 인트로 Manifest
+│   └── kor-chn_ending.json        # 엔딩 Manifest
+├── SSML/
+│   ├── kor-chn_conversation.ssml  # 회화 SSML
+│   ├── kor-chn_intro.ssml         # 인트로 SSML
+│   └── kor-chn_ending.ssml        # 엔딩 SSML
+├── mp3/
+│   ├── kor-chn_conversation.mp3   # 회화 오디오
+│   ├── kor-chn_intro.mp3          # 인트로 오디오
+│   └── kor-chn_ending.mp3         # 엔딩 오디오
+├── timing/
+│   ├── kor-chn_conversation.json  # 회화 타이밍
+│   ├── kor-chn_intro.json         # 인트로 타이밍
+│   └── kor-chn_ending.json        # 엔딩 타이밍
+├── conversation/
+│   ├── conversation_01_screen1.png
+│   └── conversation_01_screen2.png
+├── intro/
+│   └── intro_01.png
+├── ending/
+│   └── ending_01.png
+├── video/
+│   ├── kor-chn_conversation.mp4
+│   ├── kor-chn_intro.mp4
+│   ├── kor-chn_ending.mp4
+│   └── kor-chn_final.mp4
+└── _text_settings.json
+
+단계별 동작 정의
+===============
+
+1단계: Manifest 생성
+------------------
+입력: UI 스크립트 데이터 (CSV/텍스트)
+처리: 
+- 스크립트 타입별 Manifest 구조 생성
+- 프로젝트명 추출
+- 장면별 데이터 구조화
+출력: manifest/{project}_{type}.json
+
+2단계: 오디오 생성
+----------------
+입력: Manifest 파일
+처리:
+- SSML 생성 (화자별 음성 설정)
+- TTS API 호출
+- 타이밍 정보 추출 (<mark> 태그)
+출력: 
+- SSML/{project}_{type}.ssml
+- mp3/{project}_{type}.mp3
+- timing/{project}_{type}.json
+
+3단계: 자막 이미지 생성
+---------------------
+입력: Manifest + 타이밍 정보 + UI 설정
+처리:
+- UI 설정을 반영한 텍스트 렌더링
+- FFmpeg로 PNG 이미지 렌더링
+- 장면별 이미지 시퀀스 생성
+출력:
+- {type}/{scene}_{screen}.png
+
+4단계: 비디오 렌더링
+------------------
+입력: Manifest + 오디오 + 자막 이미지 + 타이밍
+처리:
+- FFmpeg 명령 생성
+- 배경 이미지 + 자막 오버레이
+- 오디오 합성
+출력: video/{project}_{type}.mp4
+
+5단계: 최종 생성
+--------------
+입력: 개별 MP4 파일들
+처리:
+- FFmpeg로 파일 병합
+- 최종 비디오 생성
+출력: video/{project}_final.mp4
+
+아직 정의가 필요한 동작들
+=======================
+
+1. UI에서 스크립트 타입 전달
+   - 현재: UI에서 "회화" 선택 시 script_type = "conversation"
+   - 필요: UI → PipelineManager로 스크립트 타입 전달 로직
+
+2. 오디오 생성 시 스크립트 타입 전달
+   - 현재: AudioGenerator.generate_audio_from_manifest()에 script_type 매개변수 추가됨
+   - 필요: UI에서 호출할 때 올바른 script_type 전달
+
+3. 자막 이미지 생성 시 스크립트 타입 처리
+   - 현재: SubtitleGenerator에서 스크립트 타입별 처리 필요
+   - 필요: conversation, intro, ending별 다른 이미지 생성 로직
+
+4. 비디오 렌더링 시 파일 경로 매핑
+   - 현재: 각 단계별 출력 파일 경로가 정의됨
+   - 필요: 비디오 렌더링 시 올바른 파일 경로 참조
+
+확인이 필요한 부분들
+==================
+
+1. UI 연동
+   - PipelineTabView에서 각 버튼 클릭 시 올바른 매개변수 전달
+   - 스크립트 타입별 다른 처리 로직
+
+2. 파일 경로 일관성
+   - 모든 컴포넌트에서 동일한 파일명 규칙 사용
+   - 프로젝트명과 스크립트 타입 조합
+
+3. 에러 처리
+   - 각 단계별 실패 시 적절한 에러 메시지
+   - 이전 단계 결과물이 없을 때의 처리
+
+4. 로깅 및 진행 상황
+   - 각 단계별 상세한 로그 출력
+   - UI에서 진행 상황 표시
+
+다음 단계 계획
+=============
+
+1. UI 연동 로직 완성: 각 버튼에서 올바른 매개변수 전달
+2. 파일 경로 매핑 완성: 모든 컴포넌트에서 일관된 경로 사용
+3. 에러 처리 강화: 각 단계별 실패 시나리오 처리
+4. 로깅 시스템 완성: 상세한 진행 상황 및 디버그 정보
+5. 테스트 시나리오 정의: 각 단계별 테스트 방법
+
+업데이트 히스토리
+===============
+
+2024-09-14
+- 초기 문서 생성
+- v0.9 파이프라인 현재 상태 정리
+- 파일 구조 및 단계별 동작 정의
+- 아직 필요한 동작들 식별
+- Manifest 파일과 타이밍 파일의 상세한 기능 및 용도 설명 추가
+- JSON 구조 예시 및 파일명 규칙 명시
+- 파이프라인 컴포넌트 전체 목록 및 상세 기능 설명 추가
+- 각 컴포넌트의 주요 메서드와 역할 명시
+- UI 컴포넌트들의 기능 및 용도 정리
+- ASSRenderer 컴포넌트 제거 (ASS 파일 사용 안함)
+- 파일 구조에서 ASS 디렉토리 제거
+- 자막 이미지 생성 단계에서 ASS 파일 생성 과정 제거
+- 현재 적용된 UI 설정 상세 정보 추가
+- 각 탭별 텍스트 스타일 설정 정리
+- UI 설정 파일 구조 및 자동 로드 기능 설명 추가
+- 각 UI 탭별 상세 위치 좌표 및 크기 정보 추가
+- 폰트, 색상, 정렬, 효과 등 모든 디폴트 값 상세 정리
+
+2024-09-15
+- ASS 제거 및 PNG 직접 생성 시스템 완전 구현
+- ass_renderer 모듈 의존성 완전 제거
+- PNGRenderer 클래스 구현 (PIL/Pillow 기반)
+- 자막 이미지 생성 파이프라인 완전 교체
+- PipelineContext 및 렌더러 모듈 구조화
+- 제작 사양서 요구사항 완전 반영
+- 공통 함수 및 통합 관리 시스템 추가 (src/pipeline/common/)
+- ScriptTypeManager: 스크립트 타입별 설정 통합 관리
+- CommonFunctions: 공통 유틸리티 함수 모음
+- PipelineConfig: 파이프라인 전역 설정 관리
+- 통합 관리 시스템의 장점 및 사용 예시 추가
+- 하나의 변경으로 모든 스크립트 타입에 적용 가능한 구조 구현
+- 비디오 제작을 위한 우선순위 작업 계획 추가
+- 5단계 Phase별 상세 작업 계획 수립
+- 예상 완료 시점 및 참고 자료 정리
+- 효율적인 비디오 제작을 위한 최적화 방안 추가
+- 7가지 핵심 최적화 전략 및 구체적 구현 방안 제시
+- 배치 처리, 템플릿 시스템, 성능 최적화 등 상세 계획
+- 효율성 지표 및 목표 설정 (처리 시간, 품질, 사용자 만족도)
+- 스크립트 타입별 오디오 및 이미지 제작 방법 상세 추가
+- 회화, 인트로, 엔딩, 대화, 썸네일 제작 프로세스 구체화
+- SSML 생성, TTS 처리, 이미지 렌더링 단계별 설명
+- 공통 제작 설정 및 파일명 규칙, 디렉토리 구조 정리
+- 이미지 생성 설정 반영 문제 해결 방안 추가
+- 계층적 설정 관리 시스템, 타입 안전 설정 시스템 구축 방안
+- 설정 검증 및 정규화, 실시간 동기화, 디버깅 시스템 설계
+- 통합 테스트 및 검증 시스템, 구현 우선순위 계획 수립
+- 제작 사양서 오디오 생성 요구사항 반영
+- 화자 설정 (원어화자, 학습어 화자 1,2,3,4) 및 무음 처리 규칙 추가
+- 파일명 규칙 및 디렉토리 구조 제작 사양서 기준으로 수정
+- SSML 마크 태그 규칙 및 재생 순서 명확화
+- 제작 사양서 자막 이미지 생성 요구사항 반영
+- 회화 이미지 2화면 생성 (화면1: 순번+원어, 화면2: 전체) 로직 추가
+- 썸네일 AI JSON 파싱, 3세트 생성, 터미널 출력 기능 추가
+- 인트로/엔딩 MD 인라인 스크립트, 스마트 줄바꿈, 폰트 크기 자동 조절 기능 추가
+
+비디오 제작을 위한 우선순위 작업 계획
+=====================================
+
+1. 파이프라인 통합 및 기반 구축 (우선순위: 높음)
+   □ 공통 함수 시스템을 기존 파이프라인에 통합
+     - PipelineManager에서 CommonFunctions 사용하도록 수정
+     - ScriptTypeManager를 UI 설정 로드에 연동
+     - PipelineConfig를 전역 설정으로 적용
+   □ UI 컴포넌트와 통합 관리 시스템 연동
+     - TextSettingsTabView에서 ScriptTypeManager 사용
+     - 설정 변경 시 자동으로 모든 타입에 반영되도록 구현
+     - UI 설정 저장/로드 시 통합 관리 시스템 활용
+
+2. 핵심 파이프라인 기능 완성 (우선순위: 높음)
+   □ Manifest 생성 기능 완성 및 테스트
+     - ScriptTypeManager를 활용한 Manifest 생성
+     - 스크립트 타입별 데이터 검증 강화
+     - Manifest 파일명 규칙 통일 (kor-chn_conversation.json)
+   □ 오디오 생성 파이프라인 완성
+     - SSML 생성 및 Google Cloud TTS 연동
+     - 타이밍 정보 추출 및 저장
+     - 오디오 파일명 규칙 통일
+   □ 자막 이미지 생성 파이프라인 완성
+     - ScriptTypeManager 설정을 활용한 자막 렌더링
+     - UI 설정과 자막 생성 연동
+     - 자막 프레임 파일명 규칙 통일
+
+3. 비디오 렌더링 및 최종 출력 (우선순위: 중간)
+   □ 비디오 렌더링 파이프라인 완성
+     - FFmpeg를 활용한 오디오+비디오 합성
+     - 자막 이미지와 오디오 동기화
+     - 최종 비디오 파일 생성
+   □ 전체 파이프라인 End-to-End 테스트
+     - 회화, 인트로, 엔딩, 대화 모든 타입 테스트
+     - 실제 데이터로 전체 워크플로우 검증
+     - 성능 및 품질 검증
+
+4. 안정성 및 사용성 개선 (우선순위: 중간)
+   □ 에러 처리 및 복구 메커니즘 구현
+     - 각 단계별 에러 처리 강화
+     - 실패 시 재시도 로직 구현
+     - 사용자 친화적 에러 메시지 제공
+   □ 성능 최적화 및 병렬 처리 구현
+     - 대용량 파일 처리 최적화
+     - 병렬 처리로 생성 시간 단축
+     - 메모리 사용량 최적화
+
+5. 문서화 및 사용자 지원 (우선순위: 낮음)
+   □ 사용자 매뉴얼 및 개발자 문서 작성
+     - 파이프라인 사용법 가이드
+     - 설정 변경 방법 안내
+     - 문제 해결 가이드
+
+세부 작업 계획
+==============
+
+Phase 1: 기반 구축 (1-2주)
+- 공통 함수 시스템 통합
+- UI와 통합 관리 시스템 연동
+- 기본 파이프라인 구조 정리
+
+Phase 2: 핵심 기능 구현 (2-3주)
+- Manifest 생성 완성
+- 오디오 생성 파이프라인 완성
+- 자막 이미지 생성 파이프라인 완성
+
+Phase 3: 비디오 렌더링 (1-2주)
+- FFmpeg 렌더링 파이프라인 완성
+- End-to-End 테스트 수행
+- 품질 검증 및 최적화
+
+Phase 4: 안정성 개선 (1주)
+- 에러 처리 강화
+- 성능 최적화
+- 사용자 경험 개선
+
+Phase 5: 문서화 (1주)
+- 사용자 매뉴얼 작성
+- 개발자 문서 정리
+- 문제 해결 가이드 작성
+
+예상 완료 시점: 6-9주
+
+효율적인 비디오 제작을 위한 최적화 방안
+=====================================
+
+1. 배치 처리 및 자동화 시스템
+   □ 대량 비디오 제작을 위한 배치 처리
+     - 여러 스크립트를 한 번에 처리하는 배치 모드
+     - 프로젝트별 템플릿 시스템으로 설정 재사용
+     - 자동화된 파일명 생성 및 정리
+   □ 스케줄링 및 백그라운드 처리
+     - 장시간 작업을 위한 백그라운드 실행
+     - 작업 큐 시스템으로 순차적 처리
+     - 진행률 모니터링 및 알림 시스템
+
+2. 템플릿 및 프리셋 시스템
+   □ 프로젝트 템플릿 관리
+     - 언어별, 주제별 미리 정의된 템플릿
+     - 자주 사용하는 설정을 프리셋으로 저장
+     - 템플릿 간 설정 복사 및 수정 기능
+   □ 스타일 프리셋 시스템
+     - 폰트, 색상, 레이아웃 조합을 프리셋으로 관리
+     - 브랜드 가이드라인에 맞는 스타일 템플릿
+     - 일관된 디자인을 위한 스타일 검증
+
+3. 성능 최적화 전략
+   □ 병렬 처리 최적화
+     - 오디오 생성과 자막 생성 동시 처리
+     - 멀티스레딩을 활용한 이미지 렌더링
+     - GPU 가속을 활용한 비디오 렌더링
+   □ 메모리 및 리소스 관리
+     - 대용량 파일 처리 시 스트리밍 방식 사용
+     - 임시 파일 자동 정리 및 압축
+     - 메모리 사용량 모니터링 및 최적화
+
+4. 품질 관리 및 검증 시스템
+   □ 자동 품질 검사
+     - 오디오 품질 검증 (볼륨, 클리핑 등)
+     - 자막 가독성 검사 (폰트 크기, 대비 등)
+     - 비디오 동기화 검증
+   □ A/B 테스트 시스템
+     - 여러 버전의 자막 스타일 비교
+     - 오디오 음성 품질 비교
+     - 사용자 피드백 기반 자동 개선
+
+5. 워크플로우 최적화
+   □ 단계별 검증 및 수정
+     - 각 단계별 미리보기 기능
+     - 실시간 설정 변경 및 재렌더링
+     - 부분 재생성으로 시간 절약
+   □ 협업 및 버전 관리
+     - 프로젝트별 버전 관리 시스템
+     - 팀원 간 설정 공유 및 동기화
+     - 변경 이력 추적 및 롤백 기능
+
+6. 사용자 경험 개선
+   □ 직관적인 UI/UX
+     - 드래그 앤 드롭으로 간편한 파일 업로드
+     - 실시간 미리보기 및 즉시 피드백
+     - 단축키 및 핫키로 빠른 작업
+   □ 스마트 자동화
+     - AI 기반 자막 타이밍 자동 조정
+     - 음성 인식으로 자동 자막 생성
+     - 컨텍스트 기반 스타일 추천
+
+7. 확장성 및 유지보수성
+   □ 모듈화된 아키텍처
+     - 플러그인 시스템으로 기능 확장
+     - API 기반 외부 도구 연동
+     - 마이크로서비스 아키텍처 고려
+   □ 설정 관리 시스템
+     - 중앙 집중식 설정 관리
+     - 환경별 설정 분리 (개발/운영)
+     - 설정 백업 및 복원 기능
+
+구체적인 구현 방안
+==================
+
+1. 배치 처리 시스템 구현
+   ```python
+   # 배치 처리 예시
+   class BatchVideoProcessor:
+       def __init__(self, config: PipelineConfig):
+           self.config = config
+           self.queue = []
+           self.results = []
+       
+       def add_project(self, project_data: Dict[str, Any]):
+           """프로젝트를 큐에 추가"""
+           self.queue.append(project_data)
+       
+       def process_batch(self, max_workers: int = 4):
+           """배치 처리 실행"""
+           with ThreadPoolExecutor(max_workers=max_workers) as executor:
+               futures = [executor.submit(self.process_single, project) 
+                         for project in self.queue]
+               for future in as_completed(futures):
+                   self.results.append(future.result())
+   ```
+
+2. 템플릿 시스템 구현
+   ```python
+   # 템플릿 관리 예시
+   class TemplateManager:
+       def __init__(self):
+           self.templates = {}
+           self.presets = {}
+       
+       def create_template(self, name: str, config: PipelineConfig):
+           """템플릿 생성"""
+           self.templates[name] = config.to_dict()
+       
+       def apply_template(self, name: str) -> PipelineConfig:
+           """템플릿 적용"""
+           if name in self.templates:
+               return PipelineConfig.from_dict(self.templates[name])
+           return PipelineConfig()
+   ```
+
+3. 성능 모니터링 시스템
+   ```python
+   # 성능 모니터링 예시
+   class PerformanceMonitor:
+       def __init__(self):
+           self.metrics = {}
+           self.start_time = None
+       
+       def start_monitoring(self, operation_name: str):
+           """모니터링 시작"""
+           self.start_time = time.time()
+           self.metrics[operation_name] = {
+               'start_time': self.start_time,
+               'memory_usage': psutil.Process().memory_info().rss
+           }
+       
+       def end_monitoring(self, operation_name: str):
+           """모니터링 종료"""
+           if operation_name in self.metrics:
+               self.metrics[operation_name]['duration'] = time.time() - self.start_time
+               self.metrics[operation_name]['end_memory'] = psutil.Process().memory_info().rss
+   ```
+
+4. 품질 검증 시스템
+   ```python
+   # 품질 검증 예시
+   class QualityValidator:
+       def __init__(self):
+           self.validators = {
+               'audio': self.validate_audio_quality,
+               'subtitle': self.validate_subtitle_quality,
+               'video': self.validate_video_sync
+           }
+       
+       def validate_audio_quality(self, audio_file: str) -> Dict[str, Any]:
+           """오디오 품질 검증"""
+           # 볼륨, 클리핑, 노이즈 검사
+           pass
+       
+       def validate_subtitle_quality(self, subtitle_file: str) -> Dict[str, Any]:
+           """자막 품질 검증"""
+           # 가독성, 대비, 폰트 크기 검사
+           pass
+   ```
+
+5. 워크플로우 최적화
+   ```python
+   # 워크플로우 관리 예시
+   class WorkflowManager:
+       def __init__(self):
+           self.steps = []
+           self.checkpoints = []
+       
+       def add_step(self, step_name: str, processor: Callable):
+           """워크플로우 단계 추가"""
+           self.steps.append((step_name, processor))
+       
+       def execute_with_checkpoints(self):
+           """체크포인트와 함께 실행"""
+           for i, (step_name, processor) in enumerate(self.steps):
+               try:
+                   result = processor()
+                   self.checkpoints.append((step_name, result))
+               except Exception as e:
+                   # 이전 체크포인트에서 재시작
+                   self.restore_from_checkpoint(i-1)
+                   raise
+   ```
+
+효율성 지표 및 목표
+==================
+
+1. 처리 시간 최적화
+   - 단일 비디오 제작 시간: 5분 이내
+   - 배치 처리 (10개): 30분 이내
+   - 병렬 처리로 70% 시간 단축
+
+2. 리소스 사용량 최적화
+   - 메모리 사용량: 4GB 이하
+   - CPU 사용률: 80% 이하
+   - 디스크 I/O 최소화
+
+3. 품질 지표
+   - 오디오 품질: 95% 이상 만족
+   - 자막 가독성: 98% 이상 만족
+   - 동기화 정확도: 99% 이상
+
+4. 사용자 만족도
+   - 설정 변경 후 즉시 미리보기 (3초 이내)
+   - 에러 발생률: 1% 이하
+   - 사용자 작업 시간: 50% 단축
+
+스크립트 타입별 오디오 및 이미지 제작 방법
+=========================================
+
+1. 회화 (Conversation) 제작 방법
+   ==============================
+
+   □ 오디오 제작 프로세스
+     - 입력 데이터: 회화 스크립트 (원어, 학습어, 읽기)
+     - 화자 설정: 원어화자, 학습어 화자 1,2,3,4
+     - 대화 순번 및 재생 순서:
+       1. 원어화자 - 원어
+       2. 학습어 화자 1 - 학습어
+       3. 학습어 화자 2 - 학습어
+       4. 학습어 화자 3 - 학습어
+       5. 학습어 화자 4 - 학습어
+     - 무음 처리: 각 화자간, 행간 1초 무음 삽입
+     - SSML 생성: 각 문장별로 SSML 태그 생성
+       * <speak> 태그로 전체 감싸기
+       * <mark name="start_1"/> 태그로 시작점 표시
+       * <mark name="end_1"/> 태그로 종료점 표시
+       * <prosody rate="0.9" pitch="+10%"> 태그로 음성 조절
+       * <break time="1s"/> 태그로 화자간 무음 처리
+     - TTS 처리: Google Cloud TTS API 호출
+     - 타이밍 추출: SSML 마크에서 타이밍 정보 추출
+     - 파일 저장: 
+       * 오디오: ./output/{프로젝트명}/{식별자}/mp3/{식별자}_conversation.mp3
+       * SSML: ./output/{프로젝트명}/{식별자}/SSML/{식별자}_conversation.ssml
+
+   □ 이미지 제작 프로세스 (제작 사양서 반영)
+     - 해상도: 1920x1080 (16:9 비율)
+     - 행 구성: 4행 (순번, 원어, 학습어, 읽기)
+     - 배경: pawel-czerwinski-IeRofQlthaY-unsplash.jpg
+     - 폰트: KoPubWorldDotum (Bold)
+     - 색상 구성:
+       * 순번: #FFFFFF (흰색), 외곽선만 적용
+       * 원어: #FFFFFF (흰색), 쉐도우 적용
+       * 학습어: #FF00FF (마젠타), 쉐도우+외곽선 적용
+       * 읽기: #FFFF00 (노란색), 바탕+외곽선 적용
+     - 위치 설정:
+       * 순번: x=150, y=50, w=1820, 크기=100pt
+       * 원어: x=50, y=150, w=1820, 크기=120pt
+       * 학습어: x=50, y=450, w=1820, 크기=120pt
+       * 읽기: x=50, y=750, w=1820, 크기=100pt
+     - 2개 독립적인 텍스트 화면 생성:
+       * 화면 1: 순번, 원어 텍스트만 표시
+       * 화면 2: 순번, 원어, 학습어, 읽기 모두 표시
+     - 파일 저장: ./output/{프로젝트명}/{식별자}/conversation/{식별자}_001.png
+
+   □ 제작 순서
+     1. 회화 스크립트 데이터 로드 (한 행씩 처리)
+     2. 화자별 SSML 생성 및 오디오 합성
+     3. 각 화자간, 행간 1초 무음 삽입
+     4. 타이밍 정보 추출 및 저장
+     5. 각 행별로 2개 화면 자막 이미지 생성
+        - 화면 1: 순번 + 원어만
+        - 화면 2: 순번 + 원어 + 학습어 + 읽기
+     6. 배경 이미지와 텍스트 레이어 합성
+     7. 최종 이미지 파일 저장
+
+2. 인트로 (Intro) 제작 방법
+   ========================
+
+   □ 오디오 제작 프로세스
+     - 입력 데이터: 인트로 스크립트 (제목, 부제목)
+     - 화자 설정: 원어화자
+     - 무음 처리: 문장간 1초 무음 삽입
+     - SSML 생성: 인트로 전용 SSML 구조
+       * <speak> 태그로 전체 감싸기
+       * <mark name="intro_start"/> 태그로 시작점 표시
+       * <prosody rate="0.8" pitch="+5%"> 태그로 차분한 음성
+       * <break time="1s"/> 태그로 문장간 무음 처리
+     - TTS 처리: Google Cloud TTS API 호출
+     - 타이밍 추출: 인트로 전용 타이밍 정보
+     - 파일 저장: 
+       * 오디오: ./output/{프로젝트명}/{식별자}/mp3/{식별자}_intro.mp3
+       * SSML: ./output/{프로젝트명}/{식별자}/SSML/{식별자}_intro.ssml
+
+   □ 이미지 제작 프로세스 (제작 사양서 반영)
+     - 해상도: 1920x1080 (16:9 비율)
+     - 행 구성: 1행 (제목)
+     - 배경: pawel-czerwinski-IeRofQlthaY-unsplash.jpg
+     - 폰트: KoPubWorldDotum (Bold)
+     - 색상: #FFFFFF (흰색)
+     - 효과: 바탕+쉐도우+외곽선 모두 적용
+     - 위치 설정:
+       * 1행: x=50, y=1000, w=1820, 크기=90pt
+       * 상하 정렬: Bottom (화면 하단)
+       * 좌우 정렬: Center (가운데 정렬)
+     - 스마트 줄바꿈: 문장이 w를 넘으면 자동 줄바꿈
+     - MD 인라인 스크립트: 텍스트 속성 변경 지원
+     - 파일 저장: ./output/{프로젝트명}/{식별자}/intro/{식별자}_001.png
+
+   □ 제작 순서
+     1. 인트로 스크립트 데이터 로드 (한 문장씩 처리)
+     2. SSML 생성 및 오디오 합성
+     3. 문장간 1초 무음 삽입
+     4. 타이밍 정보 추출 및 저장
+     5. 인트로 자막 이미지 생성
+        - MD 인라인 스크립트 파싱
+        - 스마트 줄바꿈 처리
+        - 상하 정렬에 따른 텍스트 배치
+     6. 배경 이미지와 텍스트 레이어 합성
+     7. 최종 이미지 파일 저장
+
+3. 엔딩 (Ending) 제작 방법
+   =======================
+
+   □ 오디오 제작 프로세스
+     - 입력 데이터: 엔딩 스크립트 (감사 인사, 다음 편 안내)
+     - 화자 설정: 원어화자
+     - 무음 처리: 문장간 1초 무음 삽입
+     - SSML 생성: 엔딩 전용 SSML 구조
+       * <speak> 태그로 전체 감싸기
+       * <mark name="ending_start"/> 태그로 시작점 표시
+       * <prosody rate="0.9" pitch="+15%"> 태그로 밝은 음성
+       * <break time="1s"/> 태그로 문장간 무음 처리
+     - TTS 처리: Google Cloud TTS API 호출
+     - 타이밍 추출: 엔딩 전용 타이밍 정보
+     - 파일 저장: 
+       * 오디오: ./output/{프로젝트명}/{식별자}/mp3/{식별자}_ending.mp3
+       * SSML: ./output/{프로젝트명}/{식별자}/SSML/{식별자}_ending.ssml
+
+   □ 이미지 제작 프로세스 (제작 사양서 반영)
+     - 해상도: 1920x1080 (16:9 비율)
+     - 행 구성: 1행 (감사 인사)
+     - 배경: pawel-czerwinski-IeRofQlthaY-unsplash.jpg
+     - 폰트: KoPubWorldDotum (Bold)
+     - 색상: #FFFFFF (흰색)
+     - 효과: 바탕+쉐도우+외곽선 모두 적용
+     - 위치 설정:
+       * 1행: x=50, y=50, w=1820, 크기=100pt
+       * 상하 정렬: Middle (화면 중앙)
+       * 좌우 정렬: Center (가운데 정렬)
+     - 스마트 줄바꿈: 문장이 w를 넘으면 자동 줄바꿈
+     - MD 인라인 스크립트: 텍스트 속성 변경 지원
+     - 파일 저장: ./output/{프로젝트명}/{식별자}/ending/{식별자}_001.png
+
+   □ 제작 순서
+     1. 엔딩 스크립트 데이터 로드 (한 문장씩 처리)
+     2. SSML 생성 및 오디오 합성
+     3. 문장간 1초 무음 삽입
+     4. 타이밍 정보 추출 및 저장
+     5. 엔딩 자막 이미지 생성
+        - MD 인라인 스크립트 파싱
+        - 스마트 줄바꿈 처리
+        - 상하 정렬에 따른 텍스트 배치
+     6. 배경 이미지와 텍스트 레이어 합성
+     7. 최종 이미지 파일 저장
+
+4. 대화 (Dialogue) 제작 방법
+   ==========================
+
+   □ 오디오 제작 프로세스
+     - 입력 데이터: 대화 스크립트 (원어, 학습어1, 학습어2)
+     - SSML 생성: 대화 전용 SSML 구조
+       * <speak> 태그로 전체 감싸기
+       * <mark name="dialogue_start_1"/> 태그로 시작점 표시
+       * <prosody rate="1.0" pitch="0%"> 태그로 자연스러운 음성
+       * <break time="0.5s"/> 태그로 짧은 간격
+     - TTS 처리: Google Cloud TTS API 호출
+     - 타이밍 추출: 대화 전용 타이밍 정보
+     - 파일 저장: kor-chn_dialogue.mp3
+
+   □ 이미지 제작 프로세스
+     - 해상도: 1920x1080 (16:9 비율)
+     - 행 구성: 3행 (원어, 학습어1, 학습어2)
+     - 배경: pawel-czerwinski-IeRofQlthaY-unsplash.jpg
+     - 폰트: KoPubWorldDotum (Bold)
+     - 색상: #FFFFFF (흰색) - 모든 행 동일
+     - 효과: 바탕, 쉐도우, 외곽선 모두 비활성화
+     - 위치 설정:
+       * 원어: x=50, y=250, w=1820, 크기=100pt
+       * 학습어1: x=50, y=550, w=1820, 크기=100pt
+       * 학습어2: x=50, y=850, w=1820, 크기=100pt
+     - 정렬: 좌우 정렬=Left, 상하 정렬=Top
+
+   □ 제작 순서
+     1. 대화 스크립트 데이터 로드
+     2. SSML 생성 및 오디오 합성
+     3. 타이밍 정보 추출 및 저장
+     4. 대화 자막 이미지 생성
+     5. 배경 이미지와 텍스트 레이어 합성
+     6. 최종 이미지 파일 저장
+
+5. 썸네일 (Thumbnail) 제작 방법
+   =============================
+
+   □ 이미지 제작 프로세스 (제작 사양서 반영)
+     - 해상도: 1024x768 (16:9 비율)
+     - 행 구성: 4행 (제목, 부제목, 설명, 태그)
+     - 배경: pawel-czerwinski-IeRofQlthaY-unsplash.jpg
+     - 폰트: Noto Sans KR, KoPubWorldDotum (Bold)
+     - 색상 구성:
+       * 1행: #FFFFFF (흰색)
+       * 2행: #00FFFF (시안)
+       * 3행: #FF00FF (마젠타)
+       * 4행: #FFFF00 (노란색)
+     - 효과: 모든 행에 쉐도우+외곽선 적용
+     - 위치 설정:
+       * 1행: x=30, y=50, w=964, 크기=100pt
+       * 2행: x=30, y=230, w=964, 크기=100pt
+       * 3행: x=30, y=410, w=964, 크기=100pt
+       * 4행: x=30, y=590, w=964, 크기=100pt
+     - 정렬: 좌우 정렬=Center, 상하 정렬=Top
+     - AI JSON 파싱: AI 생성 JSON 파일에서 썸네일 문장 추출
+     - 3세트 생성: 주어진 3세트를 모두 이미지로 생성
+     - 터미널 출력: 읽은 값을 터미널에 출력
+     - 폰트 크기 조절: 텍스트가 w를 넘으면 폰트 크기 자동 조절
+     - 파일 저장: ./output/{프로젝트명}/{식별자}/thumbnail/{식별자}_001.png
+
+   □ 제작 순서
+     1. AI 생성 JSON 파일 로드 및 파싱
+     2. 썸네일 문장 추출 (4줄 텍스트)
+     3. 추출된 값을 터미널에 출력
+     4. 3세트 썸네일 이미지 생성
+     5. 텍스트가 w를 넘는 경우 폰트 크기 조절
+     6. 배경 이미지와 텍스트 레이어 합성
+     7. 최종 썸네일 파일 저장
+
+공통 제작 설정 및 최적화
+========================
+
+1. 공통 배경 설정
+   - 이미지: pawel-czerwinski-IeRofQlthaY-unsplash.jpg
+   - 투명도: 0.2 (20%)
+   - 여백: 2px
+   - 타입: 이미지
+
+2. 공통 쉐도우 설정
+   - 활성화: true
+   - 두께: 4px
+   - 색상: #000000 (검은색)
+   - 블러: 4px
+   - 오프셋: x=3, y=3
+   - 투명도: 1.0 (100%)
+   - 블러 사용: true
+
+3. 공통 외곽선 설정
+   - 활성화: true
+   - 두께: 4px
+   - 색상: #000000 (검은색)
+
+4. 파일명 규칙 (제작 사양서 반영)
+   - 오디오: {식별자}_{script_type}.mp3
+     * 회화: {식별자}_conversation.mp3
+     * 인트로: {식별자}_intro.mp3
+     * 엔딩: {식별자}_ending.mp3
+   - SSML: {식별자}_{script_type}.ssml
+     * 회화: {식별자}_conversation.ssml
+     * 인트로: {식별자}_intro.ssml
+     * 엔딩: {식별자}_ending.ssml
+   - 이미지: {script_type}_{scene_number}_{frame_number}.png
+   - 타이밍: {project_name}_{script_type}.json
+   - 매니페스트: {project_name}_{script_type}.json
+
+5. 디렉토리 구조 (제작 사양서 반영)
+   - 오디오: ./output/{프로젝트명}/{식별자}/mp3/
+   - SSML: ./output/{프로젝트명}/{식별자}/SSML/
+   - 이미지: ./output/{프로젝트명}/{식별자}/{script_type}/
+     * 회화: ./output/{프로젝트명}/{식별자}/conversation/
+     * 인트로: ./output/{프로젝트명}/{식별자}/intro/
+     * 엔딩: ./output/{프로젝트명}/{식별자}/ending/
+     * 썸네일: ./output/{프로젝트명}/{식별자}/thumbnail/
+     * 대화: ./output/{프로젝트명}/{식별자}/dialogue/
+   - 타이밍: ./output/{프로젝트명}/{식별자}/timing/
+   - 매니페스트: ./output/{프로젝트명}/{식별자}/manifest/
+
+6. 화자 설정 및 무음 처리 규칙
+   =============================
+
+   □ 회화 (Conversation) 화자 설정
+     - 원어화자: 원어 텍스트 담당
+     - 학습어 화자 1,2,3,4: 학습어 텍스트 담당
+     - 화자간 무음: 1초 (<break time="1s"/>)
+     - 재생 순서: 원어화자 → 학습어 화자 1 → 학습어 화자 2 → 학습어 화자 3 → 학습어 화자 4
+
+   □ 인트로/엔딩 화자 설정
+     - 원어화자: 모든 텍스트 담당
+     - 문장간 무음: 1초 (<break time="1s"/>)
+     - 처리 방식: 한 문장씩 순차 처리
+
+   □ SSML 마크 태그 규칙
+     - 시작점: <mark name="start_{sequence}"/>
+     - 종료점: <mark name="end_{sequence}"/>
+     - 무음: <break time="1s"/>
+     - 음성 조절: <prosody rate="0.9" pitch="+10%">
+
+7. 자막 이미지 생성 특수 기능
+   ============================
+
+   □ 회화 이미지 2화면 생성
+     - 화면 1: 순번 + 원어만 표시
+     - 화면 2: 순번 + 원어 + 학습어 + 읽기 모두 표시
+     - 각 행별로 2개 독립적인 텍스트 화면 생성
+
+   □ 썸네일 AI JSON 파싱
+     - AI 생성 JSON 파일에서 썸네일 문장 추출
+     - 4줄 텍스트를 읽어 이미지 생성
+     - 3세트를 모두 이미지로 생성
+     - 읽은 값을 터미널에 출력
+
+   □ 인트로/엔딩 스마트 줄바꿈
+     - MD 인라인 스크립트로 텍스트 속성 변경
+     - 문장이 w를 넘으면 스마트 줄바꿈
+     - 상하 정렬에 따른 텍스트 배치:
+       * Top: x,y를 기준으로 화면 아래로 텍스트 배치
+       * Bottom: x,y가 마지막 줄 기준으로 그 위로 줄 배치
+
+   □ 폰트 크기 자동 조절
+     - 텍스트가 w를 넘는 경우 폰트 크기 자동 감소
+     - 가독성을 유지하면서 텍스트가 화면에 맞도록 조절
+
+이미지 생성 설정 반영 문제 해결 방안
+=====================================
+
+ASS 제거 및 PNG 직접 생성 시스템 구현 완료
+==========================================
+
+1. ASS 관련 문제 해결
+   ✅ ASS 파일 생성 과정 완전 제거
+     - ass_renderer 모듈 의존성 제거
+     - FFmpeg ASS 렌더링 과정 제거
+     - 복잡한 ASS 파일 파싱 로직 제거
+   ✅ PNG 직접 생성 시스템 구현
+     - PIL/Pillow를 사용한 고품질 이미지 생성
+     - UI 설정을 직접 적용하는 렌더링 시스템
+     - 제작 사양서 요구사항 완전 반영
+
+2. 새로운 PNG 렌더러 시스템 (src/pipeline/renderers/png_renderer.py)
+   ✅ PNGRenderer 클래스 구현
+     - TextSettings, CommonSettings 데이터 클래스
+     - 폰트 로딩 및 관리 시스템
+     - 색상 파싱 및 RGBA 변환
+     - 마크다운 인라인 스타일 파싱
+     - 스마트 줄바꿈 알고리즘
+     - 텍스트 효과 적용 (배경, 그림자, 외곽선)
+   
+   ✅ 스크립트 타입별 이미지 생성 메서드
+     - create_conversation_image(): 2개 독립 화면 생성
+     - create_intro_ending_image(): MD 인라인 스크립트, 스마트 줄바꿈
+     - create_thumbnail_image(): AI JSON 파싱, 3세트, 터미널 출력
+
+3. 자막 이미지 생성 파이프라인 개선 (src/pipeline/steps/create_subtitles.py)
+   ✅ ASS 기반 시스템을 PNG 직접 생성으로 완전 교체
+     - run() 함수: PNG 렌더러 초기화 및 타입별 이미지 생성
+     - _create_conversation_images(): 회화 이미지 (2개 독립 화면)
+     - _create_intro_images(): 인트로 이미지 (MD 인라인, 스마트 줄바꿈)
+     - _create_ending_images(): 엔딩 이미지 (MD 인라인, 스마트 줄바꿈)
+     - _create_thumbnail_images(): 썸네일 이미지 (AI JSON 파싱)
+
+4. 파이프라인 통합 (src/pipeline/ffmpeg/pipeline_manager.py)
+   ✅ create_subtitles() 메서드 추가
+     - UI에서 호출하는 자막 이미지 생성 인터페이스
+     - Manifest 로드 및 파싱
+     - UI 설정 로드 및 적용
+     - PipelineContext 생성 및 PNG 렌더러 실행
+
+5. 모듈 구조 개선
+   ✅ PipelineContext 클래스 구현 (src/pipeline/core/context.py)
+     - PipelinePaths: 경로 관리
+     - PipelineSettings: 설정 관리
+     - PipelineContext: 통합 컨텍스트
+   
+   ✅ 렌더러 모듈 구조화 (src/pipeline/renderers/)
+     - png_renderer.py: PNG 직접 렌더링
+     - __init__.py: 모듈 export
+
+6. 제작 사양서 요구사항 완전 반영
+   ✅ 회화 이미지: 2개 독립 화면 (순번+원어, 순번+원어+학습어+읽기)
+   ✅ 인트로/엔딩: MD 인라인 스크립트, 스마트 줄바꿈, 상하 정렬
+   ✅ 썸네일: AI JSON 파싱, 3세트 생성, 터미널 출력, 폰트 크기 자동 조정
+   ✅ 파일명 규칙: {식별자}_001.png 형식
+   ✅ 디렉토리 구조: conversation/, intro/, ending/, thumbnail/ 폴더
+
+7. 성능 및 안정성 개선
+   ✅ FFmpeg 의존성 제거 (자막 이미지 생성 부분)
+   ✅ 직접 PNG 생성으로 처리 속도 향상
+   ✅ 에러 처리 및 로깅 강화
+   ✅ 타입 안전성 확보 (dataclass 사용)
+
+이제 ASS 없이 완전히 새로운 PNG 직접 생성 시스템으로 자막 이미지를 생성할 수 있습니다.
+
+해결 방안
+=========
+
+1. 계층적 설정 관리 시스템 구축
+   =============================
+
+   □ 설정 우선순위 정의
+     ```
+     우선순위 (높음 → 낮음):
+     1. 사용자 직접 설정 (UI에서 변경한 값)
+     2. 스크립트별 기본 설정
+     3. 공통 기본 설정
+     4. 시스템 기본값
+     ```
+
+   □ 설정 병합 전략
+     ```python
+     class SettingMerger:
+         def merge_settings(self, common_settings, script_settings, user_settings):
+             """설정 병합 로직"""
+             merged = {}
+             
+             # 1단계: 공통 기본 설정 적용
+             merged.update(common_settings)
+             
+             # 2단계: 스크립트별 설정 적용 (공통 설정 덮어쓰기)
+             merged.update(script_settings)
+             
+             # 3단계: 사용자 설정 적용 (최고 우선순위)
+             merged.update(user_settings)
+             
+             # 4단계: 설정 검증 및 정규화
+             return self.validate_and_normalize(merged)
+     ```
+
+2. 타입 안전 설정 시스템
+   =====================
+
+   □ 설정 스키마 정의
+     ```python
+     from dataclasses import dataclass
+     from typing import Optional, Dict, Any
+     
+     @dataclass
+     class BackgroundSettings:
+         enabled: bool = True
+         color: str = "#000000"
+         alpha: float = 0.2
+         margin: int = 2
+         type: str = "이미지"
+         value: str = ""
+     
+     @dataclass
+     class ShadowSettings:
+         enabled: bool = True
+         thick: int = 4
+         color: str = "#000000"
+         blur: int = 4
+         offx: int = 3
+         offy: int = 3
+         alpha: float = 1.0
+         useBlur: bool = True
+     
+     @dataclass
+     class BorderSettings:
+         enabled: bool = True
+         thick: int = 4
+         color: str = "#000000"
+     
+     @dataclass
+     class RowSettings:
+         row_name: str
+         x: int
+         y: int
+         w: int
+         font_size: int
+         font_name: str
+         color: str
+         bold: bool
+         h_align: str
+         v_align: str
+         background: bool
+         shadow: bool
+         border: bool
+     
+     @dataclass
+     class ScriptTypeSettings:
+         row_count: int
+         aspect_ratio: str
+         resolution: str
+         rows: List[RowSettings]
+     
+     @dataclass
+     class ImageGenerationSettings:
+         common: Dict[str, Any]
+         script_types: Dict[str, ScriptTypeSettings]
+     ```
+
+3. 설정 검증 및 정규화 시스템
+   ==========================
+
+   □ 설정 검증 로직
+     ```python
+     class SettingValidator:
+         def validate_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
+             """설정 값 검증 및 정규화"""
+             validated = {}
+             
+             # 배경 설정 검증
+             if 'bg' in settings:
+                 validated['bg'] = self.validate_background(settings['bg'])
+             
+             # 쉐도우 설정 검증
+             if 'shadow' in settings:
+                 validated['shadow'] = self.validate_shadow(settings['shadow'])
+             
+             # 외곽선 설정 검증
+             if 'border' in settings:
+                 validated['border'] = self.validate_border(settings['border'])
+             
+             # 스크립트별 설정 검증
+             if 'tabs' in settings:
+                 validated['tabs'] = self.validate_script_types(settings['tabs'])
+             
+             return validated
+         
+         def validate_background(self, bg_settings: Dict[str, Any]) -> Dict[str, Any]:
+             """배경 설정 검증"""
+             validated = {
+                 'enabled': bool(bg_settings.get('enabled', True)),
+                 'color': self.validate_color(bg_settings.get('color', '#000000')),
+                 'alpha': max(0.0, min(1.0, float(bg_settings.get('alpha', 0.2)))),
+                 'margin': max(0, int(bg_settings.get('margin', 2))),
+                 'type': str(bg_settings.get('type', '이미지')),
+                 'value': str(bg_settings.get('value', ''))
+             }
+             return validated
+         
+         def validate_color(self, color: str) -> str:
+             """색상 값 검증"""
+             if not color.startswith('#'):
+                 color = '#' + color
+             if len(color) != 7:
+                 return '#000000'
+             return color.upper()
+     ```
+
+4. 실시간 설정 동기화 시스템
+   ==========================
+
+   □ 설정 변경 감지 및 반영
+     ```python
+     class SettingSyncManager:
+         def __init__(self):
+             self.observers = []
+             self.current_settings = {}
+         
+         def register_observer(self, observer):
+             """설정 변경 감지자 등록"""
+             self.observers.append(observer)
+         
+         def update_settings(self, new_settings: Dict[str, Any]):
+             """설정 업데이트 및 알림"""
+             old_settings = self.current_settings.copy()
+             self.current_settings = self.merge_and_validate(new_settings)
+             
+             # 변경사항 감지
+             changes = self.detect_changes(old_settings, self.current_settings)
+             
+             # 관찰자들에게 알림
+             for observer in self.observers:
+                 observer.on_settings_changed(changes)
+         
+         def detect_changes(self, old: Dict, new: Dict) -> Dict[str, Any]:
+             """설정 변경사항 감지"""
+             changes = {}
+             for key, value in new.items():
+                 if key not in old or old[key] != value:
+                     changes[key] = {'old': old.get(key), 'new': value}
+             return changes
+     ```
+
+5. 디버깅 및 로깅 시스템
+   =====================
+
+   □ 설정 적용 과정 추적
+     ```python
+     class SettingDebugger:
+         def __init__(self):
+             self.log_file = "setting_debug.log"
+             self.enabled = True
+         
+         def log_setting_application(self, step: str, settings: Dict[str, Any]):
+             """설정 적용 과정 로깅"""
+             if not self.enabled:
+                 return
+             
+             timestamp = datetime.now().isoformat()
+             log_entry = {
+                 'timestamp': timestamp,
+                 'step': step,
+                 'settings': settings
+             }
+             
+             with open(self.log_file, 'a', encoding='utf-8') as f:
+                 f.write(json.dumps(log_entry, ensure_ascii=False) + '\n')
+         
+         def generate_setting_report(self) -> str:
+             """설정 적용 보고서 생성"""
+             report = []
+             report.append("=== 설정 적용 보고서 ===")
+             report.append(f"생성 시간: {datetime.now()}")
+             report.append("")
+             
+             # 현재 설정 상태
+             report.append("현재 설정 상태:")
+             report.append(json.dumps(self.current_settings, indent=2, ensure_ascii=False))
+             
+             return '\n'.join(report)
+     ```
+
+6. 이미지 렌더러 개선
+   ==================
+
+   □ 설정 기반 렌더링 엔진
+     ```python
+     class ImprovedImageRenderer:
+         def __init__(self, settings_manager: SettingSyncManager):
+             self.settings_manager = settings_manager
+             self.debugger = SettingDebugger()
+         
+         def render_image(self, script_type: str, text_data: Dict[str, Any]) -> str:
+             """개선된 이미지 렌더링"""
+             try:
+                 # 1. 설정 로드 및 병합
+                 settings = self.load_and_merge_settings(script_type)
+                 self.debugger.log_setting_application("설정 로드", settings)
+                 
+                 # 2. 설정 검증
+                 validated_settings = self.validate_settings(settings)
+                 self.debugger.log_setting_application("설정 검증", validated_settings)
+                 
+                 # 3. 렌더링 컨텍스트 생성
+                 context = self.create_render_context(validated_settings, text_data)
+                 self.debugger.log_setting_application("렌더링 컨텍스트", context)
+                 
+                 # 4. 이미지 생성
+                 image_path = self.generate_image(context)
+                 
+                 # 5. 결과 검증
+                 self.validate_output(image_path, validated_settings)
+                 
+                 return image_path
+                 
+             except Exception as e:
+                 self.debugger.log_error(f"이미지 렌더링 실패: {str(e)}")
+                 raise
+         
+         def load_and_merge_settings(self, script_type: str) -> Dict[str, Any]:
+             """설정 로드 및 병합"""
+             # 공통 설정 로드
+             common_settings = self.settings_manager.get_common_settings()
+             
+             # 스크립트별 설정 로드
+             script_settings = self.settings_manager.get_script_settings(script_type)
+             
+             # 사용자 설정 로드
+             user_settings = self.settings_manager.get_user_settings(script_type)
+             
+             # 설정 병합
+             merger = SettingMerger()
+             return merger.merge_settings(common_settings, script_settings, user_settings)
+     ```
+
+7. 통합 테스트 및 검증 시스템
+   ==========================
+
+   □ 설정 반영 테스트
+     ```python
+     class SettingReflectionTest:
+         def __init__(self):
+             self.test_cases = []
+         
+         def add_test_case(self, script_type: str, expected_settings: Dict[str, Any]):
+             """테스트 케이스 추가"""
+             self.test_cases.append({
+                 'script_type': script_type,
+                 'expected': expected_settings
+             })
+         
+         def run_all_tests(self) -> Dict[str, bool]:
+             """모든 테스트 실행"""
+             results = {}
+             
+             for test_case in self.test_cases:
+                 script_type = test_case['script_type']
+                 expected = test_case['expected']
+                 
+                 # 실제 설정 로드
+                 actual = self.load_actual_settings(script_type)
+                 
+                 # 비교
+                 is_match = self.compare_settings(expected, actual)
+                 results[script_type] = is_match
+                 
+                 if not is_match:
+                     self.log_mismatch(script_type, expected, actual)
+             
+             return results
+         
+         def compare_settings(self, expected: Dict, actual: Dict) -> bool:
+             """설정 비교"""
+             for key, expected_value in expected.items():
+                 if key not in actual:
+                     return False
+                 if actual[key] != expected_value:
+                     return False
+             return True
+     ```
+
+고급 설정 관리 시스템 구현 완료
+===============================
+
+1. 실시간 설정 동기화 시스템
+   =========================
+
+   □ SettingSyncManager 클래스 (src/pipeline/settings/sync_manager.py)
+     - Observer 패턴 기반 설정 동기화
+     - 설정 변경 감지 및 자동 알림
+     - 설정 변경 히스토리 관리
+     - 설정 내보내기/가져오기 기능
+     - 동기화 상태 모니터링
+
+   □ SettingObserver 인터페이스
+     - 설정 변경 감지자 등록/해제
+     - 설정 검증 완료 알림
+     - 자동 설정 반영 메커니즘
+
+2. 디버깅 및 로깅 시스템
+   =====================
+
+   □ SettingDebugger 클래스 (src/pipeline/settings/debugger.py)
+     - 설정 적용 과정 상세 추적
+     - 디버그 세션 관리
+     - 설정 검증 로깅
+     - 렌더링 단계별 로깅
+     - 에러 추적 및 보고서 생성
+
+   □ 주요 기능
+     - 실시간 설정 변경 로깅
+     - 렌더링 성능 통계 수집
+     - 오류 발생 시 자동 로깅
+     - 디버그 데이터 내보내기
+
+3. 개선된 이미지 렌더러
+   ====================
+
+   □ ImprovedImageRenderer 클래스 (src/pipeline/renderers/improved_renderer.py)
+     - 고급 설정 관리 시스템 통합
+     - 설정 기반 렌더링 엔진
+     - 렌더링 통계 및 성능 모니터링
+     - 자동 설정 검증 및 오류 복구
+     - 상세한 렌더링 보고서 생성
+
+   □ 주요 기능
+     - 실시간 설정 동기화
+     - 렌더링 성능 추적
+     - 자동 오류 감지 및 복구
+     - 상세한 디버깅 정보 제공
+
+4. 시스템 통합 및 장점
+   ===================
+
+   □ 성능 향상
+     - 실시간 설정 동기화로 응답성 향상
+     - 렌더링 성능 모니터링으로 최적화
+     - 자동 오류 복구로 안정성 증대
+
+   □ 개발 효율성
+     - 상세한 디버깅 정보로 문제 해결 시간 단축
+     - 설정 변경 히스토리로 추적 가능
+     - 자동화된 테스트 및 검증
+
+   □ 유지보수성
+     - 모듈화된 설정 관리 시스템
+     - 표준화된 로깅 및 디버깅
+     - 타입 안전한 설정 처리
+
+구현 완료 상태
+==============
+
+1. 완료된 구현 (✅)
+   □ 설정 병합 로직 구현
+   □ 기본 설정 검증 시스템
+   □ 디버깅 로깅 시스템
+   □ 타입 안전 설정 시스템
+   □ 실시간 설정 동기화
+   □ 이미지 렌더러 개선
+   □ 고급 디버깅 도구
+
+2. 통합 테스트 및 검증 시스템 구현 완료
+   =====================================
+
+   □ SettingReflectionTest 클래스 (src/pipeline/testing/setting_reflection_test.py)
+     - UI 설정이 파이프라인에 올바르게 반영되는지 검증
+     - 설정 병합 및 검증 과정 테스트
+     - 기본 테스트 케이스 자동 생성
+     - 상세한 테스트 보고서 생성
+
+   □ SystemIntegrationTest 클래스 (src/pipeline/testing/system_integration_test.py)
+     - 전체 시스템 통합 테스트
+     - 설정 시스템 통합 테스트
+     - 렌더링 시스템 통합 테스트
+     - 파이프라인 컨텍스트 통합 테스트
+     - End-to-End 통합 테스트
+
+   □ PerformanceTest 클래스 (src/pipeline/testing/performance_test.py)
+     - 렌더링 성능 벤치마크
+     - 메모리 사용량 테스트
+     - 동시 렌더링 테스트
+     - 성능 통계 수집 및 분석
+
+   □ TestRunner 클래스 (src/pipeline/testing/test_runner.py)
+     - 모든 테스트를 통합하여 실행
+     - 종합적인 테스트 보고서 생성
+     - 테스트 결과 내보내기
+     - 테스트 요약 및 통계 제공
+
+3. 다음 단계 (🔄)
+   □ 성능 최적화
+   □ 사용자 인터페이스 개선
+   □ 문서화 및 사용자 가이드
+
+참고 자료
+=========
+
+- 제작 사양서.txt: 전체 프로젝트 요구사항
+- 자동화_파이프라인_Todos.md: 상세한 작업 목록
+- src/pipeline/: 파이프라인 구현 코드
+- src/ui/: 사용자 인터페이스 코드

@@ -20,6 +20,15 @@ class DialogueLine(BaseModel):
         return v
 
 
+class SceneContent(BaseModel):
+    """씬 콘텐츠 모델 (테스트용)"""
+    order: Optional[str] = Field(None, description="순번")
+    native_script: Optional[str] = Field(None, description="원어 스크립트")
+    learning_script: Optional[str] = Field(None, description="학습어 스크립트")
+    reading_script: Optional[str] = Field(None, description="읽기 스크립트")
+    text: Optional[str] = Field(None, description="텍스트 (인트로/엔딩용)")
+
+
 class ConversationScene(BaseModel):
     """회화 장면을 나타내는 모델"""
     sequence: int = Field(..., description="회화 순서 번호")

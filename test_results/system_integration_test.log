@@ -1,0 +1,17 @@
+[2025-09-14T13:23:12.960960] === 전체 시스템 통합 테스트 시작 ===
+[2025-09-14T13:23:12.961703] 테스트 환경 설정: /var/folders/c5/g6pj6dwj38l9624pfrrskjw40000gn/T/captiongen_test_yrnzlgah
+[2025-09-14T13:23:12.961912] 테스트용 설정 설정 완료
+[2025-09-14T13:23:12.962407] 테스트용 Manifest 생성 완료
+[2025-09-14T13:23:12.962464] --- 설정 시스템 통합 테스트 ---
+[2025-09-14T13:23:12.962664] ✅ settings_sync_integration: 통과
+[2025-09-14T13:23:12.962699] --- 렌더링 시스템 통합 테스트 ---
+[2025-09-14T13:23:12.966855] ❌ conversation_rendering_integration: 실패
+[2025-09-14T13:23:12.968687] ❌ intro_rendering_integration: 실패
+[2025-09-14T13:23:12.968771] --- 파이프라인 컨텍스트 통합 테스트 ---
+[2025-09-14T13:23:12.968899] ✅ pipeline_context_integration: 통과
+[2025-09-14T13:23:12.968938] --- End-to-End 통합 테스트 ---
+[2025-09-14T13:23:12.968994] End-to-End 테스트 실패: 'Scene' object has no attribute 'content'
+[2025-09-14T13:23:12.969025] ❌ end_to_end_integration: 실패
+[2025-09-14T13:23:12.969406] 테스트 환경 정리 완료: /var/folders/c5/g6pj6dwj38l9624pfrrskjw40000gn/T/captiongen_test_yrnzlgah
+[2025-09-14T13:23:12.969588] === 통합 테스트 완료: 2/5 통과 ===
+[2025-09-14T13:23:12.970387] 통합 테스트 결과 내보내기 완료: test_results/system_integration_test_results.json

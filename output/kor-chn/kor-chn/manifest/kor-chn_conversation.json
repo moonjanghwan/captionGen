@@ -1,0 +1,53 @@
+{
+  "project_name": "kor-chn",
+  "identifier": "kor-chn",
+  "resolution": "1920x1080",
+  "default_background": null,
+  "scenes": [
+    {
+      "id": "conversation_01",
+      "type": "conversation",
+      "sequence": 1,
+      "native_script": "안녕하세요!",
+      "learning_script": "你好！",
+      "reading_script": "니 하오!",
+      "order": "1"
+    },
+    {
+      "id": "conversation_02",
+      "type": "conversation",
+      "sequence": 2,
+      "native_script": "감사합니다.",
+      "learning_script": "谢谢。",
+      "reading_script": "씨에 씨에",
+      "order": "2"
+    },
+    {
+      "id": "conversation_03",
+      "type": "conversation",
+      "sequence": 3,
+      "native_script": "이거 얼마예요?",
+      "learning_script": "这个多少钱？",
+      "reading_script": "쩌거 뚜오샤오 치엔?",
+      "order": "3"
+    },
+    {
+      "id": "conversation_04",
+      "type": "conversation",
+      "sequence": 4,
+      "native_script": "죄송합니다 / 실례합니다.",
+      "learning_script": "对不起 / 不好意思。",
+      "reading_script": "뙤이부치 / 뿌 하오 이쓰",
+      "order": "4"
+    },
+    {
+      "id": "conversation_05",
+      "type": "conversation",
+      "sequence": 5,
+      "native_script": "안녕히 계세요.",
+      "learning_script": "再见。",
+      "reading_script": "짜이찌엔",
+      "order": "5"
+    }
+  ]
+}

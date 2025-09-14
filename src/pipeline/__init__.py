@@ -16,12 +16,24 @@ from .audio import SSMLBuilder, AudioGenerator, AudioSegmenter
 
 # 자막 시스템
 from .subtitle import TextRenderer, SubtitleGenerator
+from .renderers import PNGRenderer, ImprovedImageRenderer
+
+# 설정 시스템
+from .settings import (
+    SettingValidator, SettingMerger, MergedSettings,
+    BackgroundSettings, ShadowSettings, BorderSettings, RowSettings,
+    ScriptTypeSettings, CommonSettings, ImageGenerationSettings,
+    SettingSyncManager, SettingObserver, SettingDebugger
+)
 
 # FFmpeg 시스템
 from .ffmpeg import FFmpegRenderer, PipelineManager
 
 # UI 통합 시스템
-from .ui_integrated_manager import UIIntegratedPipelineManager, UIPipelineConfig
+from .ui_integrated_manager import UIIntegratedPipelineManager
+
+# 테스트 시스템
+from .testing import TestRunner, SettingReflectionTest, SystemIntegrationTest, PerformanceTest
 
 # 유틸리티
 from .utils import FileNamingManager, ProgressLogger
@@ -40,6 +52,23 @@ __all__ = [
     # Subtitle
     "TextRenderer",
     "SubtitleGenerator",
+    "PNGRenderer",
+    "ImprovedImageRenderer",
+    
+    # Settings
+    "SettingValidator",
+    "SettingMerger",
+    "MergedSettings",
+    "BackgroundSettings",
+    "ShadowSettings",
+    "BorderSettings",
+    "RowSettings",
+    "ScriptTypeSettings",
+    "CommonSettings",
+    "ImageGenerationSettings",
+    "SettingSyncManager",
+    "SettingObserver",
+    "SettingDebugger",
     
     # FFmpeg
     "FFmpegRenderer",
@@ -48,6 +77,12 @@ __all__ = [
     # UI Integration
     "UIIntegratedPipelineManager",
     "UIPipelineConfig",
+    
+    # 테스트 시스템
+    "TestRunner",
+    "SettingReflectionTest",
+    "SystemIntegrationTest",
+    "PerformanceTest",
     
     # Utils
     "FileNamingManager",

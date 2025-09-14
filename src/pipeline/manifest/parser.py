@@ -184,3 +184,65 @@ class ManifestParser:
         }
         
         return self.parse_dict(merged_data)
+    
+    def create_manifest(self, script_type: str, script_data: Dict[str, any]) -> Dict[str, any]:
+        """
+        스크립트 데이터로부터 Manifest 생성
+        
+        Args:
+            script_type: 스크립트 타입 (conversation, intro, ending)
+            script_data: 스크립트 데이터
+            
+        Returns:
+            Dict[str, any]: Manifest 데이터
+        """
+        try:
+            project_name = script_data.get("project_name", "untitled_project")
+            manifest_data = {
+                "project_name": project_name,
+                "identifier": script_data.get("identifier", project_name),
+                "resolution": "1920x1080",
+                "default_background": None,
+                "scenes": []
+            }
+            
+            if script_type in ["conversation", "회화", "대화"]:
+                # 대화 스크립트 처리
+                scenes = script_data.get("scenes", [])
+                for i, scene_data in enumerate(scenes, 1):
+                    scene = {
+                        "id": f"conversation_{i:02d}",
+                        "type": "conversation",
+                        "sequence": i,
+                        "native_script": scene_data.get("native_script", ""),
+                        "learning_script": scene_data.get("learning_script", ""),
+                        "reading_script": scene_data.get("reading_script", ""),
+                        "order": scene_data.get("order", str(i))
+                    }
+                    manifest_data["scenes"].append(scene)
+                    
+            elif script_type in ["intro", "인트로"]:
+                # 인트로 스크립트 처리
+                intro_text = script_data.get("script_text", script_data.get("intro_text", ""))
+                scene = {
+                    "id": "intro_01",
+                    "type": "intro",
+                    "full_script": intro_text
+                }
+                manifest_data["scenes"].append(scene)
+                
+            elif script_type in ["ending", "엔딩"]:
+                # 엔딩 스크립트 처리
+                ending_text = script_data.get("script_text", script_data.get("ending_text", ""))
+                scene = {
+                    "id": "ending_01",
+                    "type": "ending",
+                    "full_script": ending_text
+                }
+                manifest_data["scenes"].append(scene)
+            
+            return manifest_data
+            
+        except Exception as e:
+            print(f"❌ Manifest 생성 중 오류: {e}")
+            raise

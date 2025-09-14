@@ -1,0 +1,178 @@
+{
+  "audio_file": "output/kor-chn/kor-chn/mp3/kor-chn_conversation.mp3",
+  "total_duration": 14.93,
+  "marks": [
+    {
+      "name": "scene_1_screen1_start",
+      "position": 293,
+      "type": "screen1"
+    },
+    {
+      "name": "scene_1_screen1_end",
+      "position": 385,
+      "type": "screen1"
+    },
+    {
+      "name": "scene_1_screen2_start",
+      "position": 448,
+      "type": "screen2"
+    },
+    {
+      "name": "scene_1_screen2_end",
+      "position": 990,
+      "type": "screen2"
+    },
+    {
+      "name": "scene_2_screen1_start",
+      "position": 1224,
+      "type": "screen1"
+    },
+    {
+      "name": "scene_2_screen1_end",
+      "position": 1316,
+      "type": "screen1"
+    },
+    {
+      "name": "scene_2_screen2_start",
+      "position": 1379,
+      "type": "screen2"
+    },
+    {
+      "name": "scene_2_screen2_end",
+      "position": 1921,
+      "type": "screen2"
+    },
+    {
+      "name": "scene_3_screen1_start",
+      "position": 2155,
+      "type": "screen1"
+    },
+    {
+      "name": "scene_3_screen1_end",
+      "position": 2249,
+      "type": "screen1"
+    },
+    {
+      "name": "scene_3_screen2_start",
+      "position": 2312,
+      "type": "screen2"
+    },
+    {
+      "name": "scene_3_screen2_end",
+      "position": 2866,
+      "type": "screen2"
+    },
+    {
+      "name": "scene_4_screen1_start",
+      "position": 3100,
+      "type": "screen1"
+    },
+    {
+      "name": "scene_4_screen1_end",
+      "position": 3200,
+      "type": "screen1"
+    },
+    {
+      "name": "scene_4_screen2_start",
+      "position": 3263,
+      "type": "screen2"
+    },
+    {
+      "name": "scene_4_screen2_end",
+      "position": 3837,
+      "type": "screen2"
+    },
+    {
+      "name": "scene_5_screen1_start",
+      "position": 4071,
+      "type": "screen1"
+    },
+    {
+      "name": "scene_5_screen1_end",
+      "position": 4165,
+      "type": "screen1"
+    },
+    {
+      "name": "scene_5_screen2_start",
+      "position": 4228,
+      "type": "screen2"
+    },
+    {
+      "name": "scene_5_screen2_end",
+      "position": 4770,
+      "type": "screen2"
+    }
+  ],
+  "scenes": [
+    {
+      "sequence": "1",
+      "type": "conversation",
+      "timings": {
+        "screen1": {
+          "start": 293,
+          "end": 385
+        },
+        "screen2": {
+          "start": 448,
+          "end": 990
+        }
+      }
+    },
+    {
+      "sequence": "2",
+      "type": "conversation",
+      "timings": {
+        "screen1": {
+          "start": 1224,
+          "end": 1316
+        },
+        "screen2": {
+          "start": 1379,
+          "end": 1921
+        }
+      }
+    },
+    {
+      "sequence": "3",
+      "type": "conversation",
+      "timings": {
+        "screen1": {
+          "start": 2155,
+          "end": 2249
+        },
+        "screen2": {
+          "start": 2312,
+          "end": 2866
+        }
+      }
+    },
+    {
+      "sequence": "4",
+      "type": "conversation",
+      "timings": {
+        "screen1": {
+          "start": 3100,
+          "end": 3200
+        },
+        "screen2": {
+          "start": 3263,
+          "end": 3837
+        }
+      }
+    },
+    {
+      "sequence": "5",
+      "type": "conversation",
+      "timings": {
+        "screen1": {
+          "start": 4071,
+          "end": 4165
+        },
+        "screen2": {
+          "start": 4228,
+          "end": 4770
+        }
+      }
+    }
+  ]
+}

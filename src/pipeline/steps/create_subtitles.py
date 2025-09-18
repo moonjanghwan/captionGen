@@ -126,7 +126,7 @@ def _create_conversation_images(context: PipelineContext, png_renderer: PNGRende
 
         # 🔥🔥🔥 [새로운 메서드 호출] 2개 화면을 생성하는 메서드 호출 🔥🔥🔥
         created_files = png_renderer.create_conversation_image(
-            scene_data, context.paths.conversation_dir, resolution, "회화", base_filename
+            scene_data, context.paths.conversation_dir, resolution, base_filename
         )
         
         if created_files:

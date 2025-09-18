@@ -1,668 +1,422 @@
 """
-PNG 직접 렌더링 시스템
+PNG 직접 렌더링 시스템 (v10 - 최종 좌표 및 행간 수정)
 
-ASS 없이 PIL/Pillow를 사용하여 자막 이미지를 직접 생성합니다.
-UI 설정을 직접 적용하여 고품질 PNG 이미지를 생성합니다.
+- 텍스트 Y 좌표 계산 로직을 단순화하여 바탕 박스와의 위치 불일치 문제 해결
+- 행간(line_spacing) 값을 조정하여 자연스러운 줄 간격으로 수정
+- 상세 디버그 로그 유지
 """
-
 import os
-import re
-from typing import Dict, Any, List, Tuple, Optional
+import traceback
+import threading
+from typing import Dict, Any, List, Tuple
 from PIL import Image, ImageDraw, ImageFont
-import textwrap
-from dataclasses import dataclass
-from ..settings import SettingMerger, SettingValidator, MergedSettings
 
+print("\n\n✅✅✅ png_renderer.py 파일이 성공적으로 로드되었습니다! (v10) ✅✅✅\n\n")
 
-@dataclass
-class TextSettings:
-    """텍스트 설정 데이터 클래스"""
-    x: int
-    y: int
-    w: int
-    크기: int  # 폰트 크기
-    폰트: str
-    색상: str
-    굵기: bool = False
-    좌우정렬: str = "center"  # left, center, right
-    상하정렬: str = "center"  # top, center, bottom
-    바탕: bool = False
-    쉐도우: bool = False
-    외곽선: bool = False
-
-
-@dataclass
-class CommonSettings:
-    """공통 설정 데이터 클래스"""
-    bg: Dict[str, Any]  # 배경 설정
-    shadow: Dict[str, Any]  # 그림자 설정
-    border: Dict[str, Any]  # 외곽선 설정
-
+try:
+    from ..settings import MergedSettings, RowSettings
+except ImportError:
+    MergedSettings, RowSettings = dict, dict
 
 class PNGRenderer:
-    """PNG 직접 렌더링 클래스"""
-    
-    def __init__(self, settings: Dict[str, Any]):
-        """
-        PNG 렌더러 초기화
-        
-        Args:
-            settings: UI에서 전달받은 설정 딕셔너리
-        """
-        self.raw_settings = settings
+    def __init__(self, merged_settings: MergedSettings):
+        print("🚀 [진단] PNGRenderer 클래스 초기화 시작...")
+        self.merged_settings = merged_settings
         self.fonts = {}
         self._load_fonts()
-        
-        # 설정 병합 및 검증
-        self.setting_merger = SettingMerger()
-        self.setting_validator = SettingValidator()
-        self.merged_settings = self._process_settings(settings)
-    
+        self._font_cache = {}
+        self._lock = threading.Lock()
+        print("✅ [진단] PNGRenderer 초기화 성공!")
+
     def _load_fonts(self):
-        """폰트 로딩"""
         font_paths = {
             "Noto Sans KR": "~/Library/Fonts/NotoSansKR-Regular.ttf",
             "KoPubWorld돋움체": "~/Library/Fonts/KoPubWorld Dotum Medium.ttf",
-            "KoPubWorld바탕체": "~/Library/Fonts/KoPubWorld Batang Medium.ttf",
-            "Arial": "/System/Library/Fonts/Arial.ttf",
-            "Times New Roman": "/System/Library/Fonts/Times New Roman.ttf"
         }
-        
-        for font_name, font_path in font_paths.items():
-            expanded_path = os.path.expanduser(font_path)
-            if os.path.exists(expanded_path):
-                self.fonts[font_name] = expanded_path
-            else:
-                print(f"⚠️ 폰트 파일을 찾을 수 없습니다: {font_name} ({expanded_path})")
-    
-    def _get_font(self, font_name: str, size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-        """폰트 객체 가져오기"""
+        for name, path in font_paths.items():
+            exp_path = os.path.expanduser(path)
+            if os.path.exists(exp_path): self.fonts[name] = exp_path
+
+    def _get_font(self, font_name: str, size: int, weight: str = "Regular") -> ImageFont.FreeTypeFont:
+        cache_key = f"{font_name}_{size}_{weight}"
+        with self._lock:
+            if cache_key in self._font_cache:
+                return self._font_cache[cache_key]
         try:
-            font_path = self.fonts.get(font_name)
-            if font_path and os.path.exists(font_path):
-                return ImageFont.truetype(font_path, size)
-            else:
-                # 기본 폰트 사용
-                return ImageFont.load_default()
+            # 🔥🔥🔥 [폰트 굵기 지원] Bold 폰트 로딩 로직 추가 🔥🔥🔥
+            font_path = self.fonts.get(font_name, "Default")
+            if font_path != "Default" and os.path.exists(font_path):
+                # Bold 폰트 파일 경로 생성 시도
+                if weight.lower() == "bold":
+                    # KoPubWorld돋움체의 경우 Bold 버전 시도
+                    if "KoPubWorld돋움체" in font_name:
+                        bold_path = font_path.replace("KoPubWorld Dotum Medium.ttf", "KoPubWorld Dotum Bold.ttf")
+                        if os.path.exists(bold_path):
+                            font_path = bold_path
+                            print(f"✅ [폰트] Bold 폰트 로드: {bold_path}")
+                        else:
+                            print(f"⚠️ [폰트] Bold 폰트 파일을 찾을 수 없음: {bold_path}")
+                    # Noto Sans KR의 경우 Bold 버전 시도
+                    elif "Noto Sans KR" in font_name:
+                        bold_path = font_path.replace("NotoSansKR-Regular.ttf", "NotoSansKR-Bold.ttf")
+                        if os.path.exists(bold_path):
+                            font_path = bold_path
+                            print(f"✅ [폰트] Bold 폰트 로드: {bold_path}")
+                        else:
+                            print(f"⚠️ [폰트] Bold 폰트 파일을 찾을 수 없음: {bold_path}")
+                
+                font = ImageFont.truetype(font_path, size)
+                with self._lock: self._font_cache[cache_key] = font
+                print(f"✅ [폰트] 폰트 로드 성공: {font_name} {size}pt {weight}")
+                return font
         except Exception as e:
-            print(f"⚠️ 폰트 로딩 실패: {font_name}, 크기: {size}, 오류: {e}")
-            return ImageFont.load_default()
-    
-    def _process_settings(self, settings: Dict[str, Any]) -> MergedSettings:
-        """설정 처리 및 병합"""
+            print(f"❌ 폰트 로딩 실패: {e}")
+        return ImageFont.load_default()
+
+    def _parse_color(self, color_str: str, alpha_override: float = None) -> Tuple[int, int, int, int]:
+        color_str = str(color_str).strip().lstrip('#')
         try:
-            # 기본 설정 정의
-            common_settings = settings.get('common', {})
-            script_settings = settings.get('tabs', {})
-            user_settings = {}  # 사용자 직접 설정 (현재는 빈 딕셔너리)
-            
-            # 설정 병합
-            merged = self.setting_merger.merge_settings(
-                common_settings, script_settings, user_settings
-            )
-            
-            print(f"✅ 설정 병합 완료: {len(merged.script_types)}개 스크립트 타입")
-            return merged
-            
-        except Exception as e:
-            print(f"⚠️ 설정 처리 실패, 기본 설정 사용: {e}")
-            # 기본 설정으로 fallback
-            return self._get_default_merged_settings()
-    
-    def _get_default_merged_settings(self) -> MergedSettings:
-        """기본 병합 설정 반환"""
-        from ..settings.schemas import (
-            BackgroundSettings, ShadowSettings, BorderSettings,
-            RowSettings, ScriptTypeSettings, CommonSettings, MergedSettings
-        )
-        
-        # 기본 공통 설정
-        common = CommonSettings(
-            bg=BackgroundSettings(),
-            shadow=ShadowSettings(),
-            border=BorderSettings()
-        )
-        
-        # 기본 스크립트 타입 설정
-        script_types = {
-            '회화 설정': ScriptTypeSettings(
-                row_count=4,
-                aspect_ratio='16:9',
-                resolution='1920x1080',
-                rows=[
-                    RowSettings(row_name='순번', x=100, y=200, w=100, font_size=60),
-                    RowSettings(row_name='원어', x=100, y=400, w=1800, font_size=80),
-                    RowSettings(row_name='학습어', x=100, y=600, w=1800, font_size=80, color='#FFFF00'),
-                    RowSettings(row_name='읽기', x=100, y=800, w=1800, font_size=60, color='#00FF00')
-                ]
-            )
-        }
-        
-        return MergedSettings(
-            common=common,
-            script_types=script_types,
-            source_info={'fallback': True}
-        )
-    
-    def _parse_color(self, color_str: str) -> Tuple[int, int, int, int]:
-        """색상 문자열을 RGBA 튜플로 변환"""
-        if color_str.startswith('#'):
-            color_str = color_str[1:]
-        
-        if len(color_str) == 6:  # RGB
-            r = int(color_str[0:2], 16)
-            g = int(color_str[2:4], 16)
-            b = int(color_str[4:6], 16)
-            return (r, g, b, 255)
-        elif len(color_str) == 8:  # RGBA
-            r = int(color_str[0:2], 16)
-            g = int(color_str[2:4], 16)
-            b = int(color_str[4:6], 16)
-            a = int(color_str[6:8], 16)
-            return (r, g, b, a)
-        else:
-            # 기본 색상 (흰색)
-            return (255, 255, 255, 255)
-    
-    def _parse_markdown_inline(self, text: str) -> List[Dict[str, Any]]:
-        """마크다운 인라인 스타일 파싱"""
-        segments = []
-        current_text = ""
-        current_style = {}
-        
-        i = 0
-        while i < len(text):
-            if text[i:i+2] == '**':  # 볼드
-                if current_text:
-                    segments.append({'text': current_text, 'style': current_style.copy()})
-                    current_text = ""
-                
-                # ** 찾기
-                end_bold = text.find('**', i+2)
-                if end_bold != -1:
-                    bold_text = text[i+2:end_bold]
-                    bold_style = current_style.copy()
-                    bold_style['bold'] = True
-                    segments.append({'text': bold_text, 'style': bold_style})
-                    i = end_bold + 2
-                else:
-                    current_text += text[i]
-                    i += 1
-            elif text[i:i+1] == '*':  # 이탤릭
-                if current_text:
-                    segments.append({'text': current_text, 'style': current_style.copy()})
-                    current_text = ""
-                
-                # * 찾기
-                end_italic = text.find('*', i+1)
-                if end_italic != -1:
-                    italic_text = text[i+1:end_italic]
-                    italic_style = current_style.copy()
-                    italic_style['italic'] = True
-                    segments.append({'text': italic_text, 'style': italic_style})
-                    i = end_italic + 1
-                else:
-                    current_text += text[i]
-                    i += 1
-            else:
-                current_text += text[i]
-                i += 1
-        
-        if current_text:
-            segments.append({'text': current_text, 'style': current_style.copy()})
-        
-        return segments
-    
+            if len(color_str) == 6: r, g, b = (int(color_str[i:i+2], 16) for i in (0, 2, 4)); a = 255
+            elif len(color_str) == 8: r, g, b, a = (int(color_str[i:i+2], 16) for i in (0, 2, 4, 6))
+            else: r, g, b, a = 255, 255, 255, 255
+            if alpha_override is not None: a = int(255 * alpha_override)
+            return r, g, b, a
+        except (ValueError, TypeError): return 255, 255, 255, 255
+
     def _smart_line_break(self, text: str, max_width: int, font: ImageFont.FreeTypeFont) -> List[str]:
-        """스마트 줄바꿈"""
-        if not text:
-            return [""]
-        
-        # 마크다운 파싱
-        segments = self._parse_markdown_inline(text)
-        
+        if not text: return []
         lines = []
-        current_line = ""
-        current_width = 0
-        
-        for segment in segments:
-            segment_text = segment['text']
-            segment_font = self._get_font(
-                segment['style'].get('font', 'Noto Sans KR'),
-                segment['style'].get('size', 24),
-                segment['style'].get('bold', False)
-            )
-            
-            words = segment_text.split(' ')
+        for raw_line in text.split('\n'):
+            words = raw_line.split()
+            if not words: continue
+            current_line = ""
             for word in words:
-                word_width = segment_font.getlength(word + ' ')
-                
-                if current_width + word_width <= max_width:
-                    current_line += word + ' '
-                    current_width += word_width
+                test_line = f"{current_line} {word}".strip()
+                if font.getbbox(test_line)[2] <= max_width:
+                    current_line = test_line
                 else:
-                    if current_line:
-                        lines.append(current_line.strip())
-                    current_line = word + ' '
-                    current_width = word_width
-            
-            # 마지막 단어 처리
-            if current_line and not current_line.endswith(' '):
-                current_line += ' '
-        
-        if current_line:
-            lines.append(current_line.strip())
-        
-        return lines if lines else [""]
-    
-    def _simple_line_break(self, text: str, max_width: int, font: ImageFont.FreeTypeFont) -> List[str]:
-        """단순한 텍스트 줄바꿈"""
-        if not text:
-            return [""]
-        
-        words = text.split()
-        lines = []
-        current_line = ""
-        
-        for word in words:
-            test_line = current_line + (" " if current_line else "") + word
-            
-            try:
-                # 텍스트 너비 측정
-                bbox = font.getbbox(test_line)
-                text_width = bbox[2] - bbox[0]
-            except:
-                # 폰트 bbox가 지원되지 않는 경우 대략적 계산
-                text_width = len(test_line) * (font.size // 2)
-            
-            if text_width <= max_width:
-                current_line = test_line
-            else:
-                if current_line:
-                    lines.append(current_line)
+                    if current_line: lines.append(current_line)
                     current_line = word
-                else:
-                    # 단어가 너무 긴 경우 강제로 자름
-                    lines.append(word)
-                    current_line = ""
+            if current_line: lines.append(current_line)
+        return lines if lines else [text]
+
+    def _create_base_image(self, resolution: Tuple[int, int], tab_name: str) -> Image.Image:
+        width, height = resolution
+        bg_settings = self.merged_settings.get('common', {}).get('tab_backgrounds', {}).get(tab_name, {})
+        if not bg_settings or not bg_settings.get('enabled'):
+            bg_settings = self.merged_settings.get('common', {}).get('bg', {})
         
-        if current_line:
-            lines.append(current_line)
+        if bg_settings.get('enabled') and bg_settings.get('type') == '이미지' and bg_settings.get('value'):
+            path = os.path.expanduser(bg_settings['value'])
+            if os.path.exists(path):
+                try:
+                    return Image.open(path).convert('RGBA').resize((width, height), Image.Resampling.LANCZOS)
+                except Exception as e: print(f"⚠️ 배경 이미지 로드 실패: {e}")
         
-        return lines if lines else [""]
-    
-    def _draw_text_with_effects(self, draw: ImageDraw.Draw, text: str, position: Tuple[int, int], 
-                               row_settings, font: ImageFont.FreeTypeFont) -> None:
-        """효과가 적용된 텍스트 그리기"""
-        x, y = position
-        text_color = self._parse_color(row_settings.color)
-        
-        # 배경 그리기
-        if row_settings.background and self.merged_settings.common.bg.enabled:
-            bg_color = self._parse_color(self.merged_settings.common.bg.color)
-            text_bbox = draw.textbbox((x, y), text, font=font)
-            draw.rectangle(text_bbox, fill=bg_color)
-        
-        # 그림자 그리기
-        if row_settings.shadow and self.merged_settings.common.shadow.enabled:
-            shadow_offset = self.merged_settings.common.shadow.offx
-            shadow_color = self._parse_color(self.merged_settings.common.shadow.color)
-            draw.text((x + shadow_offset, y + shadow_offset), text, font=font, fill=shadow_color)
-        
-        # 외곽선 그리기
-        if row_settings.border and self.merged_settings.common.border.enabled:
-            border_width = self.merged_settings.common.border.thick
-            border_color = self._parse_color(self.merged_settings.common.border.color)
+        color = self._parse_color(bg_settings.get('color', '#000000'))
+        return Image.new('RGBA', (width, height), color)
+
+    def render_scene(self, image: Image.Image, scenes: List[Dict[str, Any]]) -> Image.Image:
+        all_positions = []
+        has_background = any(scene.get('settings', {}).get('바탕') == 'True' for scene in scenes)
+
+        for scene in scenes:
+            settings = scene['settings']
+            # 🔥🔥🔥 [하드코딩 제거] 설정값에서 폰트 크기와 너비 가져오기 🔥🔥🔥
+            default_font_size = int(self.merged_settings.get('common', {}).get('default_font_size', 90))
+            default_width = int(self.merged_settings.get('common', {}).get('default_width', 1820))
             
-            # 외곽선을 여러 방향으로 그리기
-            for dx in range(-border_width, border_width + 1):
-                for dy in range(-border_width, border_width + 1):
-                    if dx != 0 or dy != 0:
-                        draw.text((x + dx, y + dy), text, font=font, fill=border_color)
-        
-        # 메인 텍스트 그리기
-        draw.text((x, y), text, font=font, fill=text_color)
-    
-    def render_text_to_image(self, image: Image.Image, text: str, position: Tuple[int, int],
-                           font_name: str, font_size: int, font_color: str, max_width: int,
-                           align: str = "left", vertical_align: str = "top",
-                           stroke_width: int = 0, stroke_color: str = "#000000",
-                           shadow_offset: Tuple[int, int] = (0, 0), shadow_color: str = "#000000",
-                           background: bool = False, bg_color: str = "#000000") -> Image.Image:
-        """텍스트를 이미지에 렌더링"""
-        try:
-            draw = ImageDraw.Draw(image)
-            font = self._get_font(font_name, font_size)
+            # 🔥🔥🔥 [폰트 굵기 적용] 설정에서 굵기 정보를 가져와서 폰트 로드 🔥🔥🔥
+            font_name = str(settings.get('폰트(pt)'))
+            font_size = int(settings.get('크기(pt)', default_font_size))
+            font_weight = str(settings.get('굵기', 'Regular'))
+            font = self._get_font(font_name, font_size, font_weight)
+            lines = self._smart_line_break(str(scene.get('text', '')), int(settings.get('w', default_width)), font)
+            if not lines: continue
+
+            # --- [핵심 수정 1] 행간(line_spacing) 값 조정 ---
+            ascent, descent = font.getmetrics()
+            line_height = ascent + descent
+            # 🔥🔥🔥 [하드코딩 제거] 설정값에서 행간 비율 가져오기 🔥🔥🔥
+            line_spacing_ratio = float(self.merged_settings.get('common', {}).get('line_spacing', {}).get('ratio', '1.2'))
+            line_spacing = line_height * line_spacing_ratio
+
+            total_h = line_height * len(lines) + (line_spacing - line_height) * (len(lines) - 1)
+
+            original_y = int(settings.get('y', 0))
+            v_align = str(settings.get('상하 정렬', 'Top')).lower()
             
-            # 스마트 줄바꿈 적용
-            if max_width > 0:
-                lines = self._simple_line_break(text, max_width, font)
+            print(f"📐 [정렬 설정] 상하정렬: {v_align}, 원본 Y: {original_y}, 텍스트 높이: {total_h:.2f}")
+            
+            y = original_y
+            if v_align == "center":
+                y = original_y - total_h / 2
+                print(f"   -> 중앙 정렬: {original_y} - {total_h:.2f}/2 = {y:.2f}")
+            elif v_align == "bottom":
+                y = original_y - total_h
+                print(f"   -> 하단 정렬: {original_y} - {total_h:.2f} = {y:.2f}")
             else:
-                lines = text.split('\n')
+                print(f"   -> 상단 정렬: Y = {y} 유지")
             
-            # 각 줄의 높이 계산
-            line_heights = []
-            total_height = 0
+            # --- [핵심 수정 2] 텍스트 렌더링 Y 좌표 계산 방식 변경 ---
             for line in lines:
-                try:
-                    bbox = font.getbbox(line)
-                    line_height = bbox[3] - bbox[1]
-                except:
-                    line_height = font_size
-                line_heights.append(line_height)
-                total_height += line_height * 1.2  # 줄 간격 추가
-            
-            # 마지막 줄의 추가 간격 제거
-            if line_heights:
-                total_height -= line_heights[-1] * 0.2
-            
-            start_x, start_y = position
-            
-            # 수직 정렬에 따른 시작 Y 위치 조정
-            if vertical_align == "center":
-                start_y -= total_height / 2
-            elif vertical_align == "bottom":
-                start_y -= total_height
-            
-            current_y = start_y
-            
-            for i, line in enumerate(lines):
-                if not line.strip():  # 빈 줄 건너뛰기
-                    current_y += line_heights[i] * 1.2
-                    continue
+                bbox = font.getbbox(line)
+                line_w = bbox[2] - bbox[0]
                 
-                # 텍스트 너비 계산
-                try:
-                    bbox = font.getbbox(line)
-                    line_width = bbox[2] - bbox[0]
-                except:
-                    line_width = len(line) * (font_size // 2)
+                # Pillow는 텍스트를 그릴 때 y좌표를 상단 기준으로 삼으므로 ascent를 더할 필요가 없습니다.
+                # 이 부분이 텍스트를 아래로 밀리게 한 원인입니다.
+                text_render_y = y 
                 
-                # 수평 정렬에 따른 X 위치 계산
-                text_x = start_x
-                if align == "center":
-                    text_x -= line_width / 2
-                elif align == "right":
-                    text_x -= line_width
+                x = int(settings.get('x', 0))
+                h_align = str(settings.get('좌우 정렬', 'Left')).lower()
+                # 🔥🔥🔥 [하드코딩 제거] 설정값에서 기본 너비 가져오기 🔥🔥🔥
+                default_width = int(self.merged_settings.get('common', {}).get('default_width', 1820))
+                line_width = int(settings.get('w', default_width))
                 
-                # 배경 렌더링
-                if background:
-                    bg_color_rgba = self._parse_color(bg_color)
-                    # 텍스트 영역에 배경 그리기
-                    bg_bbox = (text_x - 5, current_y - 5, text_x + line_width + 5, current_y + line_heights[i] + 5)
-                    draw.rectangle(bg_bbox, fill=bg_color_rgba)
+                print(f"📐 [좌우 정렬] 정렬: {h_align}, 원본 X: {x}, 라인 너비: {line_w:.2f}, 컨테이너 너비: {line_width}")
                 
-                # 그림자 렌더링
-                if shadow_offset[0] != 0 or shadow_offset[1] != 0:
-                    draw.text((text_x + shadow_offset[0], current_y + shadow_offset[1]), 
-                            line, font=font, fill=shadow_color,
-                            stroke_width=stroke_width, stroke_fill=stroke_color)
-                
-                # 메인 텍스트 렌더링
-                draw.text((text_x, current_y), line, font=font, fill=font_color,
-                         stroke_width=stroke_width, stroke_fill=stroke_color)
-                
-                current_y += line_heights[i] * 1.2
-            
-            return image
-            
-        except Exception as e:
-            print(f"⚠️ 텍스트 렌더링 실패: {e}")
-            return image
-    
-    def create_conversation_image(self, scene_data: Dict[str, Any], output_path: str, 
-                                 resolution: Tuple[int, int], settings: Dict[str, Any]) -> bool:
-        """회화 이미지 생성 (2개 독립 화면)"""
-        try:
-            width, height = resolution
-            
-            # 화면 1: 순번 + 원어
-            screen1_path = output_path.replace('.png', '_screen1.png')
-            self._create_single_screen(
-                scene_data, screen1_path, resolution, "회화 설정",
-                show_learning=False, show_reading=False
-            )
-            
-            # 화면 2: 순번 + 원어 + 학습어 + 읽기
-            screen2_path = output_path.replace('.png', '_screen2.png')
-            self._create_single_screen(
-                scene_data, screen2_path, resolution, "회화 설정",
-                show_learning=True, show_reading=True
-            )
-            
-            return True
-            
-        except Exception as e:
-            print(f"❌ 회화 이미지 생성 실패: {e}")
-            return False
-    
-    def _create_single_screen(self, scene_data: Dict[str, Any], output_path: str,
-                             resolution: Tuple[int, int], script_type: str = "회화 설정",
-                             show_learning: bool = False, show_reading: bool = False) -> bool:
-        """단일 화면 이미지 생성"""
-        try:
-            width, height = resolution
-            
-            # 배경 이미지 생성
-            bg_settings = self.merged_settings.common.bg
-            if bg_settings.enabled and bg_settings.type == '이미지':
-                bg_path = bg_settings.value
-                if bg_path and os.path.exists(bg_path):
-                    image = Image.open(bg_path).convert('RGBA')
-                    image = image.resize((width, height))
+                if h_align == "center": 
+                    x += (line_width - line_w) / 2
+                    print(f"   -> 중앙 정렬: {x:.2f}")
+                elif h_align == "right": 
+                    x += line_width - line_w
+                    print(f"   -> 우측 정렬: {x:.2f}")
                 else:
-                    image = Image.new('RGBA', (width, height), (0, 0, 0, 255))
-            else:
-                image = Image.new('RGBA', (width, height), (0, 0, 0, 255))
-            
-            draw = ImageDraw.Draw(image)
-            
-            # 텍스트 설정 가져오기
-            script_type_settings = self.merged_settings.script_types.get(script_type)
-            if not script_type_settings:
-                print(f"⚠️ 스크립트 타입 설정을 찾을 수 없습니다: {script_type}")
-                return False
-            
-            rows = script_type_settings.rows
-            
-            if len(rows) >= 4:
-                # 순번 (1행)
-                order_row = rows[0]
-                order_font = self._get_font(order_row.font_name, order_row.font_size, order_row.bold)
-                self._draw_text_with_effects(
-                    draw, scene_data.get('order', ''), 
-                    (order_row.x, order_row.y), 
-                    order_row, order_font
-                )
+                    print(f"   -> 좌측 정렬: X = {x} 유지")
                 
-                # 원어 (2행)
-                native_row = rows[1]
-                native_font = self._get_font(native_row.font_name, native_row.font_size, native_row.bold)
-                self._draw_text_with_effects(
-                    draw, scene_data.get('native_script', ''), 
-                    (native_row.x, native_row.y), 
-                    native_row, native_font
-                )
-                
-                # 학습어 (3행) - show_learning이 True일 때만
-                if show_learning and len(rows) >= 3:
-                    learning_row = rows[2]
-                    learning_font = self._get_font(learning_row.font_name, learning_row.font_size, learning_row.bold)
-                    self._draw_text_with_effects(
-                        draw, scene_data.get('learning_script', ''), 
-                        (learning_row.x, learning_row.y), 
-                        learning_row, learning_font
-                    )
-                
-                # 읽기 (4행) - show_reading이 True일 때만
-                if show_reading and len(rows) >= 4:
-                    reading_row = rows[3]
-                    reading_font = self._get_font(reading_row.font_name, reading_row.font_size, reading_row.bold)
-                    self._draw_text_with_effects(
-                        draw, scene_data.get('reading_script', ''), 
-                        (reading_row.x, reading_row.y), 
-                        reading_row, reading_font
-                    )
+                # 🔥🔥🔥 [폰트 메트릭 추가] 바탕 박스 계산을 위한 정확한 텍스트 위치 계산 🔥🔥🔥
+                ascent, descent = font.getmetrics()
+                all_positions.append({
+                    'line': line, 'font': font, 'settings': settings, 'x': x,
+                    'y': text_render_y, 'w': line_w, 'h': line_height,
+                    'ascent': ascent, 'descent': descent,  # 폰트 메트릭 추가
+                    'text_top': text_render_y - ascent,    # 텍스트 상단 위치
+                    'text_bottom': text_render_y + descent # 텍스트 하단 위치
+                })
+                y += line_spacing
+
+        # 🔥🔥🔥 [라인별 개별 바탕 박스] 각 라인마다 개별적인 바탕 박스 생성 🔥🔥🔥
+        if has_background and all_positions:
+            bg_cfg = self.merged_settings.get('common', {}).get('bg', {})
+            # 🔥🔥🔥 [하드코딩 제거] 설정값에서 기본 마진 가져오기 🔥🔥🔥
+            default_margin = int(self.merged_settings.get('common', {}).get('default_margin', 5))
+            margin = int(bg_cfg.get('margin', default_margin))
             
-            # 이미지 저장
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
-            image.save(output_path, 'PNG')
-            print(f"✅ 이미지 생성 완료: {os.path.basename(output_path)}")
+            # 🔥🔥🔥 [하드코딩 제거] 설정값에서 기본 배경 색상과 투명도 가져오기 🔥🔥🔥
+            default_bg_color = self.merged_settings.get('common', {}).get('default_bg_color', '#333333')
+            default_bg_alpha = float(self.merged_settings.get('common', {}).get('default_bg_alpha', 0.5))
+            bg_color = self._parse_color(bg_cfg.get('color', default_bg_color), float(bg_cfg.get('alpha', default_bg_alpha)))
             
-            return True
+            bg_layer = Image.new('RGBA', image.size, (0, 0, 0, 0))
+            bg_draw = ImageDraw.Draw(bg_layer)
             
-        except Exception as e:
-            print(f"❌ 단일 화면 이미지 생성 실패: {e}")
-            return False
-    
-    def _parse_row_settings(self, row_data: Dict[str, Any]) -> TextSettings:
-        """행 설정 데이터를 TextSettings 객체로 변환"""
-        return TextSettings(
-            x=row_data.get('x', 0),
-            y=row_data.get('y', 0),
-            w=row_data.get('w', 100),
-            크기=row_data.get('크기(pt)', 24),
-            폰트=row_data.get('폰트(pt)', 'Noto Sans KR'),
-            색상=row_data.get('색상', '#FFFFFF'),
-            굵기=row_data.get('굵기', False),
-            좌우정렬=row_data.get('좌우 정렬', 'center'),
-            상하정렬=row_data.get('상하 정렬', 'center'),
-            바탕=row_data.get('바탕', False),
-            쉐도우=row_data.get('쉐도우', False),
-            외곽선=row_data.get('외곽선', False)
-        )
-    
-    def create_intro_ending_image(self, text_content: str, output_path: str,
-                                 resolution: Tuple[int, int], script_type: str) -> bool:
-        """인트로/엔딩 이미지 생성 (MD 인라인 스크립트, 스마트 줄바꿈)"""
+            # 각 라인별로 개별 바탕 박스 생성
+            for pos in all_positions:
+                if pos['settings'].get('바탕') == 'True':
+                    x, y, w, h = pos['x'], pos['y'], pos['w'], pos['h']
+                    
+                    # 폰트 메트릭을 사용하여 정확한 텍스트 높이 계산
+                    font = pos['font']
+                    ascent, descent = font.getmetrics()
+                    
+                    # 텍스트의 실제 상단과 하단 위치 계산
+                    text_top = y - ascent
+                    text_bottom = y + descent
+                    
+                    # 🔥🔥🔥 [디버깅] 텍스트 위치 정보 상세 로깅 🔥🔥🔥
+                    print(f"🔍 [디버깅] 텍스트: '{pos['line'][:20]}...'")
+                    print(f"   - 렌더링 Y: {y}")
+                    print(f"   - 폰트 ascent: {ascent}, descent: {descent}")
+                    print(f"   - 계산된 text_top: {text_top}, text_bottom: {text_bottom}")
+                    print(f"   - pos['text_top']: {pos.get('text_top', 'N/A')}, pos['text_bottom']: {pos.get('text_bottom', 'N/A')}")
+                    
+                    # 🔥🔥🔥 [정확한 바탕 박스 계산] 계산된 text_top과 text_bottom 사용 🔥🔥🔥
+                    line_min_x = x - margin
+                    line_max_x = x + w + margin
+                    line_min_y = text_top - margin
+                    line_max_y = text_bottom + margin
+                    
+                    print(f"🎨 [라인별 바탕 박스] '{pos['line'][:20]}...' -> ({line_min_x:.1f}, {line_min_y:.1f}, {line_max_x:.1f}, {line_max_y:.1f})")
+                    
+                    # 개별 라인 바탕 박스 그리기
+                    bg_draw.rectangle((line_min_x, line_min_y, line_max_x, line_max_y), fill=bg_color)
+            
+            image = Image.alpha_composite(image, bg_layer)
+
+        draw = ImageDraw.Draw(image)
+        for pos in all_positions:
+            x, y, line, font, settings = pos['x'], pos['y'], pos['line'], pos['font'], pos['settings']
+            
+            if settings.get('쉐도우') == 'True':
+                shadow_cfg = self.merged_settings.get('common', {}).get('shadow', {})
+                shadow_color = self._parse_color(shadow_cfg.get('color'), float(shadow_cfg.get('alpha')))
+                # 🔥🔥🔥 [하드코딩 제거] 설정값에서 기본 그림자 오프셋 가져오기 🔥🔥🔥
+                default_shadow_offx = int(self.merged_settings.get('common', {}).get('default_shadow_offx', 2))
+                default_shadow_offy = int(self.merged_settings.get('common', {}).get('default_shadow_offy', 2))
+                sx = x + int(shadow_cfg.get('offx', default_shadow_offx)); sy = y + int(shadow_cfg.get('offy', default_shadow_offy))
+                draw.text((sx, sy), line, font=font, fill=shadow_color)
+
+            if settings.get('외곽선') == 'True':
+                border_cfg = self.merged_settings.get('common', {}).get('border', {})
+                border_color = self._parse_color(border_cfg.get('color'))
+                # 🔥🔥🔥 [하드코딩 제거] 설정값에서 기본 외곽선 두께 가져오기 🔥🔥🔥
+                default_border_thick = int(self.merged_settings.get('common', {}).get('default_border_thick', 2))
+                thick = int(border_cfg.get('thick', default_border_thick))
+                for dx in range(-thick, thick + 1):
+                    for dy in range(-thick, thick + 1):
+                        if dx != 0 or dy != 0: draw.text((x + dx, y + dy), line, font=font, fill=border_color)
+
+            # 🔥🔥🔥 [텍스트 색상 적용] 설정에서 색상 정보를 가져와서 RGB 튜플로 변환 🔥🔥🔥
+            text_color_str = str(settings.get('색상', '#FFFFFF'))
+            text_color = self._parse_color(text_color_str)
+            print(f"🎨 [텍스트 색상] '{line[:20]}...' -> {text_color_str} -> {text_color}")
+            draw.text((x, y), line, font=font, fill=text_color)
+            
+        return image
+
+    def create_intro_ending_image(self, text: str, output_path: str, resolution: Tuple[int, int], script_type: str) -> bool:
         try:
-            width, height = resolution
-            
-            # 배경 이미지 생성
-            bg_settings = self.merged_settings.common.bg
-            if bg_settings.enabled and bg_settings.type == '이미지':
-                bg_path = bg_settings.value
-                if bg_path and os.path.exists(bg_path):
-                    image = Image.open(bg_path).convert('RGBA')
-                    image = image.resize((width, height))
-                else:
-                    image = Image.new('RGBA', (width, height), (0, 0, 0, 255))
-            else:
-                image = Image.new('RGBA', (width, height), (0, 0, 0, 255))
-            
-            # 텍스트 설정 가져오기
             tab_name = f"{script_type} 설정"
-            script_type_settings = self.merged_settings.script_types.get(tab_name)
-            if not script_type_settings:
-                print(f"⚠️ 스크립트 타입 설정을 찾을 수 없습니다: {tab_name}")
+            settings_tab = self.merged_settings.get('tabs', {}).get(tab_name)
+            if not settings_tab:
+                print(f"🔥🔥🔥 [오류] '{tab_name}' 설정을 찾을 수 없습니다!")
                 return False
-            
-            rows = script_type_settings.rows
-            
-            if rows:
-                row_settings = rows[0]
-                font = self._get_font(row_settings.font_name, row_settings.font_size, row_settings.bold)
                 
-                # 스마트 줄바꿈
-                wrapped_lines = self._simple_line_break(text_content, row_settings.w, font)
-                wrapped_text = '\n'.join(wrapped_lines)
-                
-                self.render_text_to_image(
-                    image=image,
-                    text=wrapped_text,
-                    position=(row_settings.x, row_settings.y),
-                    font_name=row_settings.font_name,
-                    font_size=row_settings.font_size,
-                    font_color=row_settings.color,
-                    max_width=row_settings.w,
-                    align=row_settings.h_align,
-                    vertical_align=row_settings.v_align,
-                    stroke_width=self.merged_settings.common.border.thick if row_settings.border else 0,
-                    stroke_color=self.merged_settings.common.border.color if row_settings.border else "#000000",
-                    shadow_offset=(self.merged_settings.common.shadow.offx if row_settings.shadow else 0, self.merged_settings.common.shadow.offy if row_settings.shadow else 0),
-                    shadow_color=self.merged_settings.common.shadow.color if row_settings.shadow else "#000000",
-                    background=row_settings.background,
-                    bg_color=self.merged_settings.common.bg.color if row_settings.background else "#000000"
-                )
+            scene = [{'text': text, 'settings': settings_tab['rows'][0]}]
+            image = self._create_base_image(resolution, tab_name)
+            image = self.render_scene(image, scene)
             
-            # 이미지 저장
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             image.save(output_path, 'PNG')
-            print(f"✅ {script_type} 이미지 생성 완료: {os.path.basename(output_path)}")
-            
+            print(f"✅ [성공] {script_type} 이미지 생성 완료: {os.path.basename(output_path)}")
             return True
-            
         except Exception as e:
-            print(f"❌ {script_type} 이미지 생성 실패: {e}")
+            print(f"\n🔥🔥🔥 [오류] 이미지 생성 중 심각한 오류 발생!")
+            traceback.print_exc()
             return False
     
-    def create_thumbnail_image(self, ai_data: Dict[str, Any], output_path: str,
-                              resolution: Tuple[int, int]) -> bool:
-        """썸네일 이미지 생성 (AI JSON 파싱, 3세트, 터미널 출력)"""
+    def create_conversation_image(self, conversation_data: dict, output_dir: str, resolution: Tuple[int, int], script_type: str = "회화", base_filename: str = None) -> List[str]:
+        """회화 이미지 생성 메서드 - 각 행별로 2개의 화면 생성"""
+        print(f"🎨 [회화 이미지 생성] {script_type} 이미지 생성 시작")
+        print(f"   - 대화 데이터: {conversation_data}")
+        print(f"   - 출력 디렉토리: '{output_dir}'")
+        print(f"   - 해상도: {resolution}")
+        
         try:
-            width, height = resolution
+            # 회화 설정 탭 사용
+            tab_name = f"{script_type} 설정"
+            settings_tab = self.merged_settings.get('tabs', {}).get(tab_name)
+            if not settings_tab:
+                print(f"❌ [오류] '{tab_name}' 설정을 찾을 수 없습니다!")
+                return []
             
-            # AI 데이터에서 썸네일 문장 추출
-            thumbnail_sets = ai_data.get('thumbnail', [])
-            if not thumbnail_sets:
-                print("⚠️ AI 데이터에 썸네일 정보가 없습니다.")
-                return False
+            if not settings_tab.get('rows'):
+                print(f"❌ [오류] '{tab_name}' 설정에 행이 없습니다!")
+                return []
             
-            # 3세트 생성
-            for i, thumbnail_set in enumerate(thumbnail_sets[:3]):
-                set_output_path = output_path.replace('.png', f'_set{i+1}.png')
-                
-                # 배경 이미지 생성
-                bg_settings = self.merged_settings.common.bg
-                if bg_settings.enabled and bg_settings.type == '이미지':
-                    bg_path = bg_settings.value
-                    if bg_path and os.path.exists(bg_path):
-                        image = Image.open(bg_path).convert('RGBA')
-                        image = image.resize((width, height))
-                    else:
-                        image = Image.new('RGBA', (width, height), (0, 0, 0, 255))
-                else:
-                    image = Image.new('RGBA', (width, height), (0, 0, 0, 255))
-                
-                draw = ImageDraw.Draw(image)
-                
-                # 텍스트 설정 가져오기
-                thumbnail_settings = self.merged_settings.script_types.get('썸네일 설정')
-                if not thumbnail_settings:
-                    print(f"⚠️ 썸네일 설정을 찾을 수 없습니다")
-                    continue
-                
-                rows = thumbnail_settings.rows
-                
-                # 4줄 텍스트 처리
-                for j, row_settings in enumerate(rows[:4]):
-                    if j < len(thumbnail_set):
-                        text = thumbnail_set[j]
-                        
-                        # 폰트 크기 자동 조정
-                        font_size = row_settings.font_size
-                        font = self._get_font(row_settings.font_name, font_size, row_settings.bold)
-                        
-                        # 텍스트가 너비를 넘으면 폰트 크기 줄이기
-                        while font.getlength(text) > row_settings.w and font_size > 10:
-                            font_size -= 2
-                            font = self._get_font(row_settings.font_name, font_size, row_settings.bold)
-                        
-                        # 터미널 출력
-                        print(f"썸네일 세트 {i+1}, 줄 {j+1}: {text}")
-                        
-                        self._draw_text_with_effects(
-                            draw, text, (row_settings.x, row_settings.y),
-                            row_settings, font
-                        )
-                
-                # 이미지 저장
-                os.makedirs(os.path.dirname(set_output_path), exist_ok=True)
-                image.save(set_output_path, 'PNG')
-                print(f"✅ 썸네일 세트 {i+1} 생성 완료: {os.path.basename(set_output_path)}")
+            created_files = []
             
-            return True
+            # 대화 데이터에서 각 필드 추출
+            sequence = conversation_data.get('sequence', 1)
+            native_script = conversation_data.get('native_script', '')
+            learning_script = conversation_data.get('learning_script', '')
+            reading_script = conversation_data.get('reading_script', '')
+            
+            print(f"📝 [대화 데이터] 순번: {sequence}, 원어: '{native_script}', 학습어: '{learning_script}', 읽기: '{reading_script}'")
+            
+            # 화면 1: 순번, 원어 텍스트만 표시
+            screen1_scenes = []
+            if len(settings_tab['rows']) >= 2:
+                # 순번 (1행)
+                screen1_scenes.append({
+                    'text': str(sequence),
+                    'settings': settings_tab['rows'][0]  # 순번 행
+                })
+                # 원어 (2행)
+                screen1_scenes.append({
+                    'text': native_script,
+                    'settings': settings_tab['rows'][1]  # 원어 행
+                })
+            
+            # 화면 2: 순번, 원어, 학습어, 읽기를 모두 표시
+            screen2_scenes = []
+            if len(settings_tab['rows']) >= 4:
+                # 순번 (1행)
+                screen2_scenes.append({
+                    'text': str(sequence),
+                    'settings': settings_tab['rows'][0]  # 순번 행
+                })
+                # 원어 (2행)
+                screen2_scenes.append({
+                    'text': native_script,
+                    'settings': settings_tab['rows'][1]  # 원어 행
+                })
+                # 학습어 (3행)
+                screen2_scenes.append({
+                    'text': learning_script,
+                    'settings': settings_tab['rows'][2]  # 학습어 행
+                })
+                # 읽기 (4행)
+                screen2_scenes.append({
+                    'text': reading_script,
+                    'settings': settings_tab['rows'][3]  # 읽기 행
+                })
+            
+            # 🔥🔥🔥 [파일명 일련번호] base_filename을 사용하여 파일명 생성 🔥🔥🔥
+            if not base_filename:
+                base_filename = f"{script_type}_{conversation_data.get('sequence', 1):03d}"
+            
+            # 🔥🔥🔥 [화면별 개별 처리] 인트로/엔딩과 같은 방식으로 각 화면을 개별 처리 🔥🔥🔥
+            
+            # 화면 1 생성 - 순번과 원어를 각각 개별 씬으로 처리
+            if screen1_scenes:
+                screen1_filename = f"{base_filename}_screen1.png"
+                screen1_path = os.path.join(output_dir, screen1_filename)
+                print(f"🖼️ [화면 1] 순번+원어 이미지 생성: {screen1_path}")
+                
+                image1 = self._create_base_image(resolution, tab_name)
+                
+                # 각 씬을 개별적으로 처리 (인트로/엔딩 방식)
+                for scene in screen1_scenes:
+                    single_scene = [scene]  # 단일 씬으로 래핑
+                    image1 = self.render_scene(image1, single_scene)
+                
+                os.makedirs(os.path.dirname(screen1_path), exist_ok=True)
+                image1.save(screen1_path, 'PNG')
+                created_files.append(screen1_path)
+                print(f"✅ [화면 1] 생성 완료: {os.path.basename(screen1_path)}")
+            
+            # 화면 2 생성 - 순번, 원어, 학습어, 읽기를 각각 개별 씬으로 처리
+            if screen2_scenes:
+                screen2_filename = f"{base_filename}_screen2.png"
+                screen2_path = os.path.join(output_dir, screen2_filename)
+                print(f"🖼️ [화면 2] 순번+원어+학습어+읽기 이미지 생성: {screen2_path}")
+                
+                image2 = self._create_base_image(resolution, tab_name)
+                
+                # 각 씬을 개별적으로 처리 (인트로/엔딩 방식)
+                for scene in screen2_scenes:
+                    single_scene = [scene]  # 단일 씬으로 래핑
+                    image2 = self.render_scene(image2, single_scene)
+                
+                os.makedirs(os.path.dirname(screen2_path), exist_ok=True)
+                image2.save(screen2_path, 'PNG')
+                created_files.append(screen2_path)
+                print(f"✅ [화면 2] 생성 완료: {os.path.basename(screen2_path)}")
+            
+            print(f"✅ [성공] {script_type} 이미지 생성 완료: 총 {len(created_files)}개 파일")
+            return created_files
             
         except Exception as e:
-            print(f"❌ 썸네일 이미지 생성 실패: {e}")
-            return False
+            print(f"❌ [오류] {script_type} 이미지 생성 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+
+    def get_current_settings(self) -> Dict[str, Any]:
+        """현재 설정 상태 반환 (UI에서 확인용)"""
+        return {
+            "common": self.merged_settings.get('common', {}),
+            "tabs": self.merged_settings.get('tabs', {}),
+            "fonts": list(self.fonts.keys())
+        }

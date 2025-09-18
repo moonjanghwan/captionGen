@@ -8,11 +8,6 @@ __version__ = "1.0.0"
 __author__ = "CaptionGen Team"
 __description__ = "SSML 기반 자막 이미지 생성 및 PNG 시퀀스 시스템"
 
-from .text_renderer import TextRenderer
-from .generator import SubtitleGenerator, SubtitleFrame
+# TextRenderer와 SubtitleGenerator는 삭제됨 - PNGRenderer 사용
 
-__all__ = [
-    "TextRenderer",
-    "SubtitleGenerator",
-    "SubtitleFrame"
-]
+__all__ = []

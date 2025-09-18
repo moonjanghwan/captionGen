@@ -19,12 +19,8 @@ from typing import Dict, Any, Optional
 from src.ui.ui_utils import create_labeled_widget
 
 # 파이프라인 모듈 import
-try:
-    from src.pipeline.subtitle.generator import SubtitleGenerator
-    PIPELINE_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️ 파이프라인 모듈 import 실패: {e}")
-    PIPELINE_AVAILABLE = False
+# SubtitleGenerator는 삭제됨 - PNGRenderer 사용
+PIPELINE_AVAILABLE = True
 
 from src.pipeline.ffmpeg.pipeline_manager import PipelineManager
 

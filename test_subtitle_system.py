@@ -7,7 +7,7 @@ SSML mark 태그 기반 정확한 타이밍, PNG 시퀀스 자동 생성, 텍스
 
 import json
 import os
-from src.pipeline.subtitle import TextRenderer, SubtitleGenerator, SubtitleFrame
+# TextRenderer와 SubtitleGenerator는 삭제됨 - PNGRenderer 사용
 
 def test_text_renderer():
     """텍스트 렌더러 테스트"""

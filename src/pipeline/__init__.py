@@ -15,8 +15,8 @@ from .manifest import ManifestParser, ManifestValidator, ManifestGenerator
 from .audio import SSMLBuilder, AudioGenerator, AudioSegmenter
 
 # 자막 시스템
-from .subtitle import TextRenderer, SubtitleGenerator
-from .renderers import PNGRenderer, ImprovedImageRenderer
+# TextRenderer와 SubtitleGenerator는 삭제됨 - PNGRenderer 사용
+from .renderers import PNGRenderer
 
 # 설정 시스템
 from .settings import (
@@ -49,11 +49,8 @@ __all__ = [
     "AudioGenerator",
     "AudioSegmenter",
     
-    # Subtitle
-    "TextRenderer",
-    "SubtitleGenerator",
+    # Subtitle (TextRenderer와 SubtitleGenerator는 삭제됨)
     "PNGRenderer",
-    "ImprovedImageRenderer",
     
     # Settings
     "SettingValidator",

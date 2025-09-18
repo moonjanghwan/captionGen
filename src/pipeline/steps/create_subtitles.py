@@ -7,6 +7,7 @@ Manifest와 UI 설정값을 바탕으로, PNGRenderer를 사용하여 각 장면
 import os
 import re
 from typing import List, Dict, Any, Tuple
+from PIL import Image
 
 from ..core.context import PipelineContext
 from ..renderers import PNGRenderer
@@ -29,12 +30,30 @@ def run(context: PipelineContext):
     print(f"📄 매니페스트 타입: {type(context.manifest)}")
     print(f"📄 매니페스트 내용: {context.manifest}")
 
-    # 1. PNG 렌더러 초기화
+    # 1. 개선된 PNG 렌더러 초기화 (고품질 렌더링)
     settings_dict = {
         "common": context.settings.common,
         "tabs": context.settings.tabs
     }
+    
+    # 디버깅: 설정 데이터 확인
+    print(f"🔍 [DEBUG] PNGRenderer 초기화용 설정:")
+    print(f"   - common keys: {list(context.settings.common.keys())}")
+    if 'tab_backgrounds' in context.settings.common:
+        print(f"   - tab_backgrounds: {context.settings.common['tab_backgrounds']}")
+    else:
+        print(f"   - tab_backgrounds: 없음!")
+    
+    # 🔥 UI 연동 강화: PNGRenderer 초기화 및 설정 검증
+    print("🚀 [UI 연동] PNGRenderer 초기화 시작...")
     png_renderer = PNGRenderer(settings_dict)
+    
+    # 렌더러 상태 확인
+    renderer_status = png_renderer.get_current_settings()
+    print(f"✅ [UI 연동] PNGRenderer 초기화 완료")
+    print(f"   - 사용 가능한 폰트: {renderer_status.get('fonts', [])}")
+    print(f"   - 공통 설정 키: {list(renderer_status.get('common', {}).keys())}")
+    print(f"   - 탭 설정 키: {list(renderer_status.get('tabs', {}).keys())}")
     
     # 2. 파일명 관리자 초기화
     file_manager = FileNamingManager(base_output_dir="output")
@@ -44,7 +63,7 @@ def run(context: PipelineContext):
     resolution = (width, height)
     print(f"🔍 렌더링 해상도: {width}x{height}")
     
-    # 4. 선택된 스크립트 타입에 따라 PNG 이미지 생성
+    # 4. 선택된 스크립트 타입에 따라 고품질 이미지 생성 (개선된 PNG 렌더러 사용)
     if context.script_type == "회화" or context.script_type == "conversation":
         _create_conversation_images(context, png_renderer, resolution, file_manager)
     elif context.script_type == "인트로" or context.script_type == "intro":
@@ -91,29 +110,29 @@ def _create_conversation_images(context: PipelineContext, png_renderer: PNGRende
         scene_info = f"씬 {scene.sequence}: {scene.native_script[:20]}..."
         _log(context, f"{scene_info} 처리 중..." )
         
+        # 🔥🔥🔥 [회화 이미지 2화면 생성] 제작 사양서에 따른 대화 데이터 구성 🔥🔥🔥
         scene_data = {
-            'order': str(scene.sequence),
+            'sequence': scene.sequence,
             'native_script': scene.native_script,
             'learning_script': scene.learning_script,
             'reading_script': scene.reading_script
         }
         
-        output_filename = f"{context.identifier}_{i+1:03d}.png"
-        output_path = os.path.join(context.paths.conversation_dir, output_filename)
+        # 🔥🔥🔥 [파일명 일련번호] 같은 디렉토리에 일련번호로 파일 생성 🔥🔥🔥
+        base_filename = f"{context.identifier}_{i+1:03d}"
         
-        # 화면 1, 2 파일명
-        screen1_filename = output_filename.replace('.png', '_screen1.png')
-        screen2_filename = output_filename.replace('.png', '_screen2.png')
-        
-        _log(context, f"  -> '{screen1_filename}' 생성 시도")
-        _log(context, f"  -> '{screen2_filename}' 생성 시도")
+        _log(context, f"  -> 화면 1 (순번+원어) 생성 시도: {base_filename}_screen1.png")
+        _log(context, f"  -> 화면 2 (순번+원어+학습어+읽기) 생성 시도: {base_filename}_screen2.png")
 
-        success = png_renderer.create_conversation_image(
-            scene_data, output_path, resolution, png_renderer.raw_settings
+        # 🔥🔥🔥 [새로운 메서드 호출] 2개 화면을 생성하는 메서드 호출 🔥🔥🔥
+        created_files = png_renderer.create_conversation_image(
+            scene_data, context.paths.conversation_dir, resolution, "회화", base_filename
         )
         
-        if success:
-            _log(context, f"✅ {scene_info} 이미지 생성 완료", "SUCCESS")
+        if created_files:
+            _log(context, f"✅ {scene_info} 이미지 생성 완료: {len(created_files)}개 파일", "SUCCESS")
+            for file_path in created_files:
+                _log(context, f"   - 생성된 파일: {os.path.basename(file_path)}")
         else:
             _log(context, f"❌ {scene_info} 이미지 생성 실패", "ERROR")
 
@@ -146,9 +165,18 @@ def _create_intro_images(context: PipelineContext, png_renderer: PNGRenderer,
 
         _log(context, f"  -> '{output_filename}' 생성 시도")
 
+        print(f"🔍 [DEBUG] create_intro_ending_image 호출 전:")
+        print(f"   📝 문장: '{sentence}'")
+        print(f"   📁 출력 경로: {output_path}")
+        print(f"   📏 해상도: {resolution}")
+        print(f"   🏷️ 타입: '인트로'")
+        
         success = png_renderer.create_intro_ending_image(
             sentence, output_path, resolution, "인트로"
         )
+        
+        print(f"🔍 [DEBUG] create_intro_ending_image 호출 후:")
+        print(f"   ✅ 성공: {success}")
         
         if success:
             _log(context, f"✅ {sentence_info} 이미지 생성 완료", "SUCCESS")

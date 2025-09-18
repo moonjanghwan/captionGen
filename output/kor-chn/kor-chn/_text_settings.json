@@ -3,15 +3,60 @@
   "common": {
     "bg": {
       "enabled": true,
-      "color": "#000000",
-      "alpha": "0.2",
-      "margin": "5",
+      "color": "#333333",
+      "alpha": "0.5",
+      "margin": "2",
       "type": "이미지",
       "value": "/Users/janghwanmoon/Projects/captionGen/assets/anchor/anchor.png"
     },
+    "tab_backgrounds": {
+      "회화 설정": {
+        "enabled": true,
+        "type": "이미지",
+        "value": "/Users/janghwanmoon/Projects/captionGen/assets/background/pawel-czerwinski-IeRofQlthaY-unsplash.jpg",
+        "color": "#333333",
+        "alpha": "0.5",
+        "margin": "2"
+      },
+      "썸네일 설정": {
+        "enabled": false,
+        "type": "색상",
+        "value": "#000000",
+        "color": "#000000",
+        "alpha": "1.0",
+        "margin": "2"
+      },
+      "인트로 설정": {
+        "enabled": true,
+        "type": "이미지",
+        "value": "/Users/janghwanmoon/Projects/captionGen/assets/anchor/anchor.png",
+        "color": "#333333",
+        "alpha": "0.5",
+        "margin": "2"
+      },
+      "엔딩 설정": {
+        "enabled": true,
+        "type": "이미지",
+        "value": "/Users/janghwanmoon/Projects/captionGen/assets/anchor/anchor.png",
+        "color": "#333333",
+        "alpha": "0.5",
+        "margin": "2"
+      },
+      "대화 설정": {
+        "enabled": false,
+        "type": "색상",
+        "value": "#000000",
+        "color": "#000000",
+        "alpha": "1.0",
+        "margin": "2"
+      }
+    },
+    "line_spacing": {
+      "ratio": "0.5"
+    },
     "shadow": {
       "enabled": true,
-      "thick": "4 ",
+      "thick": "2",
       "color": "#000000",
       "blur": "4",
       "offx": "3",
@@ -21,7 +66,7 @@
     },
     "border": {
       "enabled": true,
-      "thick": "4",
+      "thick": "1",
       "color": "#000000"
     }
   },
@@ -41,7 +86,7 @@
           "색상": "#FFFFFF",
           "굵기": "Bold",
           "좌우 정렬": "Left",
-          "상하 정렬": "Bottom",
+          "상하 정렬": "Top",
           "바탕": "True",
           "쉐도우": "False",
           "외곽선": "True"
@@ -56,7 +101,7 @@
           "색상": "#FFFFFF",
           "굵기": "Bold",
           "좌우 정렬": "Center",
-          "상하 정렬": "Bottom",
+          "상하 정렬": "Top",
           "바탕": "True",
           "쉐도우": "True",
           "외곽선": "False"
@@ -71,7 +116,7 @@
           "색상": "#FF00FF",
           "굵기": "Bold",
           "좌우 정렬": "Center",
-          "상하 정렬": "Bottom",
+          "상하 정렬": "Top",
           "바탕": "True",
           "쉐도우": "True",
           "외곽선": "True"
@@ -86,7 +131,7 @@
           "색상": "#FFFF00",
           "굵기": "Bold",
           "좌우 정렬": "Center",
-          "상하 정렬": "Bottom",
+          "상하 정렬": "Top",
           "바탕": "True",
           "쉐도우": "False",
           "외곽선": "True"
@@ -168,7 +213,7 @@
         {
           "행": "1행",
           "x": "50",
-          "y": "980",
+          "y": "1050",
           "w": "1820",
           "크기(pt)": "90",
           "폰트(pt)": "KoPubWorld돋움체",
@@ -190,7 +235,7 @@
         {
           "행": "1행",
           "x": "50",
-          "y": "980",
+          "y": "1050",
           "w": "1820",
           "크기(pt)": "90",
           "폰트(pt)": "KoPubWorld돋움체",

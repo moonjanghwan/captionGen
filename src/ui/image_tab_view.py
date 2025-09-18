@@ -6,7 +6,7 @@ import json
 import glob
 from tkinter import filedialog
 from src.ui.ui_utils import create_labeled_widget
-from src.pipeline.subtitle.generator import SubtitleGenerator # Import SubtitleGenerator
+# SubtitleGenerator는 삭제됨 - PNGRenderer 사용 # Import SubtitleGenerator
 from PIL import Image, ImageDraw, ImageFont, ImageColor, ImageFilter # Keep PIL imports for _make_base_canvas and other direct uses
 
 
@@ -58,21 +58,10 @@ class ImageTabView(ctk.CTkFrame):
             "KoPubWorld바탕체": os.path.expanduser("~/Library/Fonts/KoPubWorld Batang Medium.ttf")
         }
 
-    def _get_subtitle_generator(self) -> SubtitleGenerator:
-        """Helper to get an instance of SubtitleGenerator with current settings."""
-        if not getattr(self, 'root', None) or not getattr(self.root, 'data_page', None):
-            self._log_json("[오류] SubtitleGenerator 초기화 실패: root 또는 data_page를 찾을 수 없습니다.")
-            raise RuntimeError("Root or data_page not found.")
-        
-        project_name = self.root.data_page.project_name_var.get()
-        identifier = self.root.data_page.identifier_var.get()
-        
-        all_settings = self.get_all_settings()
-        
-        # Pass the font map to TextRenderer settings
-        all_settings["fonts"] = self.font_map
-
-        return SubtitleGenerator(settings=all_settings, identifier=identifier, log_callback=self._log_json)
+    # SubtitleGenerator는 삭제됨 - PNGRenderer 사용
+    # def _get_subtitle_generator(self) -> SubtitleGenerator:
+    #     """Helper to get an instance of SubtitleGenerator with current settings."""
+    #     # 삭제된 기능
 
         def _make_base_canvas(self, width: int, height: int):
             try:
@@ -146,7 +135,7 @@ class ImageTabView(ctk.CTkFrame):
         ctk.CTkRadioButton(row1, text="색상", variable=self.bg_type_var, value="색상").pack(side="left", padx=5)
         ctk.CTkRadioButton(row1, text="이미지", variable=self.bg_type_var, value="이미지").pack(side="left", padx=5)
         ctk.CTkRadioButton(row1, text="동영상", variable=self.bg_type_var, value="동영상").pack(side="left", padx=5)
-        _, self.w_bg_value = create_labeled_widget(row1, "배경값", 16)
+        _, self.w_bg_value = create_labeled_widget(row1, "배경값", 48)
         button_kwargs = {"fg_color": config.COLOR_THEME["button"], "hover_color": config.COLOR_THEME["button_hover"], "text_color": config.COLOR_THEME["text"]}
         self.btn_browse = ctk.CTkButton(row1, text="찾아보기", width=80, command=self._on_click_browse, **button_kwargs)
         self.btn_browse.pack(side="left", padx=(0,5))
@@ -154,6 +143,7 @@ class ImageTabView(ctk.CTkFrame):
             self.bg_type_var.trace_add("write", lambda *args: self._on_bg_type_change())
         except Exception:
             pass
+        
         # 초기 상태 적용
         self._on_bg_type_change()
         
@@ -169,6 +159,15 @@ class ImageTabView(ctk.CTkFrame):
         self.w_alpha.insert(0, "1.0")
         _, self.w_margin = create_labeled_widget(row2, "여백", 10, "entry", {"justify": "center"})
         self.w_margin.insert(0, "5")
+        _, self.w_line_spacing = create_labeled_widget(row2, "행간비율", 10, "entry", {"justify": "center"})
+        self.w_line_spacing.insert(0, "0.8")
+        
+        # 배경 설정 변경 이벤트 바인딩 (모든 위젯 생성 후)
+        self.w_bg_value.bind('<KeyRelease>', self._on_background_changed)
+        self.w_bg.bind('<KeyRelease>', self._on_background_changed)
+        self.w_alpha.bind('<KeyRelease>', self._on_background_changed)
+        self.w_margin.bind('<KeyRelease>', self._on_background_changed)
+        self.w_line_spacing.bind('<KeyRelease>', self._on_background_changed)
 
         # 3행
         row3 = ctk.CTkFrame(parent, fg_color="transparent")
@@ -278,40 +277,257 @@ class ImageTabView(ctk.CTkFrame):
         # Default 값: 제작 사양서 기반
         defaults = {
             "회화 설정": {"행수": "4", "비율": "16:9", "해상도": "1920x1080", "rows": [
-                {"행": "순번", "x": 50, "y": 50, "w": 1820, "크기(pt)": 80, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "원어", "x": 50, "y": 150, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#00FFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "학습어", "x": 50, "y": 450, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Noto Sans KR", "색상": "#FF00FF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "읽기", "x": 50, "y": 750, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFF00", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "순번", "x": 50, "y": 50, "w": 1820, "크기(pt)": 80, "폰트(pt)": "Arial Bold", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "원어", "x": 50, "y": 150, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Helvetica", "색상": "#00FFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "학습어", "x": 50, "y": 450, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Noto Sans KR Bold", "색상": "#FF00FF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "읽기", "x": 50, "y": 750, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Times New Roman", "색상": "#FFFF00", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
             ]},
             "썸네일 설정": {"행수": "4", "비율": "16:9", "해상도": "1920x1080", "rows": [
-                {"행": "1행", "x": 50, "y": 50, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "2행", "x": 50, "y": 200, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#00FFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "3행", "x": 50, "y": 350, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FF00FF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "4행", "x": 50, "y": 500, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFF00", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "1행", "x": 50, "y": 50, "w": 924, "크기(pt)": 100, "폰트(pt)": "Arial", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "2행", "x": 50, "y": 200, "w": 924, "크기(pt)": 100, "폰트(pt)": "Helvetica Neue", "색상": "#00FFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "3행", "x": 50, "y": 350, "w": 924, "크기(pt)": 100, "폰트(pt)": "Georgia", "색상": "#FF00FF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "4행", "x": 50, "y": 500, "w": 924, "크기(pt)": 100, "폰트(pt)": "Apple SD Gothic Neo", "색상": "#FFFF00", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
             ]},
-            "인트로 설정": {"행수": "1", "비율": "16:9", "해상도": "1920x1080", "rows": [{"행": "1행", "x": 50, "y": 980, "w": 1820, "크기(pt)": 80, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"}]},
-            "엔딩 설정": {"행수": "1", "비율": "16:9", "해상도": "1920x1080", "rows": [{"행": "1행", "x": 50, "y": 980, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"}]},
+            "인트로 설정": {"행수": "1", "비율": "16:9", "해상도": "1920x1080", "rows": [{"행": "1행", "x": 50, "y": 980, "w": 1820, "크기(pt)": 80, "폰트(pt)": "Arial Bold", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Center", "상하 정렬": "Center"}]},
+            "엔딩 설정": {"행수": "1", "비율": "16:9", "해상도": "1920x1080", "rows": [{"행": "1행", "x": 50, "y": 980, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Helvetica", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Center", "상하 정렬": "Center"}]},
             "대화 설정": {"행수": "3", "비율": "16:9", "해상도": "1920x1080", "rows": [
-                {"행": "원어", "x": 50, "y": 250, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "학습어1", "x": 50, "y": 550, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "학습어2", "x": 50, "y": 850, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "원어", "x": 50, "y": 250, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Times New Roman", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "학습어1", "x": 50, "y": 550, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Georgia", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
+                {"행": "학습어2", "x": 50, "y": 850, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Arial Italic", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
             ]},
         }
         # 기본 텍스트 설정 저장 + 각 탭 위젯 인스턴스 보관
         self.default_text_configs = defaults
         self.text_tabs = {}
+        
+        # 탭별 배경 설정 저장소 초기화
+        self.tab_background_settings = {}
+        for name in defaults.keys():
+            self.tab_background_settings[name] = {
+                "enabled": False,
+                "type": "색상",
+                "value": "#000000",
+                "color": "#000000",
+                "alpha": "1.0",
+                "margin": "5"  # 기본값, 나중에 공통 설정에서 상속받음
+            }
+        
         for name, default_data in defaults.items():
             tab = tab_view.add(name)
             inst = TextSettingsTab(tab, default_data)
             inst.pack(expand=True, fill="both")
             self.text_tabs[name] = inst
+        
+        # 탭 변경 이벤트 바인딩
+        self.tab_view.configure(command=self._on_tab_changed)
+
+    def _on_tab_changed(self):
+        """탭이 변경될 때 호출되는 함수"""
+        try:
+            # 현재 선택된 탭 가져오기
+            selected_tab_name = self.tab_view.get()
+            
+            print("=" * 60)
+            print(f"🔄 탭 변경됨: {selected_tab_name}")
+            print("=" * 60)
+            
+            # 현재 모든 탭별 설정 상태 출력
+            print("📋 현재 모든 탭별 배경 설정:")
+            for tab_name, settings in self.tab_background_settings.items():
+                print(f"   {tab_name}: {settings}")
+            
+            # 현재 탭의 배경 설정을 UI에 로드
+            if selected_tab_name in self.tab_background_settings:
+                bg_settings = self.tab_background_settings[selected_tab_name]
+                print(f"🎯 로드할 설정: {bg_settings}")
+                
+                # 배경 설정을 UI에 적용
+                self.bg_type_var.set(bg_settings.get("type", "색상"))
+                self.w_bg_value.delete(0, tk.END)
+                self.w_bg_value.insert(0, bg_settings.get("value", ""))
+                self.w_bg.delete(0, tk.END)
+                self.w_bg.insert(0, bg_settings.get("color", "#000000"))
+                self.w_alpha.delete(0, tk.END)
+                self.w_alpha.insert(0, str(bg_settings.get("alpha", "1.0")))
+                self.w_margin.delete(0, tk.END)
+                self.w_margin.insert(0, str(bg_settings.get("margin", "5")))
+                
+                print(f"✅ 탭 '{selected_tab_name}'의 배경 설정 UI에 적용 완료")
+                print(f"   - 타입: {self.bg_type_var.get()}")
+                print(f"   - 값: {self.w_bg_value.get()}")
+                print(f"   - 색상: {self.w_bg.get()}")
+                print(f"   - 투명도: {self.w_alpha.get()}")
+                print(f"   - 여백: {self.w_margin.get()}")
+            else:
+                print(f"❌ 탭 '{selected_tab_name}'의 설정을 찾을 수 없음")
+                
+        except Exception as e:
+            print(f"❌ 탭 변경 처리 중 오류: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _on_background_changed(self, event=None):
+        """배경 설정 변경 시 호출되는 이벤트 핸들러"""
+        try:
+            # 🔥🔥🔥 [탭별 배경 마진 실시간 동기화] 공통 배경 마진 변경 시 탭별 배경 마진도 동기화 🔥🔥🔥
+            try:
+                common_margin = self.w_margin.get()
+                if common_margin:
+                    for tab_name in self.tab_background_settings.keys():
+                        self.tab_background_settings[tab_name]["margin"] = common_margin
+                    print(f"✅ [실시간 동기화] 탭별 배경 마진 업데이트: {common_margin}px")
+            except Exception as margin_error:
+                print(f"⚠️ [실시간 동기화] 마진 동기화 중 오류: {margin_error}")
+            
+            # 기존 배경 변경 로직
+            self._update_common_states()
+            
+            # 🔥 UI 연동 강화: 실시간 설정 반영
+            self._notify_settings_changed()
+            
+        except Exception as e:
+            print(f"❌ 배경 설정 변경 처리 중 오류: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _notify_settings_changed(self):
+        """설정 변경 시 PNGRenderer에 알림"""
+        try:
+            print("🔄 [UI 연동] 설정 변경 감지 - PNGRenderer에 알림")
+            
+            # 현재 설정을 가져와서 로깅
+            current_settings = self.get_all_settings()
+            print(f"📋 [UI 연동] 변경된 설정 키: {list(current_settings.keys())}")
+            
+            # 탭별 배경 설정 상태 로깅
+            tab_backgrounds = current_settings.get('common', {}).get('tab_backgrounds', {})
+            if tab_backgrounds:
+                print("🎨 [UI 연동] 탭별 배경 설정 상태:")
+                for tab_name, bg_settings in tab_backgrounds.items():
+                    enabled = bg_settings.get('enabled', False)
+                    print(f"   - {tab_name}: {'✅ 활성' if enabled else '❌ 비활성'}")
+            
+            # JSON 뷰어에 현재 설정 표시
+            self._update_json_viewer_with_current_settings()
+            
+        except Exception as e:
+            print(f"❌ [UI 연동] 설정 변경 알림 중 오류: {e}")
+    
+    def _update_json_viewer_with_current_settings(self):
+        """JSON 뷰어에 현재 설정 상태 표시"""
+        try:
+            current_settings = self.get_all_settings()
+            
+            display_text = "🔄 실시간 설정 상태\n"
+            display_text += "=" * 50 + "\n\n"
+            display_text += "📋 현재 UI 설정:\n"
+            display_text += json.dumps(current_settings, indent=2, ensure_ascii=False)
+            
+            self.json_viewer.delete("1.0", tk.END)
+            self.json_viewer.insert("1.0", display_text)
+            
+        except Exception as e:
+            print(f"❌ JSON 뷰어 업데이트 중 오류: {e}")
+
+    def _on_background_changed_original(self, event=None):
+        """배경 설정이 변경될 때 호출되는 함수"""
+        try:
+            # 현재 선택된 탭 가져오기
+            current_tab = self.tab_view.get()
+            if not current_tab:
+                print("❌ 현재 선택된 탭이 없음")
+                return
+            
+            print("=" * 50)
+            print(f"🔄 배경 설정 변경됨 (탭: {current_tab})")
+            print("=" * 50)
+            
+            # 현재 UI의 배경 설정을 현재 탭에 저장
+            if current_tab in self.tab_background_settings:
+                new_settings = {
+                    "enabled": True,
+                    "type": self.bg_type_var.get(),
+                    "value": self.w_bg_value.get(),
+                    "color": self.w_bg.get(),
+                    "alpha": self.w_alpha.get(),
+                    "margin": self.w_margin.get()
+                }
+                
+                print(f"💾 저장할 설정: {new_settings}")
+                self.tab_background_settings[current_tab] = new_settings
+                
+                print(f"✅ 탭 '{current_tab}'의 배경 설정 저장 완료")
+                print("📋 저장 후 모든 탭별 설정:")
+                for tab_name, settings in self.tab_background_settings.items():
+                    print(f"   {tab_name}: {settings}")
+            else:
+                print(f"❌ 탭 '{current_tab}'이 설정 저장소에 없음")
+                
+        except Exception as e:
+            print(f"❌ 배경 설정 변경 처리 중 오류: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _create_control_buttons(self, parent):
         button_kwargs = {"fg_color": config.COLOR_THEME["button"], "hover_color": config.COLOR_THEME["button_hover"], "text_color": config.COLOR_THEME["text"]}
+        ctk.CTkButton(parent, text="🎨 실시간 미리보기", command=self._on_click_realtime_preview, **button_kwargs).pack(side="left", padx=10, pady=10)
         ctk.CTkButton(parent, text="미리보기", command=self._on_click_preview, **button_kwargs).pack(side="left", padx=10, pady=10)
         ctk.CTkButton(parent, text="비디오 생성", command=self._on_click_video, **button_kwargs).pack(side="left", padx=10, pady=10)
+        ctk.CTkButton(parent, text="탭별 설정 확인", command=self._on_click_show_tab_settings, **button_kwargs).pack(side="left", padx=10, pady=10)
         ctk.CTkButton(parent, text="설정 읽기", command=self._on_click_load_settings, **button_kwargs).pack(side="right", padx=10, pady=10)
         ctk.CTkButton(parent, text="설정 저장", command=self._on_click_save_settings, **button_kwargs).pack(side="right", padx=10, pady=10)
+
+    def _on_click_show_tab_settings(self):
+        """탭별 설정을 확인하는 함수"""
+        try:
+            print("=" * 80)
+            print("📋 현재 모든 탭별 배경 설정 상태")
+            print("=" * 80)
+            
+            current_tab = self.tab_view.get()
+            print(f"🎯 현재 선택된 탭: {current_tab}")
+            print()
+            
+            # 상세한 탭별 설정 정보 출력
+            for tab_name, settings in self.tab_background_settings.items():
+                status = "✅ 활성" if settings.get("enabled", False) else "❌ 비활성"
+                print(f"📌 {tab_name} ({status}):")
+                print(f"   - 타입: {settings.get('type', 'N/A')}")
+                print(f"   - 값: {settings.get('value', 'N/A')}")
+                print(f"   - 색상: {settings.get('color', 'N/A')}")
+                print(f"   - 투명도: {settings.get('alpha', 'N/A')}")
+                print(f"   - 여백: {settings.get('margin', 'N/A')}")
+                print()
+            
+            # JSON 뷰어에 상세한 정보 표시
+            display_text = "=" * 60 + "\n"
+            display_text += "📋 탭별 배경 설정 상세 정보\n"
+            display_text += "=" * 60 + "\n\n"
+            
+            for tab_name, settings in self.tab_background_settings.items():
+                status = "✅ 활성" if settings.get("enabled", False) else "❌ 비활성"
+                display_text += f"📌 {tab_name} ({status}):\n"
+                display_text += f"   - 타입: {settings.get('type', 'N/A')}\n"
+                display_text += f"   - 값: {settings.get('value', 'N/A')}\n"
+                display_text += f"   - 색상: {settings.get('color', 'N/A')}\n"
+                display_text += f"   - 투명도: {settings.get('alpha', 'N/A')}\n"
+                display_text += f"   - 여백: {settings.get('margin', 'N/A')}\n\n"
+            
+            display_text += "=" * 60 + "\n"
+            display_text += "📄 JSON 형식:\n"
+            display_text += "=" * 60 + "\n"
+            
+            import json
+            formatted_settings = json.dumps(self.tab_background_settings, indent=2, ensure_ascii=False)
+            display_text += formatted_settings
+            
+            self.json_viewer.delete("1.0", tk.END)
+            self.json_viewer.insert("1.0", display_text)
+            
+        except Exception as e:
+            print(f"❌ 탭별 설정 확인 중 오류: {e}")
+            import traceback
+            traceback.print_exc()
 
     def get_all_settings(self):
         try:
@@ -357,6 +573,10 @@ class ImageTabView(ctk.CTkFrame):
                 "type": self.bg_type_var.get(),
                 "value": self.w_bg_value.get(),
             },
+            "tab_backgrounds": self.tab_background_settings,  # 탭별 배경 설정 추가
+            "line_spacing": {
+                "ratio": self.w_line_spacing.get(),
+            },
             "shadow": {
                 "enabled": True,
                 "thick": self.w_shadow_thick.get(),
@@ -376,6 +596,12 @@ class ImageTabView(ctk.CTkFrame):
 
     def _apply_common_settings(self, data):
         try:
+            # 탭별 배경 설정 로드
+            tab_backgrounds = (data or {}).get("tab_backgrounds", {})
+            if tab_backgrounds:
+                self.tab_background_settings.update(tab_backgrounds)
+                print(f"✅ 탭별 배경 설정 로드됨: {self.tab_background_settings}")
+            
             bg = (data or {}).get("bg", {})
             self.bg_type_var.set(bg.get("type", "색상"))
             self.w_bg_value.delete(0, tk.END)
@@ -387,6 +613,22 @@ class ImageTabView(ctk.CTkFrame):
             try:
                 self.w_margin.delete(0, tk.END)
                 self.w_margin.insert(0, str(bg.get("margin", "2")))
+                
+                # 🔥🔥🔥 [탭별 배경 마진 동기화] 공통 배경 마진을 탭별 배경 마진에 적용 🔥🔥🔥
+                common_margin = str(bg.get("margin", "2"))
+                for tab_name in self.tab_background_settings.keys():
+                    self.tab_background_settings[tab_name]["margin"] = common_margin
+                print(f"✅ 탭별 배경 마진 동기화: {common_margin}px")
+                
+            except Exception:
+                pass
+            
+            # 🔥🔥🔥 [행간 비율 적용] 설정에서 행간 비율을 가져와서 UI에 적용 🔥🔥🔥
+            try:
+                line_spacing = (data or {}).get("line_spacing", {})
+                self.w_line_spacing.delete(0, tk.END)
+                self.w_line_spacing.insert(0, str(line_spacing.get("ratio", "0.8")))
+                print(f"✅ 행간 비율 적용: {line_spacing.get('ratio', '0.8')}")
             except Exception:
                 pass
             sh = (data or {}).get("shadow", {})
@@ -442,6 +684,93 @@ class ImageTabView(ctk.CTkFrame):
         except Exception as e:
             self._log_json(f"[설정 저장 오류] {e}")
             print(f"[설정 저장 오류] {e}")
+
+    def _on_click_realtime_preview(self):
+        """실시간 미리보기 기능 - PNGRenderer와 연동"""
+        try:
+            print("🎨 [실시간 미리보기] 시작...")
+            
+            # 현재 UI 설정을 가져와서 PNGRenderer로 전달
+            current_settings = self.get_all_settings()
+            print(f"📋 [실시간 미리보기] 현재 설정: {list(current_settings.keys())}")
+            
+            # PNGRenderer 초기화
+            from src.pipeline.renderers.png_renderer import PNGRenderer
+            
+            # 설정 구조 변환
+            settings_dict = {
+                "common": current_settings.get("common", {}),
+                "tabs": current_settings.get("tabs", {})
+            }
+            
+            print("🚀 [실시간 미리보기] PNGRenderer 초기화 중...")
+            renderer = PNGRenderer(settings_dict)
+            
+            # 테스트 데이터로 미리보기 이미지 생성
+            test_data = {
+                "native_script": "안녕하세요!",
+                "learning_script": "Hello!",
+                "reading_script": "안녕하세요! Hello!"
+            }
+            
+            # 미리보기 이미지 생성
+            output_dir = "test_output/realtime_preview"
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # 회화 이미지 미리보기
+            conversation_path = os.path.join(output_dir, "realtime_conversation.png")
+            success = renderer.create_conversation_image(
+                test_data, 
+                conversation_path, 
+                (1920, 1080), 
+                settings_dict
+            )
+            
+            if success:
+                print(f"✅ [실시간 미리보기] 회화 이미지 생성 완료: {conversation_path}")
+                
+                # 인트로 이미지 미리보기
+                intro_path = os.path.join(output_dir, "realtime_intro.png")
+                success = renderer.create_intro_ending_image(
+                    "실시간 미리보기 테스트입니다.",
+                    intro_path,
+                    (1920, 1080),
+                    "인트로"
+                )
+                
+                if success:
+                    print(f"✅ [실시간 미리보기] 인트로 이미지 생성 완료: {intro_path}")
+                    
+                    # JSON 뷰어에 결과 표시
+                    result_text = "🎨 실시간 미리보기 결과\n"
+                    result_text += "=" * 50 + "\n\n"
+                    result_text += f"✅ 회화 이미지: {conversation_path}\n"
+                    result_text += f"✅ 인트로 이미지: {intro_path}\n\n"
+                    result_text += "📋 사용된 설정:\n"
+                    result_text += json.dumps(renderer.get_current_settings(), indent=2, ensure_ascii=False)
+                    
+                    self.json_viewer.delete("1.0", tk.END)
+                    self.json_viewer.insert("1.0", result_text)
+                    
+                    print("🎉 [실시간 미리보기] 완료!")
+                else:
+                    print("❌ [실시간 미리보기] 인트로 이미지 생성 실패")
+            else:
+                print("❌ [실시간 미리보기] 회화 이미지 생성 실패")
+                
+        except Exception as e:
+            print(f"❌ [실시간 미리보기] 오류 발생: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # 오류 메시지를 JSON 뷰어에 표시
+            error_text = f"❌ 실시간 미리보기 오류\n"
+            error_text += "=" * 50 + "\n\n"
+            error_text += f"오류: {str(e)}\n\n"
+            error_text += "상세 정보는 콘솔을 확인하세요."
+            
+            self.json_viewer.delete("1.0", tk.END)
+            self.json_viewer.insert("1.0", error_text)
 
     def _on_click_load_settings(self):
         try:
@@ -672,6 +1001,8 @@ class ImageTabView(ctk.CTkFrame):
             if path:
                 self.w_bg_value.delete(0, tk.END)
                 self.w_bg_value.insert(0, path)
+                # 배경 설정 변경 이벤트 트리거
+                self._on_background_changed()
         except Exception as e:
             try:
                 self._log_json(f"[찾아보기 오류] {e}")
@@ -1030,7 +1361,21 @@ class TextSettingsTab(ctk.CTkFrame):
             hdr_cell = ctk.CTkLabel(grid_frame, text=header_text, justify="center", anchor="center")
             hdr_cell.grid(row=0, column=col, padx=2, pady=5, sticky="nsew")
 
-        font_options = ["Noto Sans KR", "KoPubWorld돋움체", "KoPubWorld바탕체"]
+        # PNGRenderer에서 로드된 모든 폰트 옵션 제공
+        font_options = [
+            # 한글 폰트
+            "Noto Sans KR", "Noto Sans KR Bold", 
+            "KoPubWorld돋움체", "KoPubWorld바탕체",
+            "Apple SD Gothic Neo",
+            
+            # 영문 폰트
+            "Arial", "Arial Bold", "Arial Italic", "Arial Bold Italic",
+            "Helvetica", "Helvetica Neue", 
+            "Times New Roman", "Georgia",
+            
+            # 대체 폰트
+            "Noto Sans KR (System)"
+        ]
         weight_options = ["Light", "Medium", "Bold"]
         h_align_options = ["Left", "Center", "Right"]
         v_align_options = ["Top", "Center", "Bottom"]

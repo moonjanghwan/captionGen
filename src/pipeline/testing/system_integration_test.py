@@ -11,7 +11,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 from ..settings.sync_manager import SettingSyncManager
 from ..settings.debugger import SettingDebugger
-from ..renderers.improved_renderer import ImprovedImageRenderer
+# from ..renderers.improved_renderer import ImprovedImageRenderer  # 모듈이 없어서 주석 처리
 from ..core.context import PipelineContext
 from ..manifest.models import Manifest, Scene, SceneContent
 from .setting_reflection_test import SettingReflectionTest
@@ -27,7 +27,7 @@ class SystemIntegrationTest:
         # 테스트용 컴포넌트 초기화
         self.sync_manager = SettingSyncManager("test_sync.log")
         self.debugger = SettingDebugger(test_log_file)
-        self.improved_renderer = ImprovedImageRenderer(self.sync_manager, "test_renderer_debug.log")
+        # self.improved_renderer = ImprovedImageRenderer(self.sync_manager, "test_renderer_debug.log")  # 모듈이 없어서 주석 처리
         self.setting_test = SettingReflectionTest("test_setting_reflection.log")
         
         # 테스트 통계

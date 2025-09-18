@@ -14,7 +14,8 @@ from .utils.file_naming import FileNamingManager
 from .utils.progress_logger import ProgressLogger
 from .manifest import ManifestParser
 from .audio import AudioGenerator, SSMLBuilder
-from .subtitle import SubtitleGenerator
+# SubtitleGenerator는 삭제됨 - PNGRenderer 사용
+# from .subtitle import SubtitleGenerator
 from .ffmpeg import FFmpegRenderer
 
 

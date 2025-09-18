@@ -12,7 +12,8 @@ from dataclasses import dataclass
 
 from ..manifest import ManifestParser
 from ..audio import AudioGenerator, SSMLBuilder
-from ..subtitle import SubtitleGenerator
+# SubtitleGenerator는 삭제됨 - PNGRenderer 사용
+# from ..subtitle import SubtitleGenerator
 from ..steps.create_subtitles import run as create_subtitles_run
 from ..core.context import PipelineContext
 from .renderer import FFmpegRenderer
@@ -61,7 +62,7 @@ class PipelineManager:
             self.config = PipelineConfig()
         self.manifest_parser = ManifestParser()
         self.audio_generator = AudioGenerator()
-        self.subtitle_generator = None  # 나중에 초기화
+        # SubtitleGenerator는 삭제됨 - PNGRenderer 사용
         self.ffmpeg_renderer = FFmpegRenderer()
         
         # 출력 디렉토리 생성
@@ -392,38 +393,10 @@ class PipelineManager:
     
     def _generate_subtitles(self, manifest_data: Dict[str, Any], 
                            output_dir: str) -> Optional[str]:
-        """자막 이미지 생성"""
-        try:
-            # SubtitleGenerator 초기화 (필요한 경우)
-            if self.subtitle_generator is None:
-                # 기본 설정으로 초기화
-                default_settings = {
-                    "font_family": "Arial",
-                    "font_size": 24,
-                    "font_color": "#FFFFFF",
-                    "background_color": "#000000",
-                    "text_align": "center"
-                }
-                self.subtitle_generator = SubtitleGenerator(
-                    settings=default_settings,
-                    identifier="default"
-                )
-            
-            subtitle_dir = os.path.join(output_dir, "subtitles")
-            frames = self.subtitle_generator.generate_from_manifest(
-                manifest_data, subtitle_dir, fps=30
-            )
-            
-            if frames:
-                print(f"✅ 자막 이미지 생성 완료: {len(frames)}개 프레임")
-                return subtitle_dir
-            else:
-                print("❌ 자막 이미지 생성 실패")
-                return None
-                
-        except Exception as e:
-            print(f"❌ 자막 이미지 생성 실패: {e}")
-            return None
+        """자막 이미지 생성 (SubtitleGenerator는 삭제됨 - PNGRenderer 사용)"""
+        # SubtitleGenerator는 삭제됨 - PNGRenderer 기반 시스템 사용
+        print("⚠️ SubtitleGenerator는 삭제됨 - PNGRenderer 기반 시스템을 사용하세요")
+        return None
     
     def _render_video(self, manifest_path: str, audio_path: Optional[str], 
                      subtitle_dir: str, output_dir: str) -> Optional[str]:

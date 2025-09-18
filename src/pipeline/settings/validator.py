@@ -227,9 +227,7 @@ class SettingValidator:
         font_paths = {
             "Noto Sans KR": "~/Library/Fonts/NotoSansKR-Regular.ttf",
             "KoPubWorld돋움체": "~/Library/Fonts/KoPubWorld Dotum Medium.ttf",
-            "KoPubWorld바탕체": "~/Library/Fonts/KoPubWorld Batang Medium.ttf",
-            "Arial": "~/Library/Fonts/Arial.ttf",
-            "Times New Roman": "~/Library/Fonts/Times New Roman.ttf"
+            "KoPubWorld바탕체": "~/Library/Fonts/KoPubWorld Batang Medium.ttf"
         }
         
         font_path = font_paths.get(font_name)

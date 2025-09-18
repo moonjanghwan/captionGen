@@ -12,7 +12,7 @@ from ..settings.sync_manager import SettingSyncManager
 from ..settings.debugger import SettingDebugger
 from ..settings.merger import SettingMerger
 from ..settings.validator import SettingValidator
-from ..renderers.improved_renderer import ImprovedImageRenderer
+# ImprovedImageRenderer는 삭제됨 - PNGRenderer 사용
 
 
 class SettingReflectionTest:

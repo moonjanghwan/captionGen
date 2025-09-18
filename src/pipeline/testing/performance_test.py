@@ -13,7 +13,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 from ..settings.sync_manager import SettingSyncManager
 from ..settings.debugger import SettingDebugger
-from ..renderers.improved_renderer import ImprovedImageRenderer
+# ImprovedImageRenderer는 삭제됨 - PNGRenderer 사용
 from ..core.context import PipelineContext
 from ..manifest.models import Manifest, Scene, SceneContent
 
@@ -28,7 +28,8 @@ class PerformanceTest:
         # 테스트용 컴포넌트 초기화
         self.sync_manager = SettingSyncManager("test_sync.log")
         self.debugger = SettingDebugger(test_log_file)
-        self.improved_renderer = ImprovedImageRenderer(self.sync_manager, "test_renderer_debug.log")
+        # ImprovedImageRenderer는 삭제됨 - PNGRenderer 사용
+        # self.improved_renderer = ImprovedImageRenderer(self.sync_manager, "test_renderer_debug.log")
         
         # 성능 통계
         self.performance_stats = {

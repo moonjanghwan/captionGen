@@ -1,46 +1,46 @@
 {
-  "total_duration": 31.32,
+  "total_duration": 33.96,
   "segments": [
     {
       "name": "kor-chn_ending_001.png",
       "start_time": 0.0,
-      "end_time": 4.81,
-      "duration": 4.81,
+      "end_time": 4.71,
+      "duration": 4.71,
       "text": "오늘 준비한 '일상 중국어 회화 5가지' 어떠셨나요?"
     },
     {
       "name": "kor-chn_ending_002.png",
-      "start_time": 4.81,
-      "end_time": 10.12,
+      "start_time": 4.71,
+      "end_time": 10.02,
       "duration": 5.31,
       "text": "매일매일 꾸준히 연습하면 분명 실력이 쑥쑥 늘 거예요."
     },
     {
       "name": "kor-chn_ending_003.png",
-      "start_time": 10.12,
-      "end_time": 17.23,
-      "duration": 7.11,
+      "start_time": 10.02,
+      "end_time": 17.73,
+      "duration": 7.71,
       "text": "오늘 배운 표현들을 꼭 복습하시고, 댓글로 여러분이 가장 유용하다고 생각하는 표현을 남겨주세요."
     },
     {
       "name": "kor-chn_ending_004.png",
-      "start_time": 17.23,
-      "end_time": 21.57,
-      "duration": 4.34,
+      "start_time": 17.73,
+      "end_time": 23.43,
+      "duration": 5.7,
       "text": "영상에 좋아요와 구독, 알림 설정 잊지 마시고요!"
     },
     {
       "name": "kor-chn_ending_005.png",
-      "start_time": 21.57,
-      "end_time": 27.77,
+      "start_time": 23.43,
+      "end_time": 29.63,
       "duration": 6.2,
       "text": "다음 시간에도 더 유익하고 재미있는 중국어 학습 콘텐츠로 찾아올게요."
     },
     {
       "name": "kor-chn_ending_006.png",
-      "start_time": 27.77,
-      "end_time": 31.32,
-      "duration": 3.55,
+      "start_time": 29.63,
+      "end_time": 33.96,
+      "duration": 4.33,
       "text": "다음 영상에서 만나요! 짜이찌엔!"
     }
   ],

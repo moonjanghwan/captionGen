@@ -49,20 +49,165 @@ class AudioGenerator:
             print(f"⚠️ Google Cloud TTS 클라이언트 초기화 실패: {e}")
             self.client = None
     
-    def _synthesize_segment_audio(self, text: str, output_path: str, voice_name: str, language_code: str) -> float:
-        """개별 세그먼트 오디오 생성 및 정확한 길이 반환"""
+    def _get_emotion_settings(self, script_type: str) -> Dict[str, Any]:
+        """스크립트 타입별 감정 설정 반환"""
+        
+        if script_type in ["인트로", "intro"]:
+            return {
+                "use_ssml": False,  # SSML 미지원 화자 때문에 False로 설정
+                "rate": "1.0",
+                "pitch": "+1st", 
+                "volume": "0dB",
+                "emphasis": "moderate",
+                "effects_profile": ["headphone-class-device", "telephony-class-application"],
+                "description": "친근하고 자연스러운 일상 대화 (일반 텍스트)"
+            }
+        
+        elif script_type in ["회화", "대화", "conversation"]:
+            return {
+                "use_ssml": False,  # SSML 미지원 화자 때문에 False로 설정
+                "rate": "1.0",  # 정상 속도로 정확한 발음
+                "pitch": "0st",  # 중립적 톤
+                "volume": "0dB",  # 정상 볼륨
+                "emphasis": "none",  # 강조 없음 (교육용)
+                "effects_profile": ["headphone-class-device"],  # 기본 프로필만
+                "description": "교육용 정확한 발음 (감정 최소화)"
+            }
+        
+        elif script_type in ["엔딩", "ending"]:
+            return {
+                "use_ssml": False,  # SSML 미지원 화자 때문에 False로 설정
+                "rate": "0.9",
+                "pitch": "0st", 
+                "volume": "0dB",
+                "emphasis": "moderate",
+                "effects_profile": ["headphone-class-device", "telephony-class-application"],
+                "description": "따뜻하고 마무리하는 톤 (일반 텍스트)"
+            }
+        
+        else:  # 기본값
+            return {
+                "use_ssml": False,
+                "effects_profile": ["headphone-class-device"],
+                "description": "기본 설정"
+            }
+
+    def _add_comma_pauses(self, text: str, script_type: str) -> str:
+        """쉼표와 슬래시 위치에 자연스러운 휴지 추가 (SSML용)"""
+        pause_time = self._get_comma_pause_time(script_type)
+        # 쉼표와 슬래시 모두 휴지로 대체
+        text_with_pauses = text.replace(',', f'<break time="{pause_time}"/>').replace('/', f'<break time="{pause_time}"/>')
+        return text_with_pauses
+    
+    def _add_comma_pauses_plain_text(self, text: str, script_type: str) -> str:
+        """쉼표와 슬래시 위치에 자연스러운 휴지 추가 (일반 텍스트용)"""
+        pause_time = self._get_comma_pause_time(script_type)
+        # 쉼표와 슬래시를 실제 휴지 시간으로 대체
+        if pause_time == "0.5s":
+            pause_dots = "..."  # 인트로/회화용
+        elif pause_time == "0.6s":
+            pause_dots = "...."  # 엔딩용
+        elif pause_time == "0.2s":
+            pause_dots = "."  # 최소 휴지
+        else:
+            pause_dots = ".."  # 기본값
+        
+        # 쉼표와 슬래시 모두 휴지로 대체
+        text_with_pauses = text.replace(',', pause_dots).replace('/', pause_dots)
+        return text_with_pauses
+
+    def _get_comma_pause_time(self, script_type: str) -> str:
+        """스크립트 타입별 쉼표 휴지 시간 반환"""
+        
+        if script_type in ["인트로", "intro"]:
+            return "0.5s"  # 자연스러운 인사말
+        elif script_type in ["엔딩", "ending"]:
+            return "0.6s"  # 마무리 인사 (조금 더 느긋하게)
+        elif script_type in ["회화", "대화", "conversation"]:
+            return "0.5s"  # 회화에서도 0.5초 휴지
+        else:
+            return "0.3s"  # 기본값
+
+    def _create_emotional_ssml(self, text: str, emotion_settings: Dict[str, Any], 
+                              script_type: str = "conversation") -> str:
+        """감정 설정에 따른 SSML 생성 (쉼표 휴지 포함, 화자 제외)"""
+        
+        # 인트로/엔딩인 경우 쉼표에 휴지 추가
+        if script_type in ["인트로", "엔딩", "intro", "ending"]:
+            text = self._add_comma_pauses(text, script_type)
+        
+        # SSML에는 감정 표현만 포함 (화자는 별도로 지정)
+        return f"""<speak>
+<prosody rate="{emotion_settings['rate']}" 
+         pitch="{emotion_settings['pitch']}" 
+         volume="{emotion_settings['volume']}">
+    <emphasis level="{emotion_settings['emphasis']}">
+        {text}
+    </emphasis>
+</prosody>
+</speak>"""
+
+    def _synthesize_segment_audio(self, text: str, output_path: str, voice_name: str, 
+                                 language_code: str, script_type: str = "conversation") -> float:
+        """개별 세그먼트 오디오 생성 및 정확한 길이 반환 (감정 표현 및 휴지 포함)"""
         try:
             if not self.client:
                 print("❌ Google TTS 클라이언트가 초기화되지 않았습니다.")
                 return 0.0
             
-            synthesis_input = texttospeech.SynthesisInput(text=text)
+            # 감정 설정 가져오기
+            emotion_settings = self._get_emotion_settings(script_type)
+            
+            # 화자는 Google TTS API 호출 시에 별도로 지정
             voice = texttospeech.VoiceSelectionParams(language_code=language_code, name=voice_name)
             
+            # 감정 설정에 따른 AudioConfig 생성
+            audio_config = AudioConfig(
+                audio_encoding=AudioEncoding.MP3,
+                sample_rate_hertz=22050,
+                effects_profile_id=emotion_settings.get("effects_profile", ["headphone-class-device"])
+            )
+            
+            # SSML 사용 여부에 따라 입력 방식 결정
+            if emotion_settings.get("use_ssml", False):
+                # SSML로 감정 표현 및 휴지 포함 (화자는 별도 지정)
+                ssml_text = self._create_emotional_ssml(text, emotion_settings, script_type)
+                synthesis_input = texttospeech.SynthesisInput(ssml=ssml_text)
+                print(f"🎵 감정 표현 적용: {emotion_settings['description']}")
+                
+                # 휴지 시간 로깅
+                if script_type in ["인트로", "엔딩", "회화", "대화", "intro", "ending", "conversation"]:
+                    comma_count = text.count(',')
+                    slash_count = text.count('/')
+                    total_pause_count = comma_count + slash_count
+                    pause_time = self._get_comma_pause_time(script_type)
+                    pause_seconds = float(pause_time.replace('s', ''))
+                    total_pause_time = total_pause_count * pause_seconds
+                    
+                    if total_pause_count > 0:
+                        print(f"🎵 휴지 정보: 쉼표 {comma_count}개, 슬래시 {slash_count}개, 휴지 {pause_seconds}초씩, 총 {total_pause_time}초")
+            else:
+                # 일반 텍스트 (쉼표 휴지 포함)
+                text_with_pauses = self._add_comma_pauses_plain_text(text, script_type)
+                synthesis_input = texttospeech.SynthesisInput(text=text_with_pauses)
+                
+                # 휴지 시간 로깅
+                if script_type in ["인트로", "엔딩", "회화", "대화", "intro", "ending", "conversation"]:
+                    comma_count = text.count(',')
+                    slash_count = text.count('/')
+                    total_pause_count = comma_count + slash_count
+                    pause_time = self._get_comma_pause_time(script_type)
+                    pause_seconds = float(pause_time.replace('s', ''))
+                    total_pause_time = total_pause_count * pause_seconds
+                    
+                    if total_pause_count > 0:
+                        print(f"🎵 휴지 정보: 쉼표 {comma_count}개, 슬래시 {slash_count}개, 휴지 {pause_seconds}초씩, 총 {total_pause_time}초")
+            
+            # Google TTS API 호출 (화자는 voice 파라미터로 별도 지정)
             response = self.client.synthesize_speech(
                 input=synthesis_input,
                 voice=voice,
-                audio_config=self.audio_config
+                audio_config=audio_config
             )
             
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -190,7 +335,7 @@ class AudioGenerator:
                             screen1_audio_path = os.path.join(temp_dir, f"segment_{sequence:03d}_screen1.mp3")
                             screen1_duration = self._synthesize_segment_audio(
                                 native_script, screen1_audio_path, 
-                                voice_name=native_speaker, language_code="ko-KR"
+                                voice_name=native_speaker, language_code="ko-KR", script_type=script_type
                             )
                             if screen1_duration > 0:
                                 segment_paths_for_merge.append(screen1_audio_path)
@@ -233,7 +378,7 @@ class AudioGenerator:
                                     learner_voice = learner_speakers[i-1] if i-1 < len(learner_speakers) else learner_speakers[0]
                                     learner_duration = self._synthesize_segment_audio(
                                         text_to_speak, learner_audio_path,
-                                        voice_name=learner_voice, language_code="cmn-CN"
+                                        voice_name=learner_voice, language_code="cmn-CN", script_type=script_type
                                     )
                                     if learner_duration > 0:
                                         segment_paths_for_merge.append(learner_audio_path)
@@ -282,7 +427,7 @@ class AudioGenerator:
                                     audio_path = os.path.join(temp_dir, f"segment_{sequence:03d}_line_{line_idx+1:02d}.mp3")
                                     duration = self._synthesize_segment_audio(
                                         line, audio_path, 
-                                        voice_name=native_speaker, language_code="ko-KR"
+                                        voice_name=native_speaker, language_code="ko-KR", script_type=script_type
                                     )
                                     
                                     if duration > 0:

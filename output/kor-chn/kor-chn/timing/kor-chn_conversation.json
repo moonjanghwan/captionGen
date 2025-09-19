@@ -1,5 +1,5 @@
 {
-  "total_duration": 71.09,
+  "total_duration": 68.34,
   "segments": [
     {
       "name": "kor-chn_001_screen1.png",
@@ -11,64 +11,64 @@
     {
       "name": "kor-chn_001_screen2.png",
       "start_time": 2.18,
-      "end_time": 11.67,
-      "duration": 9.49,
+      "end_time": 11.2,
+      "duration": 9.02,
       "text": "你好！ 니 하오!"
     },
     {
       "name": "kor-chn_002_screen1.png",
-      "start_time": 11.67,
-      "end_time": 14.13,
-      "duration": 2.46,
+      "start_time": 11.2,
+      "end_time": 13.45,
+      "duration": 2.25,
       "text": "감사합니다."
     },
     {
       "name": "kor-chn_002_screen2.png",
-      "start_time": 14.13,
-      "end_time": 23.86,
-      "duration": 9.73,
+      "start_time": 13.45,
+      "end_time": 23.43,
+      "duration": 9.98,
       "text": "谢谢。 씨에 씨에"
     },
     {
       "name": "kor-chn_003_screen1.png",
-      "start_time": 23.86,
-      "end_time": 26.4,
-      "duration": 2.54,
+      "start_time": 23.43,
+      "end_time": 26.21,
+      "duration": 2.78,
       "text": "이거 얼마예요?"
     },
     {
       "name": "kor-chn_003_screen2.png",
-      "start_time": 26.4,
-      "end_time": 37.3,
-      "duration": 10.9,
+      "start_time": 26.21,
+      "end_time": 37.81,
+      "duration": 11.6,
       "text": "这个多少钱？ 쩌거 뚜오샤오 치엔?"
     },
     {
       "name": "kor-chn_004_screen1.png",
-      "start_time": 37.3,
-      "end_time": 41.17,
-      "duration": 3.87,
+      "start_time": 37.81,
+      "end_time": 41.19,
+      "duration": 3.38,
       "text": "죄송합니다 / 실례합니다."
     },
     {
       "name": "kor-chn_004_screen2.png",
-      "start_time": 41.17,
-      "end_time": 57.28,
-      "duration": 16.11,
+      "start_time": 41.19,
+      "end_time": 55.33,
+      "duration": 14.14,
       "text": "对不起 / 不好意思。 뙤이부치 / 뿌 하오 이쓰"
     },
     {
       "name": "kor-chn_005_screen1.png",
-      "start_time": 57.28,
-      "end_time": 59.46,
-      "duration": 2.18,
+      "start_time": 55.33,
+      "end_time": 57.35,
+      "duration": 2.02,
       "text": "안녕히 계세요."
     },
     {
       "name": "kor-chn_005_screen2.png",
-      "start_time": 59.46,
-      "end_time": 71.09,
-      "duration": 11.63,
+      "start_time": 57.35,
+      "end_time": 68.34,
+      "duration": 10.99,
       "text": "再见。 짜이찌엔"
     }
   ],

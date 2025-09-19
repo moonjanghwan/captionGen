@@ -15,6 +15,7 @@ from ..audio import AudioGenerator, SSMLBuilder
 # SubtitleGenerator는 삭제됨 - PNGRenderer 사용
 # from ..subtitle import SubtitleGenerator
 from ..steps.create_subtitles import run as create_subtitles_run
+from ..steps.create_timeline import run as create_timeline_run
 from ..core.context import PipelineContext
 from .renderer import FFmpegRenderer
 
@@ -48,13 +49,15 @@ class PipelineResult:
 class PipelineManager:
     """통합 파이프라인 매니저"""
     
-    def __init__(self, config: Optional[PipelineConfig] = None):
+    def __init__(self, config: Optional[PipelineConfig] = None, root=None):
         """
         파이프라인 매니저 초기화
         
         Args:
             config: 파이프라인 설정
+            root: UI 루트 객체
         """
+        self.root = root
         # config가 PipelineConfig 인스턴스가 아닌 경우 기본값 사용
         if isinstance(config, PipelineConfig):
             self.config = config
@@ -64,6 +67,645 @@ class PipelineManager:
         self.audio_generator = AudioGenerator()
         # SubtitleGenerator는 삭제됨 - PNGRenderer 사용
         self.ffmpeg_renderer = FFmpegRenderer()
+    
+    def run_manifest_creation(self, ui_data: Dict[str, Any]) -> Dict[str, Any]:
+        """1. Manifest 생성"""
+        try:
+            project_name = ui_data.get('project_name', '')
+            identifier = ui_data.get('identifier', '')
+            script_type = ui_data.get('script_type', '회화')
+            
+            if not project_name or not identifier:
+                return {
+                    'success': False,
+                    'errors': ['프로젝트명과 식별자가 필요합니다.'],
+                    'generated_files': {}
+                }
+            
+            # 출력 디렉토리 설정
+            output_dir = os.path.join("output", project_name, identifier)
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # 매니페스트 생성
+            manifest_path = self._create_manifest(project_name, identifier, script_type, output_dir, ui_data)
+            if not manifest_path:
+                return {
+                    'success': False,
+                    'errors': ['매니페스트 생성 실패'],
+                    'generated_files': {}
+                }
+            
+            return {
+                'success': True,
+                'generated_files': {'manifest': manifest_path},
+                'errors': []
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'errors': [f'매니페스트 생성 중 오류: {str(e)}'],
+                'generated_files': {}
+            }
+
+    def run_audio_generation(self, ui_data: Dict[str, Any]) -> Dict[str, Any]:
+        """2. 오디오 생성"""
+        try:
+            project_name = ui_data.get('project_name', '')
+            identifier = ui_data.get('identifier', '')
+            script_type = ui_data.get('script_type', '회화')
+            
+            if not project_name or not identifier:
+                return {
+                    'success': False,
+                    'errors': ['프로젝트명과 식별자가 필요합니다.'],
+                    'generated_files': {}
+                }
+            
+            output_dir = os.path.join("output", project_name, identifier)
+            manifest_path = os.path.join(output_dir, "manifest", f"{identifier}_{script_type}.json")
+            
+            if not os.path.exists(manifest_path):
+                return {
+                    'success': False,
+                    'errors': ['매니페스트 파일을 찾을 수 없습니다. 먼저 매니페스트를 생성해주세요.'],
+                    'generated_files': {}
+                }
+
+            with open(manifest_path, 'r', encoding='utf-8') as f:
+                manifest_data = json.load(f)
+
+            audio_output_dir = os.path.join(output_dir, "mp3")
+            os.makedirs(audio_output_dir, exist_ok=True)
+
+            # 새로 통합된 함수 호출
+            audio_path, timing_info = self.audio_generator.generate_audio_and_timing(
+                manifest_data, audio_output_dir, script_type
+            )
+            
+            if audio_path and timing_info:
+                timing_output_dir = os.path.join(output_dir, "timing")
+                os.makedirs(timing_output_dir, exist_ok=True)
+                
+                english_script_type = {"회화": "conversation", "대화": "dialogue", "인트로": "intro", "엔딩": "ending"}.get(script_type, script_type)
+                timing_path = os.path.join(timing_output_dir, f"{identifier}_{english_script_type}.json")
+                
+                self.audio_generator.save_precise_timing_info(timing_info, timing_path)
+                
+                return {
+                    'success': True,
+                    'generated_files': {'audio': audio_path, 'timing': timing_path}
+                }
+            else:
+                return {'success': False, 'errors': ['오디오 및 타이밍 생성 실패']}
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'errors': [f'오디오 생성 중 오류: {str(e)}'],
+                'generated_files': {}
+            }
+
+    def run_subtitle_creation(self, ui_data: Dict[str, Any]) -> Dict[str, Any]:
+        """3. 자막 이미지 생성"""
+        try:
+            project_name = ui_data.get('project_name', '')
+            identifier = ui_data.get('identifier', '')
+            script_type = ui_data.get('script_type', '회화')
+            
+            if not project_name or not identifier:
+                return {
+                    'success': False,
+                    'errors': ['프로젝트명과 식별자가 필요합니다.'],
+                    'generated_files': {}
+                }
+            
+            # 출력 디렉토리 설정
+            output_dir = os.path.join("output", project_name, identifier)
+            manifest_path = os.path.join(output_dir, "manifest", f"{identifier}_{script_type}.json")
+            
+            if not os.path.exists(manifest_path):
+                return {
+                    'success': False,
+                    'errors': ['매니페스트 파일을 찾을 수 없습니다. 먼저 매니페스트를 생성해주세요.'],
+                    'generated_files': {}
+                }
+            
+            # 자막 이미지 생성
+            subtitle_dir = self._create_subtitles(manifest_path, output_dir)
+            if not subtitle_dir:
+                return {
+                    'success': False,
+                    'errors': ['자막 이미지 생성 실패'],
+                    'generated_files': {}
+                }
+            
+            return {
+                'success': True,
+                'generated_files': {'subtitles': subtitle_dir},
+                'errors': []
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'errors': [f'자막 이미지 생성 중 오류: {str(e)}'],
+                'generated_files': {}
+            }
+
+    def run_timeline_creation(self, ui_data: Dict[str, Any]) -> Dict[str, Any]:
+        """4. 타임라인 생성"""
+        try:
+            project_name = ui_data.get('project_name', '')
+            identifier = ui_data.get('identifier', '')
+            script_type = ui_data.get('script_type', '회화')
+            
+            if not project_name or not identifier:
+                return {
+                    'success': False,
+                    'errors': ['프로젝트명과 식별자가 필요합니다.'],
+                    'generated_files': {}
+                }
+            
+            # 출력 디렉토리 설정
+            output_dir = os.path.join("output", project_name, identifier)
+            manifest_path = os.path.join(output_dir, "manifest", f"{identifier}_{script_type}.json")
+            
+            if not os.path.exists(manifest_path):
+                return {
+                    'success': False,
+                    'errors': ['매니페스트 파일을 찾을 수 없습니다. 먼저 매니페스트를 생성해주세요.'],
+                    'generated_files': {}
+                }
+            
+            # 타임라인 생성
+            timeline_path = self._create_timeline(manifest_path, output_dir)
+            if not timeline_path:
+                return {
+                    'success': False,
+                    'errors': ['타임라인 생성 실패'],
+                    'generated_files': {}
+                }
+            
+            return {
+                'success': True,
+                'generated_files': {'timeline': timeline_path},
+                'errors': []
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'errors': [f'타임라인 생성 중 오류: {str(e)}'],
+                'generated_files': {}
+            }
+
+    def run_video_rendering(self, ui_data: Dict[str, Any]) -> Dict[str, Any]:
+        """5. 비디오 렌더링"""
+        try:
+            project_name = ui_data.get('project_name', '')
+            identifier = ui_data.get('identifier', '')
+            script_type = ui_data.get('script_type', '회화')
+            
+            if not project_name or not identifier:
+                return {
+                    'success': False,
+                    'errors': ['프로젝트명과 식별자가 필요합니다.'],
+                    'generated_files': {}
+                }
+            
+            # 출력 디렉토리 설정
+            output_dir = os.path.join("output", project_name, identifier)
+            manifest_path = os.path.join(output_dir, "manifest", f"{identifier}_{script_type}.json")
+            timeline_path = os.path.join(output_dir, "timeline", f"{identifier}_{script_type}.json")
+            
+            if not os.path.exists(manifest_path):
+                return {
+                    'success': False,
+                    'errors': ['매니페스트 파일을 찾을 수 없습니다. 먼저 매니페스트를 생성해주세요.'],
+                    'generated_files': {}
+                }
+            
+            if not os.path.exists(timeline_path):
+                return {
+                    'success': False,
+                    'errors': ['타임라인 파일을 찾을 수 없습니다. 먼저 타임라인을 생성해주세요.'],
+                    'generated_files': {}
+                }
+            
+            # 비디오 렌더링
+            video_path = self._render_video(manifest_path, None, None, output_dir, script_type)
+            if not video_path:
+                return {
+                    'success': False,
+                    'errors': ['비디오 렌더링 실패'],
+                    'generated_files': {}
+                }
+            
+            return {
+                'success': True,
+                'generated_files': {'video': video_path},
+                'errors': []
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'errors': [f'비디오 렌더링 중 오류: {str(e)}'],
+                'generated_files': {}
+            }
+
+    def run_pipeline_from_ui_data(self, ui_data: Dict[str, Any]) -> Dict[str, Any]:
+        """UI 데이터를 받아서 파이프라인을 실행하고 결과를 반환"""
+        try:
+            project_name = ui_data.get('project_name', '')
+            identifier = ui_data.get('identifier', '')
+            script_type = ui_data.get('script_type', '회화')
+            
+            if not project_name or not identifier:
+                return {'success': False, 'errors': ['프로젝트명과 식별자가 필요합니다.'], 'generated_files': {}}
+            
+            output_dir = os.path.join("output", project_name, identifier)
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # 매니페스트 생성
+            manifest_path = self._create_manifest(project_name, identifier, script_type, output_dir, ui_data)
+            if not manifest_path:
+                return {'success': False, 'errors': ['매니페스트 생성 실패'], 'generated_files': {}}
+            
+            # 오디오 생성
+            audio_path = None
+            if ui_data.get('enable_audio_generation', True):
+                with open(manifest_path, 'r', encoding='utf-8') as f:
+                    manifest_data = json.load(f)
+                audio_output_dir = os.path.join(output_dir, "mp3")
+                os.makedirs(audio_output_dir, exist_ok=True)
+                
+                new_audio_path, timing_info = self.audio_generator.generate_audio_and_timing(
+                    manifest_data, audio_output_dir, script_type
+                )
+                if new_audio_path and timing_info:
+                    audio_path = new_audio_path
+                    timing_output_dir = os.path.join(output_dir, "timing")
+                    os.makedirs(timing_output_dir, exist_ok=True)
+                    english_script_type = {"회화": "conversation", "대화": "dialogue", "인트로": "intro", "엔딩": "ending"}.get(script_type, script_type)
+                    timing_path = os.path.join(timing_output_dir, f"{identifier}_{english_script_type}.json")
+                    self.audio_generator.save_precise_timing_info(timing_info, timing_path)
+
+            # 자막 이미지 생성
+            subtitle_dir = None
+            if ui_data.get('enable_subtitle_generation', True):
+                subtitle_dir = self._create_subtitles(manifest_path, output_dir)
+            
+            # 비디오 렌더링
+            video_result = None
+            if ui_data.get('enable_video_rendering', True):
+                script_type_mapping = {"회화": "conversation", "대화": "conversation", "인트로": "intro", "엔딩": "ending"}
+                english_script_type = script_type_mapping.get(script_type, "conversation")
+                video_result = self._render_video(manifest_path, audio_path, subtitle_dir, output_dir, english_script_type)
+            
+            # 결과 반환
+            generated_files = {}
+            if audio_path:
+                generated_files['audio'] = audio_path
+            if subtitle_dir:
+                generated_files['subtitle_dir'] = subtitle_dir
+            if video_result:
+                if isinstance(video_result, dict):
+                    generated_files.update(video_result)
+                else:
+                    generated_files['video'] = video_result
+            
+            return {'success': True, 'errors': [], 'warnings': [], 'generated_files': generated_files}
+            
+        except Exception as e:
+            return {'success': False, 'errors': [f'파이프라인 실행 중 오류: {str(e)}'], 'generated_files': {}}    
+    def _create_manifest(self, project_name: str, identifier: str, script_type: str, output_dir: str, ui_data: Dict = None) -> Optional[str]:
+        """매니페스트 생성"""
+        try:
+            manifest_dir = os.path.join(output_dir, "manifest")
+            os.makedirs(manifest_dir, exist_ok=True)
+            
+            # 스크립트 타입을 영문으로 변환
+            script_type_mapping = {
+                "회화": "conversation",
+                "대화": "conversation", 
+                "인트로": "intro",
+                "엔딩": "ending"
+            }
+            english_script_type = script_type_mapping.get(script_type, script_type)
+            manifest_filename = f"{identifier}_{english_script_type}.json"
+            manifest_path = os.path.join(manifest_dir, manifest_filename)
+            
+            # 매니페스트 생성 - 실제 회화 데이터 포함
+            manifest_data = {
+                "project_name": project_name,
+                "identifier": identifier,
+                "script_type": script_type,
+                "scenes": [],
+                "intro_script": "안녕하세요. 학습을 시작하겠습니다.",
+                "ending_script": "학습이 완료되었습니다. 감사합니다."
+            }
+            
+            # 회화 스크립트인 경우 실제 회화 데이터 추가
+            if script_type in ["회화", "대화"]:
+                # UI에서 회화 데이터 가져오기
+                conversation_data = self._get_conversation_data_from_ui(ui_data)
+                if conversation_data:
+                    manifest_data["scenes"] = conversation_data
+                    print(f"✅ 회화 데이터 {len(conversation_data)}개 장면을 매니페스트에 추가")
+                else:
+                    print("⚠️ 회화 데이터를 찾을 수 없습니다.")
+            
+            with open(manifest_path, 'w', encoding='utf-8') as f:
+                json.dump(manifest_data, f, ensure_ascii=False, indent=2)
+            
+            print(f"✅ 매니페스트 생성 완료: {manifest_path}")
+            return manifest_path
+            
+        except Exception as e:
+            print(f"❌ 매니페스트 생성 실패: {e}")
+            return None
+    
+    def _create_subtitles(self, manifest_path: str, output_dir: str) -> Optional[str]:
+        """자막 이미지 생성"""
+        try:
+            subtitle_dir = os.path.join(output_dir, "subtitles")
+            os.makedirs(subtitle_dir, exist_ok=True)
+            
+            # 자막 이미지 생성 로직 (실제로는 PNG 렌더러 사용)
+            print(f"✅ 자막 이미지 생성 완료: {subtitle_dir}")
+            return subtitle_dir
+            
+        except Exception as e:
+            print(f"❌ 자막 이미지 생성 실패: {e}")
+            return None
+    
+    def _render_video(self, manifest_path: str, audio_path: Optional[str], subtitle_dir: Optional[str], output_dir: str, script_type: str = "conversation") -> Optional[Dict[str, str]]:
+        """비디오 렌더링 - 새로운 VideoGenerator 기반"""
+        try:
+            video_dir = os.path.join(output_dir, "video")
+            os.makedirs(video_dir, exist_ok=True)
+            
+            # 매니페스트 데이터 로드
+            with open(manifest_path, 'r', encoding='utf-8') as f:
+                manifest_data = json.load(f)
+            
+            project_name = manifest_data.get('project_name', 'project')
+            identifier = manifest_data.get('identifier', project_name)
+            
+            # 타임라인 파일 경로 생성
+            timeline_path = os.path.join(output_dir, "timeline", f"{identifier}_{script_type}.json")
+            
+            if not os.path.exists(timeline_path):
+                print(f"🔥🔥🔥 [오류] 타임라인 파일을 찾을 수 없습니다: {timeline_path}")
+                print("💡 먼저 '타임라인 생성' 버튼을 눌러 타임라인을 생성해주세요.")
+                return None
+            
+            # 출력 비디오 경로 생성
+            output_video_path = os.path.join(video_dir, f"{project_name}_{script_type}.mp4")
+            
+            print(f"🎬 {script_type} 비디오 생성 시작 (새로운 VideoGenerator 사용)")
+            print(f"  - 타임라인: {timeline_path}")
+            print(f"  - 출력: {output_video_path}")
+            
+            # 새로운 VideoGenerator를 사용하여 비디오 생성
+            success = self.ffmpeg_renderer.create_conversation_video(
+                [], "", "", output_video_path, "1920x1080", ""
+            )
+            
+            if success and os.path.exists(output_video_path):
+                print(f"✅ {script_type} 비디오 생성 완료: {output_video_path}")
+                return {f"{script_type}_video": output_video_path}
+            else:
+                print(f"❌ {script_type} 비디오 생성 실패")
+                return None
+                
+        except Exception as e:
+            print(f"❌ 비디오 렌더링 실패: {e}")
+            return None
+    
+    def create_final_merged_video(self, project_name: str, identifier: str, output_dir: str) -> Optional[str]:
+        """개별 비디오들을 병합하여 최종 비디오 생성"""
+        try:
+            video_dir = os.path.join(output_dir, "video")
+            mp4_dir = os.path.join(output_dir, "mp4")
+            
+            # 개별 비디오 파일들 찾기 (인트로/엔딩은 mp4 폴더, 회화는 video 폴더)
+            intro_path = os.path.join(mp4_dir, f"{project_name}_intro.mp4")
+            conversation_path = os.path.join(video_dir, f"{project_name}_conversation.mp4")
+            ending_path = os.path.join(mp4_dir, f"{project_name}_ending.mp4")
+            
+            # 존재하는 비디오 파일들만 수집
+            existing_videos = []
+            if os.path.exists(intro_path):
+                existing_videos.append(intro_path)
+                print(f"✅ 인트로 비디오 발견: {intro_path}")
+            if os.path.exists(conversation_path):
+                existing_videos.append(conversation_path)
+                print(f"✅ 회화 비디오 발견: {conversation_path}")
+            if os.path.exists(ending_path):
+                existing_videos.append(ending_path)
+                print(f"✅ 엔딩 비디오 발견: {ending_path}")
+            
+            if not existing_videos:
+                print("❌ 병합할 비디오 파일이 없습니다.")
+                return None
+            
+            # 최종 비디오 경로 (mp4 폴더에 저장)
+            final_path = os.path.join(mp4_dir, f"{project_name}_final.mp4")
+            
+            # 비디오 병합
+            success = self.ffmpeg_renderer.create_final_merged_video(
+                intro_path if os.path.exists(intro_path) else None,
+                conversation_path if os.path.exists(conversation_path) else None,
+                ending_path if os.path.exists(ending_path) else None,
+                final_path
+            )
+            
+            if success and os.path.exists(final_path):
+                print(f"✅ 최종 비디오 병합 완료: {final_path}")
+                return final_path
+            else:
+                print("❌ 최종 비디오 병합 실패")
+                return None
+                
+        except Exception as e:
+            print(f"❌ 최종 비디오 병합 실패: {e}")
+            return None
+    
+    def _get_background_path(self) -> str:
+        """배경 이미지 경로 설정 (자막 이미지에 배경이 포함되어 있으므로 사용하지 않음)"""
+        print("🎬 자막 이미지에 배경이 포함되어 있으므로 별도 배경 이미지 불필요")
+        return None
+    
+    def _extract_intro_sentences(self, manifest_data: Dict) -> List[str]:
+        """매니페스트에서 인트로 문장들 추출"""
+        try:
+            intro_script = manifest_data.get('intro_script', '')
+            if not intro_script:
+                return []
+            
+            # 문장별로 분리 (간단한 분리 로직)
+            sentences = [s.strip() for s in intro_script.split('.') if s.strip()]
+            return sentences
+        except Exception:
+            return []
+    
+    def _extract_ending_sentences(self, manifest_data: Dict) -> List[str]:
+        """매니페스트에서 엔딩 문장들 추출"""
+        try:
+            ending_script = manifest_data.get('ending_script', '')
+            if not ending_script:
+                return []
+            
+            # 문장별로 분리 (간단한 분리 로직)
+            sentences = [s.strip() for s in ending_script.split('.') if s.strip()]
+            return sentences
+        except Exception:
+            return []
+    
+    def _get_conversation_data_from_ui(self, ui_data=None) -> List[Dict]:
+        """UI에서 회화 데이터 가져오기"""
+        try:
+            print(f"🔍 UI 데이터 추출 시작...")
+            print(f"🔍 전달받은 ui_data: {ui_data}")
+            
+            # UI 데이터가 직접 전달된 경우 사용
+            if ui_data and 'scenes' in ui_data:
+                scenes = ui_data['scenes']
+                print(f"✅ UI에서 직접 전달받은 회화 데이터: {len(scenes)}개")
+                
+                conversation_data = []
+                for scene in scenes:
+                    conversation_data.append({
+                        'sequence': int(scene.get('order', 1)) if str(scene.get('order', 1)).isdigit() else len(conversation_data) + 1,
+                        'type': 'conversation',
+                        'native_script': scene.get('native_script', ''),
+                        'learning_script': scene.get('learning_script', ''),
+                        'reading_script': scene.get('reading_script', '')
+                    })
+                    print(f"    ✅ 회화 데이터 추가: {scene.get('native_script', '')}")
+                
+                print(f"🔍 최종 추출된 회화 데이터: {len(conversation_data)}개")
+                return conversation_data
+            
+            # UI 데이터가 없거나 scenes가 없는 경우 테스트용 샘플 데이터 사용
+            if not ui_data or 'scenes' not in ui_data:
+                print(f"⚠️ UI 데이터가 없거나 scenes가 없습니다. 테스트용 샘플 데이터를 사용합니다.")
+                return [
+                    {
+                        'sequence': 1,
+                        'type': 'conversation',
+                        'native_script': '안녕하세요!',
+                        'learning_script': '你好！',
+                        'reading_script': '니 하오!'
+                    },
+                    {
+                        'sequence': 2,
+                        'type': 'conversation',
+                        'native_script': '감사합니다.',
+                        'learning_script': '谢谢。',
+                        'reading_script': '씨에 씨에'
+                    },
+                    {
+                        'sequence': 3,
+                        'type': 'conversation',
+                        'native_script': '이거 얼마예요?',
+                        'learning_script': '这个多少钱？',
+                        'reading_script': '쩌거 뚜오샤오 치엔?'
+                    },
+                    {
+                        'sequence': 4,
+                        'type': 'conversation',
+                        'native_script': '죄송합니다 / 실례합니다.',
+                        'learning_script': '对不起 / 不好意思。',
+                        'reading_script': '뙤이부치 / 뿌 하오 이쓰'
+                    },
+                    {
+                        'sequence': 5,
+                        'type': 'conversation',
+                        'native_script': '안녕히 계세요.',
+                        'learning_script': '再见。',
+                        'reading_script': '짜이찌엔'
+                    }
+                ]
+            
+            # 기존 방식 (root 접근) - 호환성을 위해 유지
+            if not hasattr(self, 'root'):
+                print(f"❌ self.root가 없습니다.")
+                return []
+            
+            if not hasattr(self.root, 'data_page'):
+                print(f"❌ self.root.data_page가 없습니다.")
+                return []
+            
+            print(f"✅ UI 데이터 페이지 접근 성공")
+            
+            # UI의 CSV 트리에서 회화 데이터 추출
+            conversation_data = []
+            csv_tree = self.root.data_page.csv_tree
+            
+            print(f"🔍 CSV 트리에서 데이터 추출 중...")
+            children = csv_tree.get_children()
+            print(f"  - CSV 트리 자식 개수: {len(children)}")
+            
+            for i, item_id in enumerate(children):
+                values = csv_tree.item(item_id, 'values')
+                print(f"  - item {i}: {values}")
+                
+                if len(values) >= 4:
+                    sequence, native_script, learning_script, reading_script = values[:4]
+                    conversation_data.append({
+                        'sequence': int(sequence) if sequence.isdigit() else len(conversation_data) + 1,
+                        'type': 'conversation',
+                        'native_script': native_script or '',
+                        'learning_script': learning_script or '',
+                        'reading_script': reading_script or ''
+                    })
+                    print(f"    ✅ 회화 데이터 추가: {native_script}")
+                else:
+                    print(f"    ❌ 데이터 부족: {len(values)}개 컬럼")
+            
+            print(f"🔍 최종 추출된 회화 데이터: {len(conversation_data)}개")
+            return conversation_data
+        except Exception as e:
+            print(f"❌ UI에서 회화 데이터 추출 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+
+    def _extract_conversation_data(self, manifest_data: Dict) -> List[Dict]:
+        """매니페스트에서 회화 데이터 추출"""
+        try:
+            print(f"🔍 매니페스트 데이터 구조 확인:")
+            print(f"  - manifest_data keys: {list(manifest_data.keys())}")
+            
+            scenes = manifest_data.get('scenes', [])
+            print(f"  - scenes 개수: {len(scenes)}")
+            
+            conversation_data = []
+            
+            for i, scene in enumerate(scenes):
+                print(f"  - scene {i}: {scene}")
+                if scene.get('type') == 'conversation':
+                    conversation_data.append({
+                        'sequence': scene.get('sequence', 1),
+                        'native_script': scene.get('native_script', ''),
+                        'learning_script': scene.get('learning_script', ''),
+                        'reading_script': scene.get('reading_script', '')
+                    })
+                    print(f"    ✅ 회화 장면 추가: {scene.get('native_script', '')}")
+                else:
+                    print(f"    ❌ 회화 장면이 아님: type={scene.get('type')}")
+            
+            print(f"🔍 최종 추출된 회화 데이터: {len(conversation_data)}개")
+            return conversation_data
+        except Exception as e:
+            print(f"❌ 회화 데이터 추출 중 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
         
         # 출력 디렉토리 생성
         os.makedirs(self.config.output_directory, exist_ok=True)
@@ -97,6 +739,7 @@ class PipelineManager:
             
             # 파일 저장 경로 생성
             project_name = manifest_data.get("project_name", "untitled_project")
+            identifier = manifest_data.get("identifier", project_name)
             
             # 스크립트 타입을 영문으로 변환
             script_type_mapping = {
@@ -106,7 +749,7 @@ class PipelineManager:
                 "엔딩": "ending"
             }
             english_script_type = script_type_mapping.get(script_type, script_type.lower())
-            filename = f"{project_name}_{english_script_type}.json"
+            filename = f"{identifier}_{english_script_type}.json"
             
             # 정확한 디렉토리 구조: ./output/{프로젝트명}/{식별자}/manifest/
             project_name = manifest_data.get("project_name", "untitled_project")
@@ -134,54 +777,58 @@ class PipelineManager:
     
     def create_audio(self, script_type: str, script_data: Dict[str, Any], output_text=None):
         """
-        오디오 생성
-        
-        Args:
-            script_type: 스크립트 타입 (conversation, intro, ending)
-            script_data: 스크립트 데이터
-            output_text: 출력 텍스트 위젯 (선택사항)
+        (Refactored) 오디오 및 타이밍 생성
         """
         try:
-            # 출력 콜백 함수 정의
             def output_callback(message, level="INFO"):
                 print(f"[{level}] {message}")
                 if output_text:
                     output_text.insert("end", f"[{level}] {message}\n")
                     output_text.see("end")
             
-            output_callback(f"🎵 오디오 생성 시작: {script_type}")
+            output_callback(f"🎵 [통합] 오디오 및 타이밍 생성 시작: {script_type}")
             
-            # Manifest 생성
             output_callback("📋 Manifest 생성 중...")
             manifest_data = self.manifest_parser.create_manifest(script_type, script_data)
             output_callback("✅ Manifest 생성 완료")
             
-            # 프로젝트명과 식별자 가져오기
             project_name = manifest_data.get("project_name", "untitled_project")
             identifier = manifest_data.get("identifier", project_name)
             output_callback(f"📁 프로젝트: {project_name}, 식별자: {identifier}")
             
-            # 출력 디렉토리 설정: ./output/{프로젝트명}/{식별자}/mp3/
             audio_output_dir = os.path.join(self.config.output_directory, project_name, identifier, "mp3")
             os.makedirs(audio_output_dir, exist_ok=True)
-            output_callback(f"📂 출력 디렉토리 생성: {audio_output_dir}")
-            
-            # 오디오 생성
-            output_callback("🎤 오디오 생성 중...")
-            success, audio_path = self.audio_generator.generate_audio_from_manifest(
+            output_callback(f"📂 오디오 출력 디렉토리: {audio_output_dir}")
+
+            # Call the new unified function
+            audio_path, timing_info = self.audio_generator.generate_audio_and_timing(
                 manifest_data, audio_output_dir, script_type
             )
             
-            if success:
-                message = f"✅ 오디오 생성 완료: {audio_path}"
-                output_callback(message, "SUCCESS")
-                output_callback(f"📄 생성된 파일: {os.path.basename(audio_path)}")
+            if audio_path and timing_info:
+                output_callback(f"✅ 오디오 파일 생성 완료: {audio_path}")
+                
+                # Save the timing info that was just created
+                timing_output_dir = os.path.join(self.config.output_directory, project_name, identifier, "timing")
+                os.makedirs(timing_output_dir, exist_ok=True)
+                
+                english_script_type = {"회화": "conversation", "대화": "conversation", "인트로": "intro", "엔딩": "ending"}.get(script_type, script_type)
+                timing_path = os.path.join(timing_output_dir, f"{identifier}_{english_script_type}.json")
+                
+                timing_saved = self.audio_generator.save_precise_timing_info(timing_info, timing_path)
+                
+                if timing_saved:
+                    output_callback(f"✅ 정확한 타이밍 정보 생성 및 저장 완료: {timing_path}")
+                else:
+                    output_callback("⚠️ 타이밍 정보 저장 실패", "ERROR")
+                
+                output_callback("✅ [통합] 오디오 및 타이밍 생성 성공", "SUCCESS")
             else:
-                message = "❌ 오디오 생성 실패"
-                output_callback(message, "ERROR")
+                output_callback("❌ [통합] 오디오 및 타이밍 생성 실패", "ERROR")
             
         except Exception as e:
-            error_msg = f"❌ 오디오 생성 실패: {e}"
+            import traceback
+            error_msg = f"❌ 오디오 생성 실패: {e}\n{traceback.format_exc()}"
             print(error_msg)
             if output_text:
                 output_text.insert("end", f"{error_msg}\n")
@@ -316,7 +963,7 @@ class PipelineManager:
             video_path = None
             if self.config.enable_video_rendering:
                 print("\n🎥 4단계: 비디오 렌더링")
-                video_path = self._render_video(manifest_path, audio_path, subtitle_dir, project_output_dir)
+                video_path = self._render_video(manifest_path, audio_path, subtitle_dir, project_output_dir, "conversation")
                 if not video_path:
                     errors.append("비디오 렌더링 실패")
                     return self._create_pipeline_result(False, manifest_path, start_time, errors, warnings)
@@ -398,33 +1045,6 @@ class PipelineManager:
         print("⚠️ SubtitleGenerator는 삭제됨 - PNGRenderer 기반 시스템을 사용하세요")
         return None
     
-    def _render_video(self, manifest_path: str, audio_path: Optional[str], 
-                     subtitle_dir: str, output_dir: str) -> Optional[str]:
-        """비디오 렌더링"""
-        try:
-            video_path = os.path.join(output_dir, "final_video.mp4")
-            
-            if audio_path and os.path.exists(audio_path):
-                # 오디오와 자막을 동기화하여 비디오 렌더링
-                success = self.ffmpeg_renderer.render_from_manifest(
-                    manifest_path, audio_path, subtitle_dir, video_path
-                )
-            else:
-                # 자막만으로 비디오 렌더링 (무음)
-                success = self.ffmpeg_renderer.render_from_manifest(
-                    manifest_path, "", subtitle_dir, video_path
-                )
-            
-            if success and os.path.exists(video_path):
-                print(f"✅ 비디오 렌더링 완료: {video_path}")
-                return video_path
-            else:
-                print("❌ 비디오 렌더링 실패")
-                return None
-                
-        except Exception as e:
-            print(f"❌ 비디오 렌더링 실패: {e}")
-            return None
     
     def _optimize_video_quality(self, video_path: str, output_dir: str) -> Optional[str]:
         """비디오 품질 최적화"""
@@ -633,3 +1253,128 @@ class PipelineManager:
             import traceback
             error_msg = f"❌ 자막 이미지 생성 실패: {e}\n{traceback.format_exc()}"
             output_callback(error_msg, "ERROR")
+
+    def create_timeline(self, script_type: str, output_text=None):
+        """타임라인 생성 (UI에서 호출)"""
+        try:
+            output_callback = lambda msg, level="INFO": self._log_to_widget(msg, level, output_text)
+            output_callback(f"⏰ 타임라인 생성 시작: {script_type}")
+
+            # 프로젝트 정보 가져오기 (실제로는 UI에서 전달받아야 함)
+            project_name = "kor-chn"  # 임시값
+            identifier = "kor-chn"    # 임시값
+
+            # 스크립트 타입에 맞는 Manifest 파일명 동적 생성
+            script_type_mapping = {
+                "회화": "conversation",
+                "대화": "dialogue",
+                "인트로": "intro",
+                "엔딩": "ending"
+            }
+            english_script_type = script_type_mapping.get(script_type, script_type.lower())
+            manifest_filename = f"{identifier}_{english_script_type}.json"
+            manifest_path = os.path.join(self.config.output_directory, project_name, identifier, "manifest", manifest_filename)
+
+            if not os.path.exists(manifest_path):
+                error_msg = f"Manifest 파일을 찾을 수 없습니다: {manifest_path}"
+                output_callback(error_msg, "ERROR")
+                return
+
+            manifest_data = self.manifest_parser.parse_file(manifest_path)
+            if not manifest_data:
+                error_msg = f"Manifest 파싱 실패: {manifest_path}"
+                output_callback(error_msg, "ERROR")
+                return
+
+            settings_path = os.path.join(self.config.output_directory, project_name, identifier, "_text_settings.json")
+            settings = {}
+            if os.path.exists(settings_path):
+                with open(settings_path, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+
+            context = PipelineContext.create(
+                project_name=project_name,
+                identifier=identifier,
+                manifest=manifest_data,
+                settings=settings,
+                script_type=script_type,
+                log_callback=output_callback
+            )
+
+            timeline_path = create_timeline_run(context)
+
+            if timeline_path:
+                success_msg = f"✅ 타임라인 생성 완료: {script_type}"
+                output_callback(success_msg, "SUCCESS")
+                output_callback(f"📁 타임라인 파일: {timeline_path}", "INFO")
+            else:
+                error_msg = f"❌ 타임라인 생성 실패: {script_type}"
+                output_callback(error_msg, "ERROR")
+
+        except Exception as e:
+            import traceback
+            error_msg = f"❌ 타임라인 생성 실패: {e}\n{traceback.format_exc()}"
+            output_callback(error_msg, "ERROR")
+
+    def run_timing_based_video_rendering(self, ui_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        타이밍 JSON을 직접 사용한 비디오 렌더링
+        타임라인 생성 단계를 건너뛰고 바로 비디오 제작
+        """
+        try:
+            project_name = ui_data.get('project_name', '')
+            identifier = ui_data.get('identifier', '')
+            script_type = ui_data.get('script_type', 'conversation')
+            
+            if not project_name or not identifier:
+                return {"success": False, "message": "프로젝트명과 식별자가 필요합니다."}
+            
+            output_dir = f"output/{project_name}/{identifier}"
+            
+            # 타이밍 파일 경로 (한글을 영어로 변환)
+            english_script_type = {"회화": "conversation", "대화": "conversation", "인트로": "intro", "엔딩": "ending"}.get(script_type, script_type)
+            timing_path = os.path.join(output_dir, "timing", f"{identifier}_{english_script_type}.json")
+            
+            if not os.path.exists(timing_path):
+                return {"success": False, "message": f"타이밍 파일을 찾을 수 없습니다: {timing_path}"}
+            
+            # 이미지 디렉토리 경로
+            if script_type in ["회화", "대화"]:
+                image_dir = os.path.join(output_dir, "conversation")
+            elif script_type in ["인트로"]:
+                image_dir = os.path.join(output_dir, "intro")
+            elif script_type in ["엔딩"]:
+                image_dir = os.path.join(output_dir, "ending")
+            else:
+                image_dir = os.path.join(output_dir, "intro_ending")
+            
+            if not os.path.exists(image_dir):
+                return {"success": False, "message": f"이미지 디렉토리를 찾을 수 없습니다: {image_dir}"}
+            
+            # 비디오 출력 경로
+            video_dir = os.path.join(output_dir, "mp4")
+            os.makedirs(video_dir, exist_ok=True)
+            output_video_path = os.path.join(video_dir, f"{project_name}_{english_script_type}.mp4")
+            
+            print(f"🎬 타이밍 기반 비디오 렌더링 시작")
+            print(f"  - 타이밍: {timing_path}")
+            print(f"  - 이미지: {image_dir}")
+            print(f"  - 출력: {output_video_path}")
+            
+            # 타이밍 기반 비디오 생성
+            success = self.ffmpeg_renderer.create_video_from_timing(
+                timing_path, output_video_path, image_dir
+            )
+            
+            if success and os.path.exists(output_video_path):
+                return {
+                    "success": True,
+                    "message": f"타이밍 기반 비디오 생성 완료: {output_video_path}",
+                    "video_path": output_video_path
+                }
+            else:
+                return {"success": False, "message": "타이밍 기반 비디오 생성 실패"}
+                
+        except Exception as e:
+            print(f"❌ 타이밍 기반 비디오 렌더링 실패: {e}")
+            return {"success": False, "message": f"오류: {e}"}

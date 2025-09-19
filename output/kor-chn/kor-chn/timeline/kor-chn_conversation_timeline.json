@@ -1,0 +1,97 @@
+{
+  "resolution": "1920x1080",
+  "final_audio_path": "output/kor-chn/kor-chn/mp3/kor-chn_conversation.mp3",
+  "total_duration": 61.936327,
+  "timeline": [
+    {
+      "scene_id": "scene_1_screen1_start_to_scene_1_screen1_end",
+      "start_time": 0.0,
+      "end_time": 1.2,
+      "duration": 1.2,
+      "image_path": "output/kor-chn/kor-chn/conversation/kor-chn_001_screen1.png",
+      "scene_type": "conversation",
+      "sequence": 1
+    },
+    {
+      "scene_id": "scene_1_screen2_start_to_scene_1_screen2_end",
+      "start_time": 2.2,
+      "end_time": 3.9,
+      "duration": 1.7,
+      "image_path": "output/kor-chn/kor-chn/conversation/kor-chn_001_screen2.png",
+      "scene_type": "conversation",
+      "sequence": 1
+    },
+    {
+      "scene_id": "scene_2_screen1_start_to_scene_2_screen1_end",
+      "start_time": 4.9,
+      "end_time": 6.1,
+      "duration": 1.2,
+      "image_path": "output/kor-chn/kor-chn/conversation/kor-chn_002_screen1.png",
+      "scene_type": "conversation",
+      "sequence": 2
+    },
+    {
+      "scene_id": "scene_2_screen2_start_to_scene_2_screen2_end",
+      "start_time": 7.1,
+      "end_time": 8.9,
+      "duration": 1.8,
+      "image_path": "output/kor-chn/kor-chn/conversation/kor-chn_002_screen2.png",
+      "scene_type": "conversation",
+      "sequence": 2
+    },
+    {
+      "scene_id": "scene_3_screen1_start_to_scene_3_screen1_end",
+      "start_time": 9.9,
+      "end_time": 11.1,
+      "duration": 1.2,
+      "image_path": "output/kor-chn/kor-chn/conversation/kor-chn_003_screen1.png",
+      "scene_type": "conversation",
+      "sequence": 3
+    },
+    {
+      "scene_id": "scene_3_screen2_start_to_scene_3_screen2_end",
+      "start_time": 12.1,
+      "end_time": 15.7,
+      "duration": 3.6,
+      "image_path": "output/kor-chn/kor-chn/conversation/kor-chn_003_screen2.png",
+      "scene_type": "conversation",
+      "sequence": 3
+    },
+    {
+      "scene_id": "scene_4_screen1_start_to_scene_4_screen1_end",
+      "start_time": 16.7,
+      "end_time": 18.8,
+      "duration": 2.2,
+      "image_path": "output/kor-chn/kor-chn/conversation/kor-chn_004_screen1.png",
+      "scene_type": "conversation",
+      "sequence": 4
+    },
+    {
+      "scene_id": "scene_4_screen2_start_to_scene_4_screen2_end",
+      "start_time": 19.8,
+      "end_time": 24.1,
+      "duration": 4.3,
+      "image_path": "output/kor-chn/kor-chn/conversation/kor-chn_004_screen2.png",
+      "scene_type": "conversation",
+      "sequence": 4
+    },
+    {
+      "scene_id": "scene_5_screen1_start_to_scene_5_screen1_end",
+      "start_time": 25.1,
+      "end_time": 26.4,
+      "duration": 1.3,
+      "image_path": "output/kor-chn/kor-chn/conversation/kor-chn_005_screen1.png",
+      "scene_type": "conversation",
+      "sequence": 5
+    },
+    {
+      "scene_id": "scene_5_screen2_start_to_scene_5_screen2_end",
+      "start_time": 27.4,
+      "end_time": 29.2,
+      "duration": 1.8,
+      "image_path": "output/kor-chn/kor-chn/conversation/kor-chn_005_screen2.png",
+      "scene_type": "conversation",
+      "sequence": 5
+    }
+  ]
+}

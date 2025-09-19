@@ -187,23 +187,32 @@ class UIIntegratedPipelineManager:
             # 6단계: 비디오 렌더링
             if self.config.enable_video_rendering:
                 self.progress_logger.start_step("비디오 렌더링")
-                video_path = self._render_video(manifest_path, generated_files.get("audio"), subtitle_dir)
-                if video_path:
-                    generated_files["video"] = video_path
-                    self.progress_logger.complete_step("비디오 렌더링", f"비디오 렌더링 완료: {video_path}")
+                video_result = self._render_video(manifest_path, generated_files.get("audio"), subtitle_dir)
+                if video_result:
+                    # 비디오 결과가 딕셔너리인 경우 (개별 비디오 파일들 포함)
+                    if isinstance(video_result, dict):
+                        generated_files.update(video_result)
+                        main_video = video_result.get("video")
+                        if main_video:
+                            self.progress_logger.complete_step("비디오 렌더링", f"비디오 렌더링 완료: {main_video}")
+                    else:
+                        # 단일 비디오 파일인 경우 (기존 방식)
+                        generated_files["video"] = video_result
+                        self.progress_logger.complete_step("비디오 렌더링", f"비디오 렌더링 완료: {video_result}")
                     
-                    # 품질 최적화 (선택적)
-                    if self.config.enable_quality_optimization:
+                    # 품질 최적화 (선택적) - 메인 비디오에 대해서만
+                    main_video_path = generated_files.get("video")
+                    if main_video_path and self.config.enable_quality_optimization:
                         self.progress_logger.log_info("품질 최적화 시작")
-                        optimized_path = self._optimize_video_quality(video_path)
+                        optimized_path = self._optimize_video_quality(main_video_path)
                         if optimized_path:
                             generated_files["video_optimized"] = optimized_path
                             self.progress_logger.log_info("품질 최적화 완료")
                     
-                    # 프리뷰 생성 (선택적)
-                    if self.config.enable_preview_generation:
+                    # 프리뷰 생성 (선택적) - 메인 비디오에 대해서만
+                    if main_video_path and self.config.enable_preview_generation:
                         self.progress_logger.log_info("프리뷰 생성 시작")
-                        preview_path = self._create_preview(video_path)
+                        preview_path = self._create_preview(main_video_path)
                         if preview_path:
                             generated_files["preview"] = preview_path
                             self.progress_logger.log_info("프리뷰 생성 완료")
@@ -359,18 +368,88 @@ class UIIntegratedPipelineManager:
     
     def _render_video(self, manifest_path: str, audio_path: Optional[str], 
                      subtitle_dir: str) -> Optional[str]:
-        """비디오 렌더링"""
+        """비디오 렌더링 - 제작 사양서에 따른 회화/인트로/엔딩 비디오 생성"""
         try:
-            filename = self.file_manager.generate_final_video_filename(self.config.project_name)
-            filepath = self.file_manager.get_full_path(self.project_dirs["video"], filename)
+            # 1. 매니페스트 데이터 로드
+            manifest_data = self.manifest_manager.load_manifest(manifest_path)
+            if not manifest_data:
+                self.progress_logger.log_error("매니페스트 데이터 로드 실패")
+                return None
             
-            success = self.ffmpeg_renderer.render_from_manifest(
-                manifest_path, audio_path or "", subtitle_dir, filepath
+            # 2. 배경 이미지 경로 설정
+            background_path = self._get_background_path()
+            
+            # 3. 해상도 설정
+            resolution = "1920x1080"  # 기본 해상도
+            
+            # 4. 각 비디오 생성
+            intro_video_path = None
+            conversation_video_path = None
+            ending_video_path = None
+            
+            # 인트로 비디오 생성
+            intro_sentences = self._extract_intro_sentences(manifest_data)
+            if intro_sentences:
+                intro_filename = f"{self.config.project_name}_intro.mp4"
+                intro_path = self.file_manager.get_full_path(self.project_dirs["video"], intro_filename)
+                
+                success = self.ffmpeg_renderer.create_intro_ending_video(
+                    intro_sentences, audio_path or "", subtitle_dir, intro_path, 
+                    resolution, background_path, "intro"
+                )
+                if success:
+                    intro_video_path = intro_path
+                    self.progress_logger.log_info(f"인트로 비디오 생성 완료: {intro_path}")
+            
+            # 회화 비디오 생성
+            conversation_data = self._extract_conversation_data(manifest_data)
+            if conversation_data:
+                conversation_filename = f"{self.config.project_name}_conversation.mp4"
+                conversation_path = self.file_manager.get_full_path(self.project_dirs["video"], conversation_filename)
+                
+                success = self.ffmpeg_renderer.create_conversation_video(
+                    conversation_data, audio_path or "", subtitle_dir, conversation_path,
+                    resolution, background_path
+                )
+                if success:
+                    conversation_video_path = conversation_path
+                    self.progress_logger.log_info(f"회화 비디오 생성 완료: {conversation_path}")
+            
+            # 엔딩 비디오 생성
+            ending_sentences = self._extract_ending_sentences(manifest_data)
+            if ending_sentences:
+                ending_filename = f"{self.config.project_name}_ending.mp4"
+                ending_path = self.file_manager.get_full_path(self.project_dirs["video"], ending_filename)
+                
+                success = self.ffmpeg_renderer.create_intro_ending_video(
+                    ending_sentences, audio_path or "", subtitle_dir, ending_path,
+                    resolution, background_path, "ending"
+                )
+                if success:
+                    ending_video_path = ending_path
+                    self.progress_logger.log_info(f"엔딩 비디오 생성 완료: {ending_path}")
+            
+            # 5. 최종 비디오 병합
+            final_filename = f"{self.config.project_name}_final.mp4"
+            final_path = self.file_manager.get_full_path(self.project_dirs["video"], final_filename)
+            
+            success = self.ffmpeg_renderer.create_final_merged_video(
+                intro_video_path, conversation_video_path, ending_video_path, final_path
             )
             
-            if success and os.path.exists(filepath):
-                return filepath
+            if success and os.path.exists(final_path):
+                self.progress_logger.log_info(f"최종 비디오 생성 완료: {final_path}")
+                # 개별 비디오 파일들도 결과에 포함
+                result_files = {"video": final_path}
+                if intro_video_path:
+                    result_files["intro_video"] = intro_video_path
+                if conversation_video_path:
+                    result_files["conversation_video"] = conversation_video_path
+                if ending_video_path:
+                    result_files["ending_video"] = ending_video_path
+                return result_files
             else:
+                self.progress_logger.log_error("최종 비디오 생성 실패")
                 return None
                 
         except Exception as e:
@@ -394,6 +473,66 @@ class UIIntegratedPipelineManager:
             self.progress_logger.log_error(f"품질 최적화 실패: {e}")
             return None
     
+    def _get_background_path(self) -> str:
+        """배경 이미지 경로 반환"""
+        try:
+            # 기본 배경 이미지 경로 (assets/background 폴더에서 첫 번째 이미지 사용)
+            background_dir = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "background")
+            if os.path.exists(background_dir):
+                bg_files = [f for f in os.listdir(background_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+                if bg_files:
+                    return os.path.join(background_dir, bg_files[0])
+            
+            # 기본 검은색 배경 (fallback)
+            return "black"
+        except Exception:
+            return "black"
+    
+    def _extract_intro_sentences(self, manifest_data: Dict) -> List[str]:
+        """매니페스트에서 인트로 문장들 추출"""
+        try:
+            intro_script = manifest_data.get('intro_script', '')
+            if not intro_script:
+                return []
+            
+            # 문장별로 분리 (간단한 분리 로직)
+            sentences = [s.strip() for s in intro_script.split('.') if s.strip()]
+            return sentences
+        except Exception:
+            return []
+    
+    def _extract_ending_sentences(self, manifest_data: Dict) -> List[str]:
+        """매니페스트에서 엔딩 문장들 추출"""
+        try:
+            ending_script = manifest_data.get('ending_script', '')
+            if not ending_script:
+                return []
+            
+            # 문장별로 분리 (간단한 분리 로직)
+            sentences = [s.strip() for s in ending_script.split('.') if s.strip()]
+            return sentences
+        except Exception:
+            return []
+    
+    def _extract_conversation_data(self, manifest_data: Dict) -> List[Dict]:
+        """매니페스트에서 회화 데이터 추출"""
+        try:
+            scenes = manifest_data.get('scenes', [])
+            conversation_data = []
+            
+            for scene in scenes:
+                if scene.get('type') == 'conversation':
+                    conversation_data.append({
+                        'sequence': scene.get('sequence', 1),
+                        'native_script': scene.get('native_script', ''),
+                        'learning_script': scene.get('learning_script', ''),
+                        'reading_script': scene.get('reading_script', '')
+                    })
+            
+            return conversation_data
+        except Exception:
+            return []
+
     def _create_preview(self, video_path: str) -> Optional[str]:
         """프리뷰 생성"""
         try:

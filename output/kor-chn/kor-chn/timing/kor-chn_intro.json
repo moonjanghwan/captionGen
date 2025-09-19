@@ -1,0 +1,48 @@
+{
+  "total_duration": 33.57,
+  "segments": [
+    {
+      "name": "kor-chn_intro_001.png",
+      "start_time": 0.0,
+      "end_time": 2.7,
+      "duration": 2.7,
+      "text": "여러분, 안녕하세요!"
+    },
+    {
+      "name": "kor-chn_intro_002.png",
+      "start_time": 2.7,
+      "end_time": 8.79,
+      "duration": 6.09,
+      "text": "중국어 왕초보 탈출을 위한 필수 채널, '차이나톡'에 오신 걸 환영합니다!"
+    },
+    {
+      "name": "kor-chn_intro_003.png",
+      "start_time": 8.79,
+      "end_time": 17.13,
+      "duration": 8.34,
+      "text": "오늘은 여러분이 중국 현지에서 바로 쓸 수 있는 '일상생활 필수 중국어 회화' 5가지를 배워볼 거예요."
+    },
+    {
+      "name": "kor-chn_intro_004.png",
+      "start_time": 17.13,
+      "end_time": 24.35,
+      "duration": 7.22,
+      "text": "카페에서 주문할 때, 길을 물어볼 때, 인사할 때 등 정말 유용하게 쓰일 표현들이 가득하니까요."
+    },
+    {
+      "name": "kor-chn_intro_005.png",
+      "start_time": 24.35,
+      "end_time": 30.13,
+      "duration": 5.78,
+      "text": "지금 바로 저와 함께 쉽고 재미있게 중국어 실력을 키워볼까요?"
+    },
+    {
+      "name": "kor-chn_intro_006.png",
+      "start_time": 30.13,
+      "end_time": 33.57,
+      "duration": 3.44,
+      "text": "준비되셨나요? 그럼 시작해볼까요!"
+    }
+  ],
+  "final_audio_path": "output/kor-chn/kor-chn/mp3/kor-chn_intro.mp3"
+}

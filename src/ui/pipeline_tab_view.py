@@ -408,10 +408,13 @@ class PipelineTabView(ctk.CTkFrame):
         
         buttons = {
             "📋 Manifest 생성": (self._create_manifest, "#3498DB", "#2980B9"),
-            "🎵 오디오 생성": (self._create_audio, "#E67E22", "#D35400"),
-            "📝 자막 이미지 생성": (self._create_subtitles, "#9B59B6", "#8E44AD"),
-            "🎬 비디오 렌더링": (self._render_video, "#27AE60", "#229954"),
-            "🚀 최종 생성": (self._final_generation, "#F1C40F", "#F39C12")
+            "🎵 오디오 생성": (self._create_audio, "#3498DB", "#2980B9"),
+            "📝 자막 이미지 생성": (self._create_subtitles, "#3498DB", "#2980B9"),
+            "⏰ 타임라인 생성": (self._create_timeline, "#3498DB", "#2980B9"),
+            "🎬 비디오 렌더링": (self._render_video, "#3498DB", "#2980B9"),
+            "⚡ 타이밍 기반 렌더링": (self._timing_based_render, "#E74C3C", "#C0392B"),
+            "🔗 최종 병합": (self._merge_final_video, "#3498DB", "#2980B9"),
+            "🚀 자동 생성": (self._auto_generation, "#3498DB", "#2980B9")
         }
 
         for text, (command, fg_color, hover_color) in buttons.items():
@@ -485,25 +488,88 @@ class PipelineTabView(ctk.CTkFrame):
     
     def _get_current_script_data_from_ui(self, script_type: str) -> Optional[Any]:
         """현재 UI에 표시된 스크립트 데이터를 추출합니다."""
+        print(f"🔍 UI 데이터 추출 시작 - script_type: {script_type}")
+        
         # 프로젝트명과 식별자 가져오기
         project_name = "kor-chn"  # 기본값
         identifier = "kor-chn"    # 기본값
-        if hasattr(self, 'root') and hasattr(self.root, 'data_page'):
-            project_name = self.root.data_page.project_name_var.get() or "kor-chn"
-            identifier = self.root.data_page.identifier_var.get() or project_name
+        
+        print(f"🔍 self.root 존재 여부: {hasattr(self, 'root')}")
+        if hasattr(self, 'root'):
+            print(f"🔍 self.root.data_page 존재 여부: {hasattr(self.root, 'data_page')}")
+            if hasattr(self.root, 'data_page'):
+                project_name = self.root.data_page.project_name_var.get() or "kor-chn"
+                identifier = self.root.data_page.identifier_var.get() or project_name
+                print(f"✅ 프로젝트명: {project_name}, 식별자: {identifier}")
+            else:
+                print(f"❌ self.root.data_page가 없습니다.")
+        else:
+            print(f"❌ self.root가 없습니다.")
         
         if script_type in ["회화", "대화"]:
             scenes = []
-            for item_id in self.csv_tree.get_children():
-                values = self.csv_tree.item(item_id, 'values')
-                # Ensure values has enough elements, pad with empty strings if necessary
-                padded_values = (list(values) + [''] * 4)[:4] 
-                scenes.append({
-                    "order": padded_values[0],
-                    "native_script": padded_values[1],
-                    "learning_script": padded_values[2],
-                    "reading_script": padded_values[3]
-                })
+            print(f"🔍 회화 데이터 추출 시작...")
+            
+            if hasattr(self, 'root') and hasattr(self.root, 'data_page'):
+                print(f"✅ UI 데이터 페이지 접근 성공")
+                csv_tree = self.root.data_page.csv_tree
+                children = csv_tree.get_children()
+                print(f"🔍 CSV 트리 자식 개수: {len(children)}")
+                
+                for i, item_id in enumerate(children):
+                    values = csv_tree.item(item_id, 'values')
+                    print(f"  - item {i}: {values}")
+                    # Ensure values has enough elements, pad with empty strings if necessary
+                    padded_values = (list(values) + [''] * 4)[:4] 
+                    scenes.append({
+                        "order": padded_values[0],
+                        "native_script": padded_values[1],
+                        "learning_script": padded_values[2],
+                        "reading_script": padded_values[3]
+                    })
+                    print(f"    ✅ 회화 데이터 추가: {padded_values[1]}")
+                
+                print(f"🔍 최종 추출된 scenes 개수: {len(scenes)}")
+                
+                # CSV 트리에 데이터가 없으면 테스트용 샘플 데이터 추가
+                if len(scenes) == 0:
+                    print(f"⚠️ CSV 트리에 데이터가 없습니다. 테스트용 샘플 데이터를 추가합니다.")
+                    scenes = [
+                        {
+                            "order": "1",
+                            "native_script": "안녕하세요!",
+                            "learning_script": "你好！",
+                            "reading_script": "니 하오!"
+                        },
+                        {
+                            "order": "2",
+                            "native_script": "감사합니다.",
+                            "learning_script": "谢谢。",
+                            "reading_script": "씨에 씨에"
+                        },
+                        {
+                            "order": "3",
+                            "native_script": "이거 얼마예요?",
+                            "learning_script": "这个多少钱？",
+                            "reading_script": "쩌거 뚜오샤오 치엔?"
+                        },
+                        {
+                            "order": "4",
+                            "native_script": "죄송합니다 / 실례합니다.",
+                            "learning_script": "对不起 / 不好意思。",
+                            "reading_script": "뙤이부치 / 뿌 하오 이쓰"
+                        },
+                        {
+                            "order": "5",
+                            "native_script": "안녕히 계세요.",
+                            "learning_script": "再见。",
+                            "reading_script": "짜이찌엔"
+                        }
+                    ]
+                    print(f"✅ 테스트용 샘플 데이터 {len(scenes)}개 추가 완료")
+            else:
+                print(f"❌ UI 데이터 페이지에 접근할 수 없습니다.")
+            
             return {
                 "project_name": project_name,
                 "identifier": identifier,
@@ -577,13 +643,174 @@ class PipelineTabView(ctk.CTkFrame):
         thread = threading.Thread(target=self.pipeline_manager.create_subtitles, args=(script_type, self.output_text,)) 
         thread.start()
 
-    def _render_video(self):
-        """비디오 렌더링"""
-        self._add_output_message("🎬 비디오 렌더링 기능은 구현 중입니다.", "WARNING")
-        # ... (Implementation will use pipeline_manager)
+    def _create_timeline(self):
+        """타임라인 생성"""
+        if not PIPELINE_AVAILABLE:
+            messagebox.showerror("오류", "파이프라인 모듈을 사용할 수 없습니다.")
+            return
+        
+        script_type = self.script_var.get()
+        thread = threading.Thread(target=self.pipeline_manager.create_timeline, args=(script_type, self.output_text,)) 
+        thread.start()
 
-    def _final_generation(self):
-        self._add_output_message("🚀 최종 생성 기능은 구현 중입니다.", "WARNING")
+    def _render_video(self):
+        """비디오 렌더링 - 제작 사양서에 따른 회화/인트로/엔딩 비디오 생성"""
+        # 프로젝트 설정 검증
+        project_name = self.root.data_page.project_name_var.get() if self.root and hasattr(self.root, 'data_page') else ""
+        identifier = self.root.data_page.identifier_var.get() if self.root and hasattr(self.root, 'data_page') else ""
+        
+        if not project_name or not identifier:
+            self._add_output_message("❌ 프로젝트명과 식별자를 먼저 설정해주세요.", "ERROR")
+            return
+        
+        self._add_output_message("🎬 비디오 렌더링 시작...", "INFO")
+        
+        def run_render():
+            try:
+                # UI 데이터 수집
+                ui_data = self._collect_ui_data()
+                
+                # 파이프라인 실행
+                result = self.pipeline_manager.run_pipeline_from_ui_data(ui_data)
+                
+                if result.get('success', False):
+                    self._add_output_message("✅ 비디오 렌더링 완료!", "SUCCESS")
+                    
+                    # 생성된 비디오 파일들 표시
+                    generated_files = result.get('generated_files', {})
+                    if generated_files.get("video"):
+                        self._add_output_message(f"📁 최종 비디오: {generated_files['video']}", "INFO")
+                    if generated_files.get("intro_video"):
+                        self._add_output_message(f"📁 인트로 비디오: {generated_files['intro_video']}", "INFO")
+                    if generated_files.get("conversation_video"):
+                        self._add_output_message(f"📁 회화 비디오: {generated_files['conversation_video']}", "INFO")
+                    if generated_files.get("ending_video"):
+                        self._add_output_message(f"📁 엔딩 비디오: {generated_files['ending_video']}", "INFO")
+                else:
+                    self._add_output_message("❌ 비디오 렌더링 실패", "ERROR")
+                    for error in result.get('errors', []):
+                        self._add_output_message(f"  - {error}", "ERROR")
+                
+            except Exception as e:
+                self._add_output_message(f"❌ 비디오 렌더링 중 오류 발생: {e}", "ERROR")
+        
+        # 백그라운드에서 실행
+        threading.Thread(target=run_render, daemon=True).start()
+
+    def _collect_ui_data(self):
+        """UI에서 데이터를 수집하여 파이프라인에 전달"""
+        try:
+            project_name = self.root.data_page.project_name_var.get() if self.root and hasattr(self.root, 'data_page') else ""
+            identifier = self.root.data_page.identifier_var.get() if self.root and hasattr(self.root, 'data_page') else ""
+            
+            return {
+                'project_name': project_name,
+                'identifier': identifier,
+                'script_type': self.script_var.get(),
+                'enable_audio_generation': True,
+                'enable_subtitle_generation': True,
+                'enable_video_rendering': True,
+                'enable_quality_optimization': False,
+                'enable_preview_generation': False
+            }
+        except Exception as e:
+            self._add_output_message(f"❌ UI 데이터 수집 실패: {e}", "ERROR")
+            return {}
+
+    def _auto_generation(self):
+        """자동 생성 - A~G 단계를 순차적으로 자동 실행"""
+        # 프로젝트 설정 검증
+        project_name = self.root.data_page.project_name_var.get() if self.root and hasattr(self.root, 'data_page') else ""
+        identifier = self.root.data_page.identifier_var.get() if self.root and hasattr(self.root, 'data_page') else ""
+        
+        if not project_name or not identifier:
+            self._add_output_message("❌ 프로젝트명과 식별자를 먼저 설정해주세요.", "ERROR")
+            return
+        
+        self._add_output_message("🚀 자동 생성 시작 - 전체 파이프라인 실행...", "INFO")
+        
+        def run_auto_generation():
+            try:
+                # UI 데이터 수집
+                ui_data = self._collect_ui_data()
+                
+                # 1. 매니페스트 생성
+                self._add_output_message("📋 1단계: 매니페스트 생성...", "INFO")
+                manifest_result = self.pipeline_manager.run_manifest_creation(ui_data)
+                if not manifest_result.get('success', False):
+                    self._add_output_message("❌ 매니페스트 생성 실패", "ERROR")
+                    return
+                
+                # 2. 오디오 생성
+                self._add_output_message("🎵 2단계: 오디오 생성...", "INFO")
+                audio_result = self.pipeline_manager.run_audio_generation(ui_data)
+                if not audio_result.get('success', False):
+                    self._add_output_message("❌ 오디오 생성 실패", "ERROR")
+                    return
+                
+                # 3. 자막 이미지 생성
+                self._add_output_message("📝 3단계: 자막 이미지 생성...", "INFO")
+                subtitle_result = self.pipeline_manager.run_subtitle_creation(ui_data)
+                if not subtitle_result.get('success', False):
+                    self._add_output_message("❌ 자막 이미지 생성 실패", "ERROR")
+                    return
+                
+                # 4. 타임라인 생성
+                self._add_output_message("⏰ 4단계: 타임라인 생성...", "INFO")
+                timeline_result = self.pipeline_manager.run_timeline_creation(ui_data)
+                if not timeline_result.get('success', False):
+                    self._add_output_message("❌ 타임라인 생성 실패", "ERROR")
+                    return
+                
+                # 5. 비디오 렌더링
+                self._add_output_message("🎬 5단계: 비디오 렌더링...", "INFO")
+                video_result = self.pipeline_manager.run_video_rendering(ui_data)
+                if not video_result.get('success', False):
+                    self._add_output_message("❌ 비디오 렌더링 실패", "ERROR")
+                    return
+                
+                # 6. 최종 병합
+                self._add_output_message("🔗 6단계: 최종 병합...", "INFO")
+                merge_result = self.pipeline_manager.create_final_merged_video(project_name, identifier, f"output/{project_name}/{identifier}")
+                if not merge_result:
+                    self._add_output_message("❌ 최종 병합 실패", "ERROR")
+                    return
+                
+                self._add_output_message("✅ 자동 생성 완료! 모든 단계가 성공적으로 완료되었습니다.", "SUCCESS")
+                self._add_output_message(f"📁 최종 비디오: {merge_result}", "INFO")
+                
+            except Exception as e:
+                self._add_output_message(f"❌ 자동 생성 중 오류 발생: {e}", "ERROR")
+        
+        # 백그라운드에서 실행
+        threading.Thread(target=run_auto_generation, daemon=True).start()
+    
+    def _timing_based_render(self):
+        """타이밍 기반 비디오 렌더링 - 타임라인 생성 생략"""
+        project_name = self.root.data_page.project_name_var.get() if self.root and hasattr(self.root, 'data_page') else ""
+        identifier = self.root.data_page.identifier_var.get() if self.root and hasattr(self.root, 'data_page') else ""
+        
+        if not project_name or not identifier:
+            self._add_output_message("❌ 프로젝트명과 식별자를 먼저 설정해주세요.", "ERROR")
+            return
+        
+        self._add_output_message("⚡ 타이밍 기반 비디오 렌더링 시작...", "INFO")
+        
+        def run_timing_based_render():
+            try:
+                ui_data = self._collect_ui_data()
+                result = self.pipeline_manager.run_timing_based_video_rendering(ui_data)
+                
+                if result.get('success', False):
+                    self._add_output_message("✅ 타이밍 기반 비디오 렌더링 완료!", "SUCCESS")
+                    self._add_output_message(f"📁 비디오 파일: {result.get('video_path', '')}", "INFO")
+                else:
+                    self._add_output_message(f"❌ 타이밍 기반 비디오 렌더링 실패: {result.get('message', '')}", "ERROR")
+                    
+            except Exception as e:
+                self._add_output_message(f"❌ 타이밍 기반 렌더링 중 오류 발생: {e}", "ERROR")
+        
+        threading.Thread(target=run_timing_based_render, daemon=True).start()
 
     def _on_script_change(self, choice=None):
         self.after(50, self._refresh_script)
@@ -833,3 +1060,30 @@ class PipelineTabView(ctk.CTkFrame):
             error_msg = f"'{script_type}' 데이터 로드 실패: {e}"
             self._add_output_message(error_msg, "ERROR")
             messagebox.showerror("오류", error_msg)
+
+    def _merge_final_video(self):
+        """최종 비디오 병합"""
+        # 프로젝트 설정 검증
+        project_name = self.root.data_page.project_name_var.get() if self.root and hasattr(self.root, 'data_page') else ""
+        identifier = self.root.data_page.identifier_var.get() if self.root and hasattr(self.root, 'data_page') else ""
+        
+        if not project_name or not identifier:
+            self._add_output_message("❌ 프로젝트명과 식별자를 먼저 설정해주세요.", "ERROR")
+            return
+        
+        self._add_output_message("🔗 최종 비디오 병합 시작...", "INFO")
+        
+        def run_merge():
+            try:
+                output_dir = os.path.join("output", project_name, identifier)
+                result = self.pipeline_manager.create_final_merged_video(project_name, identifier, output_dir)
+                if result:
+                    self._add_output_message("✅ 최종 비디오 병합 완료!", "SUCCESS")
+                    self._add_output_message(f"📁 최종 비디오: {result}", "INFO")
+                else:
+                    self._add_output_message("❌ 최종 비디오 병합 실패", "ERROR")
+            except Exception as e:
+                self._add_output_message(f"❌ 최종 비디오 병합 중 오류: {e}", "ERROR")
+        
+        thread = threading.Thread(target=run_merge)
+        thread.start()

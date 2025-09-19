@@ -1,0 +1,8 @@
+{
+  "project_name": "kor-chn",
+  "identifier": "kor-chn",
+  "script_type": "회화",
+  "scenes": [],
+  "intro_script": "안녕하세요. 학습을 시작하겠습니다.",
+  "ending_script": "학습이 완료되었습니다. 감사합니다."
+}

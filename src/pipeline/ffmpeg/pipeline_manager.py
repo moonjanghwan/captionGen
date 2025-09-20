@@ -7,6 +7,7 @@ Manifest부터 최종 MP4까지 전체 파이프라인을 관리하고 조율합
 import os
 import json
 import time
+import time as time_module
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 
@@ -15,7 +16,7 @@ from ..audio import AudioGenerator, SSMLBuilder
 # SubtitleGenerator는 삭제됨 - PNGRenderer 사용
 # from ..subtitle import SubtitleGenerator
 from ..steps.create_subtitles import run as create_subtitles_run
-from ..steps.create_timeline import run as create_timeline_run
+
 from ..core.context import PipelineContext
 from .renderer import FFmpegRenderer
 
@@ -213,52 +214,7 @@ class PipelineManager:
                 'generated_files': {}
             }
 
-    def run_timeline_creation(self, ui_data: Dict[str, Any]) -> Dict[str, Any]:
-        """4. 타임라인 생성"""
-        try:
-            project_name = ui_data.get('project_name', '')
-            identifier = ui_data.get('identifier', '')
-            script_type = ui_data.get('script_type', '회화')
-            
-            if not project_name or not identifier:
-                return {
-                    'success': False,
-                    'errors': ['프로젝트명과 식별자가 필요합니다.'],
-                    'generated_files': {}
-                }
-            
-            # 출력 디렉토리 설정
-            output_dir = os.path.join("output", project_name, identifier)
-            manifest_path = os.path.join(output_dir, "manifest", f"{identifier}_{script_type}.json")
-            
-            if not os.path.exists(manifest_path):
-                return {
-                    'success': False,
-                    'errors': ['매니페스트 파일을 찾을 수 없습니다. 먼저 매니페스트를 생성해주세요.'],
-                    'generated_files': {}
-                }
-            
-            # 타임라인 생성
-            timeline_path = self._create_timeline(manifest_path, output_dir)
-            if not timeline_path:
-                return {
-                    'success': False,
-                    'errors': ['타임라인 생성 실패'],
-                    'generated_files': {}
-                }
-            
-            return {
-                'success': True,
-                'generated_files': {'timeline': timeline_path},
-                'errors': []
-            }
-            
-        except Exception as e:
-            return {
-                'success': False,
-                'errors': [f'타임라인 생성 중 오류: {str(e)}'],
-                'generated_files': {}
-            }
+
 
     def run_video_rendering(self, ui_data: Dict[str, Any]) -> Dict[str, Any]:
         """5. 비디오 렌더링"""
@@ -454,26 +410,38 @@ class PipelineManager:
             project_name = manifest_data.get('project_name', 'project')
             identifier = manifest_data.get('identifier', project_name)
             
-            # 타임라인 파일 경로 생성
-            timeline_path = os.path.join(output_dir, "timeline", f"{identifier}_{script_type}.json")
+            # 타이밍 파일 경로 생성 (타임라인 대신)
+            timing_path = os.path.join(output_dir, "timing", f"{identifier}_{script_type}.json")
             
-            if not os.path.exists(timeline_path):
-                print(f"🔥🔥🔥 [오류] 타임라인 파일을 찾을 수 없습니다: {timeline_path}")
-                print("💡 먼저 '타임라인 생성' 버튼을 눌러 타임라인을 생성해주세요.")
+            if not os.path.exists(timing_path):
+                print(f"🔥🔥🔥 [오류] 타이밍 파일을 찾을 수 없습니다: {timing_path}")
+                print("💡 먼저 '오디오 생성' 버튼을 눌러 타이밍 파일을 생성해주세요.")
                 return None
             
             # 출력 비디오 경로 생성
             output_video_path = os.path.join(video_dir, f"{project_name}_{script_type}.mp4")
             
-            print(f"🎬 {script_type} 비디오 생성 시작 (새로운 VideoGenerator 사용)")
-            print(f"  - 타임라인: {timeline_path}")
+            print(f"🎬 {script_type} 비디오 생성 시작 (타이밍 기반)")
+            print(f"  - 타이밍: {timing_path}")
             print(f"  - 출력: {output_video_path}")
             
-            # 새로운 VideoGenerator를 사용하여 비디오 생성
-            success = self.ffmpeg_renderer.create_conversation_video(
-                [], "", "", output_video_path, "1920x1080", ""
-            )
-            
+            # 이미지 디렉토리 경로 설정
+            image_subdir_map = {
+                "conversation": "conversation",
+                "intro": "intro",
+                "ending": "ending"
+            }
+            image_subdir = image_subdir_map.get(script_type, script_type)
+            image_dir = os.path.join(output_dir, image_subdir)
+
+            if not os.path.exists(image_dir):
+                print(f"🔥🔥🔥 [오류] 이미지 디렉토리를 찾을 수 없습니다: {image_dir}")
+                return None
+
+            # 올바른 렌더링 함수 호출
+            success = self.ffmpeg_renderer.create_video_from_timing(
+                timing_path, output_video_path, image_dir, script_type
+            )            
             if success and os.path.exists(output_video_path):
                 print(f"✅ {script_type} 비디오 생성 완료: {output_video_path}")
                 return {f"{script_type}_video": output_video_path}
@@ -485,16 +453,16 @@ class PipelineManager:
             print(f"❌ 비디오 렌더링 실패: {e}")
             return None
     
-    def create_final_merged_video(self, project_name: str, identifier: str, output_dir: str) -> Optional[str]:
+    def create_final_merged_video(self, project_name: str, identifier: str, output_dir: str, smooth_transition: bool = True) -> Optional[str]:
         """개별 비디오들을 병합하여 최종 비디오 생성"""
         try:
             video_dir = os.path.join(output_dir, "video")
             mp4_dir = os.path.join(output_dir, "mp4")
             
-            # 개별 비디오 파일들 찾기 (인트로/엔딩은 mp4 폴더, 회화는 video 폴더)
-            intro_path = os.path.join(mp4_dir, f"{project_name}_intro.mp4")
-            conversation_path = os.path.join(video_dir, f"{project_name}_conversation.mp4")
-            ending_path = os.path.join(mp4_dir, f"{project_name}_ending.mp4")
+            # 개별 비디오 파일들 찾기 (모든 비디오는 mp4 폴더에 저장됨)
+            intro_path = os.path.join(mp4_dir, f"{identifier}_intro.mp4")
+            conversation_path = os.path.join(mp4_dir, f"{identifier}_conversation.mp4")
+            ending_path = os.path.join(mp4_dir, f"{identifier}_ending.mp4")
             
             # 존재하는 비디오 파일들만 수집
             existing_videos = []
@@ -513,14 +481,15 @@ class PipelineManager:
                 return None
             
             # 최종 비디오 경로 (mp4 폴더에 저장)
-            final_path = os.path.join(mp4_dir, f"{project_name}_final.mp4")
+            final_path = os.path.join(mp4_dir, f"{identifier}_final.mp4")
             
             # 비디오 병합
             success = self.ffmpeg_renderer.create_final_merged_video(
                 intro_path if os.path.exists(intro_path) else None,
                 conversation_path if os.path.exists(conversation_path) else None,
                 ending_path if os.path.exists(ending_path) else None,
-                final_path
+                final_path,
+                smooth_transition
             )
             
             if success and os.path.exists(final_path):
@@ -1254,127 +1223,399 @@ class PipelineManager:
             error_msg = f"❌ 자막 이미지 생성 실패: {e}\n{traceback.format_exc()}"
             output_callback(error_msg, "ERROR")
 
-    def create_timeline(self, script_type: str, output_text=None):
-        """타임라인 생성 (UI에서 호출)"""
+
+
+    def create_unified_timing_file(self, project_name: str, identifier: str) -> Optional[str]:
+        """
+        intro, conversation, ending 타이밍 파일들을 하나로 통합하는 함수
+        
+        Args:
+            project_name: 프로젝트명
+            identifier: 식별자
+            
+        Returns:
+            통합 타이밍 파일 경로 또는 None
+        """
         try:
-            output_callback = lambda msg, level="INFO": self._log_to_widget(msg, level, output_text)
-            output_callback(f"⏰ 타임라인 생성 시작: {script_type}")
-
-            # 프로젝트 정보 가져오기 (실제로는 UI에서 전달받아야 함)
-            project_name = "kor-chn"  # 임시값
-            identifier = "kor-chn"    # 임시값
-
-            # 스크립트 타입에 맞는 Manifest 파일명 동적 생성
-            script_type_mapping = {
-                "회화": "conversation",
-                "대화": "dialogue",
-                "인트로": "intro",
-                "엔딩": "ending"
+            print("🔗 통합 타이밍 파일 생성 시작...")
+            
+            timing_dir = os.path.join(self.config.output_directory, project_name, identifier, "timing")
+            unified_timing_path = os.path.join(timing_dir, f"{identifier}_unified.json")
+            
+            # 개별 타이밍 파일들 로드
+            timing_files = {
+                'intro': os.path.join(timing_dir, f"{identifier}_intro.json"),
+                'conversation': os.path.join(timing_dir, f"{identifier}_conversation.json"),
+                'ending': os.path.join(timing_dir, f"{identifier}_ending.json")
             }
-            english_script_type = script_type_mapping.get(script_type, script_type.lower())
-            manifest_filename = f"{identifier}_{english_script_type}.json"
-            manifest_path = os.path.join(self.config.output_directory, project_name, identifier, "manifest", manifest_filename)
-
-            if not os.path.exists(manifest_path):
-                error_msg = f"Manifest 파일을 찾을 수 없습니다: {manifest_path}"
-                output_callback(error_msg, "ERROR")
-                return
-
-            manifest_data = self.manifest_parser.parse_file(manifest_path)
-            if not manifest_data:
-                error_msg = f"Manifest 파싱 실패: {manifest_path}"
-                output_callback(error_msg, "ERROR")
-                return
-
-            settings_path = os.path.join(self.config.output_directory, project_name, identifier, "_text_settings.json")
-            settings = {}
-            if os.path.exists(settings_path):
-                with open(settings_path, 'r', encoding='utf-8') as f:
-                    settings = json.load(f)
-
-            context = PipelineContext.create(
-                project_name=project_name,
-                identifier=identifier,
-                manifest=manifest_data,
-                settings=settings,
-                script_type=script_type,
-                log_callback=output_callback
-            )
-
-            timeline_path = create_timeline_run(context)
-
-            if timeline_path:
-                success_msg = f"✅ 타임라인 생성 완료: {script_type}"
-                output_callback(success_msg, "SUCCESS")
-                output_callback(f"📁 타임라인 파일: {timeline_path}", "INFO")
-            else:
-                error_msg = f"❌ 타임라인 생성 실패: {script_type}"
-                output_callback(error_msg, "ERROR")
-
+            
+            unified_segments = []
+            total_duration = 0.0
+            current_time = 0.0
+            
+            # 각 스크립트 타입별로 타이밍 파일 처리
+            for script_type, timing_path in timing_files.items():
+                if not os.path.exists(timing_path):
+                    print(f"⚠️ {script_type} 타이밍 파일이 없습니다: {timing_path}")
+                    continue
+                
+                print(f"📄 {script_type} 타이밍 파일 로드 중...")
+                
+                with open(timing_path, 'r', encoding='utf-8') as f:
+                    timing_data = json.load(f)
+                
+                segments = timing_data.get('segments', [])
+                script_duration = timing_data.get('total_duration', 0.0)
+                
+                print(f"📊 {script_type} 타이밍 정보:")
+                print(f"  - 세그먼트 수: {len(segments)}개")
+                print(f"  - 총 길이: {script_duration:.2f}초")
+                
+                # 각 세그먼트의 시간을 통합 시간으로 조정
+                for i, segment in enumerate(segments):
+                    adjusted_segment = segment.copy()
+                    adjusted_segment['start_time'] = segment['start_time'] + current_time
+                    adjusted_segment['end_time'] = segment['end_time'] + current_time
+                    adjusted_segment['script_type'] = script_type  # 스크립트 타입 추가
+                    unified_segments.append(adjusted_segment)
+                    
+                    if i < 3:  # 처음 3개 세그먼트만 로그 출력
+                        print(f"    - 세그먼트 {i+1}: {segment['start_time']:.2f}s → {adjusted_segment['start_time']:.2f}s")
+                
+                total_duration += script_duration
+                current_time += script_duration
+                
+                print(f"✅ {script_type} 타이밍 통합 완료 (길이: {script_duration:.2f}초, 누적: {current_time:.2f}초)")
+            
+            # 통합 타이밍 파일 생성
+            unified_timing_data = {
+                "project_name": project_name,
+                "identifier": identifier,
+                "total_duration": total_duration,
+                "segments": unified_segments,
+                "resolution": "1920x1080",
+                "script_types": list(timing_files.keys()),
+                "created_at": time_module.strftime("%Y-%m-%d %H:%M:%S")
+            }
+            
+            # 통합 타이밍 파일 저장
+            with open(unified_timing_path, 'w', encoding='utf-8') as f:
+                json.dump(unified_timing_data, f, ensure_ascii=False, indent=2)
+            
+            print(f"✅ 통합 타이밍 파일 생성 완료: {unified_timing_path}")
+            print(f"📊 총 세그먼트 수: {len(unified_segments)}개")
+            print(f"📊 총 비디오 길이: {total_duration:.2f}초")
+            
+            return unified_timing_path
+            
         except Exception as e:
+            print(f"❌ 통합 타이밍 파일 생성 실패: {e}")
             import traceback
-            error_msg = f"❌ 타임라인 생성 실패: {e}\n{traceback.format_exc()}"
-            output_callback(error_msg, "ERROR")
+            traceback.print_exc()
+            return None
+
+    def create_unified_video(self, project_name: str, identifier: str) -> Dict[str, Any]:
+        """
+        통합 타이밍 파일을 사용하여 최종 비디오를 한 번에 생성하는 함수
+        
+        Args:
+            project_name: 프로젝트명
+            identifier: 식별자
+            
+        Returns:
+            생성 결과 딕셔너리
+        """
+        try:
+            print("🎬 통합 비디오 생성 시작...")
+            
+            # 통합 타이밍 파일 생성
+            unified_timing_path = self.create_unified_timing_file(project_name, identifier)
+            if not unified_timing_path:
+                return {"success": False, "message": "통합 타이밍 파일 생성 실패"}
+            
+            # 통합 비디오 출력 경로
+            output_dir = f"output/{project_name}/{identifier}"
+            video_dir = os.path.join(output_dir, "mp4")
+            os.makedirs(video_dir, exist_ok=True)
+            
+            unified_video_path = os.path.join(video_dir, f"{identifier}_unified.mp4")
+            
+            # 통합 오디오 파일 생성 (intro + conversation + ending)
+            unified_audio_path = self._create_unified_audio(project_name, identifier)
+            if not unified_audio_path:
+                return {"success": False, "message": "통합 오디오 파일 생성 실패"}
+            
+            # 통합 타이밍 파일에 오디오 경로 추가
+            with open(unified_timing_path, 'r', encoding='utf-8') as f:
+                timing_data = json.load(f)
+            
+            timing_data['final_audio_path'] = unified_audio_path
+            
+            with open(unified_timing_path, 'w', encoding='utf-8') as f:
+                json.dump(timing_data, f, ensure_ascii=False, indent=2)
+            
+            # 통합 이미지 디렉토리 (모든 스크립트 타입의 이미지가 포함된 디렉토리)
+            unified_image_dir = os.path.join(output_dir, "unified_images")
+            os.makedirs(unified_image_dir, exist_ok=True)
+            
+            # 모든 스크립트 타입의 이미지를 통합 디렉토리로 복사
+            self._copy_all_images_to_unified_dir(project_name, identifier, unified_image_dir)
+            
+            # VideoGenerator를 사용하여 통합 비디오 생성
+            success = self.ffmpeg_renderer.create_video_from_timing(
+                unified_timing_path, 
+                unified_video_path, 
+                unified_image_dir, 
+                "unified"
+            )
+            
+            if success and os.path.exists(unified_video_path):
+                print(f"✅ 통합 비디오 생성 완료: {unified_video_path}")
+                return {
+                    "success": True,
+                    "message": "통합 비디오 생성 완료",
+                    "video_path": unified_video_path,
+                    "timing_path": unified_timing_path
+                }
+            else:
+                return {"success": False, "message": "통합 비디오 생성 실패"}
+                
+        except Exception as e:
+            print(f"❌ 통합 비디오 생성 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            return {"success": False, "message": f"통합 비디오 생성 중 오류: {e}"}
+
+    def _create_unified_audio(self, project_name: str, identifier: str) -> Optional[str]:
+        """
+        intro, conversation, ending 오디오 파일들을 하나로 합치는 함수
+        """
+        try:
+            print("🎵 통합 오디오 파일 생성 시작...")
+            
+            audio_dir = os.path.join(self.config.output_directory, project_name, identifier, "mp3")
+            unified_audio_path = os.path.join(audio_dir, f"{identifier}_unified.mp3")
+            
+            # 개별 오디오 파일들
+            audio_files = [
+                os.path.join(audio_dir, f"{identifier}_intro.mp3"),
+                os.path.join(audio_dir, f"{identifier}_conversation.mp3"),
+                os.path.join(audio_dir, f"{identifier}_ending.mp3")
+            ]
+            
+            # 존재하는 오디오 파일들만 필터링하고 길이 확인
+            existing_audio_files = []
+            total_duration = 0.0
+            
+            for audio_file in audio_files:
+                if os.path.exists(audio_file):
+                    # 오디오 파일 길이 확인
+                    import subprocess
+                    try:
+                        cmd = ['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', audio_file]
+                        result = subprocess.run(cmd, capture_output=True, text=True)
+                        if result.returncode == 0:
+                            duration = float(result.stdout.strip())
+                            print(f"📊 {os.path.basename(audio_file)}: {duration:.2f}초")
+                            total_duration += duration
+                            existing_audio_files.append(audio_file)
+                        else:
+                            print(f"⚠️ {os.path.basename(audio_file)} 길이 확인 실패")
+                    except Exception as e:
+                        print(f"⚠️ {os.path.basename(audio_file)} 길이 확인 중 오류: {e}")
+                else:
+                    print(f"⚠️ 오디오 파일이 없습니다: {audio_file}")
+            
+            if not existing_audio_files:
+                print("❌ 통합할 오디오 파일이 없습니다.")
+                return None
+            
+            print(f"📊 총 예상 통합 오디오 길이: {total_duration:.2f}초")
+            
+            # FFmpeg를 사용하여 오디오 파일들 연결
+            import subprocess
+            
+            # concat 파일 생성
+            concat_file_path = unified_audio_path + "_concat.txt"
+            with open(concat_file_path, 'w', encoding='utf-8') as f:
+                for audio_file in existing_audio_files:
+                    f.write(f"file '{os.path.abspath(audio_file)}'\n")
+            
+            print(f"📝 Concat 파일 생성: {concat_file_path}")
+            print(f"📝 통합할 파일들: {[os.path.basename(f) for f in existing_audio_files]}")
+            
+            # FFmpeg 명령어 실행
+            cmd = [
+                'ffmpeg', '-y',
+                '-f', 'concat',
+                '-safe', '0',
+                '-i', concat_file_path,
+                '-c', 'copy',
+                unified_audio_path
+            ]
+            
+            print(f"🚀 FFmpeg 명령어 실행: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                # 생성된 파일의 실제 길이 확인
+                try:
+                    cmd = ['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', unified_audio_path]
+                    result_check = subprocess.run(cmd, capture_output=True, text=True)
+                    if result_check.returncode == 0:
+                        actual_duration = float(result_check.stdout.strip())
+                        print(f"✅ 통합 오디오 파일 생성 완료: {unified_audio_path}")
+                        print(f"📊 실제 통합 오디오 길이: {actual_duration:.2f}초")
+                    else:
+                        print(f"✅ 통합 오디오 파일 생성 완료: {unified_audio_path}")
+                except Exception as e:
+                    print(f"✅ 통합 오디오 파일 생성 완료: {unified_audio_path}")
+                    print(f"⚠️ 길이 확인 중 오류: {e}")
+                
+                # 임시 concat 파일 삭제
+                os.remove(concat_file_path)
+                return unified_audio_path
+            else:
+                print(f"❌ 통합 오디오 파일 생성 실패: {result.stderr}")
+                print(f"❌ FFmpeg stdout: {result.stdout}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ 통합 오디오 파일 생성 중 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def _copy_all_images_to_unified_dir(self, project_name: str, identifier: str, unified_image_dir: str):
+        """
+        모든 스크립트 타입의 이미지를 통합 디렉토리로 복사
+        """
+        try:
+            print("📁 통합 이미지 디렉토리 준비 중...")
+            
+            # 각 스크립트 타입별 이미지 디렉토리
+            image_dirs = {
+                'intro': os.path.join(self.config.output_directory, project_name, identifier, "intro"),
+                'conversation': os.path.join(self.config.output_directory, project_name, identifier, "conversation"),
+                'ending': os.path.join(self.config.output_directory, project_name, identifier, "ending")
+            }
+            
+            import shutil
+            
+            for script_type, image_dir in image_dirs.items():
+                if os.path.exists(image_dir):
+                    # 해당 스크립트 타입의 모든 이미지 파일 복사
+                    for filename in os.listdir(image_dir):
+                        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+                            src_path = os.path.join(image_dir, filename)
+                            dst_path = os.path.join(unified_image_dir, filename)
+                            shutil.copy2(src_path, dst_path)
+                            print(f"📄 이미지 복사: {filename}")
+            
+            print(f"✅ 통합 이미지 디렉토리 준비 완료: {unified_image_dir}")
+            
+        except Exception as e:
+            print(f"❌ 통합 이미지 디렉토리 준비 중 오류: {e}")
 
     def run_timing_based_video_rendering(self, ui_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         타이밍 JSON을 직접 사용한 비디오 렌더링
-        타임라인 생성 단계를 건너뛰고 바로 비디오 제작
+        선택된 스크립트 타입만 처리하여 개별 비디오 생성
         """
         try:
             project_name = ui_data.get('project_name', '')
             identifier = ui_data.get('identifier', '')
-            script_type = ui_data.get('script_type', 'conversation')
+            selected_script_type = ui_data.get('script_type', '')
             
             if not project_name or not identifier:
                 return {"success": False, "message": "프로젝트명과 식별자가 필요합니다."}
             
+            if not selected_script_type:
+                return {"success": False, "message": "생성할 스크립트 타입을 선택해주세요."}
+            
             output_dir = f"output/{project_name}/{identifier}"
-            
-            # 타이밍 파일 경로 (한글을 영어로 변환)
-            english_script_type = {"회화": "conversation", "대화": "conversation", "인트로": "intro", "엔딩": "ending"}.get(script_type, script_type)
-            timing_path = os.path.join(output_dir, "timing", f"{identifier}_{english_script_type}.json")
-            
-            if not os.path.exists(timing_path):
-                return {"success": False, "message": f"타이밍 파일을 찾을 수 없습니다: {timing_path}"}
-            
-            # 이미지 디렉토리 경로
-            if script_type in ["회화", "대화"]:
-                image_dir = os.path.join(output_dir, "conversation")
-            elif script_type in ["인트로"]:
-                image_dir = os.path.join(output_dir, "intro")
-            elif script_type in ["엔딩"]:
-                image_dir = os.path.join(output_dir, "ending")
-            else:
-                image_dir = os.path.join(output_dir, "intro_ending")
-            
-            if not os.path.exists(image_dir):
-                return {"success": False, "message": f"이미지 디렉토리를 찾을 수 없습니다: {image_dir}"}
-            
-            # 비디오 출력 경로
             video_dir = os.path.join(output_dir, "mp4")
             os.makedirs(video_dir, exist_ok=True)
-            output_video_path = os.path.join(video_dir, f"{project_name}_{english_script_type}.mp4")
             
-            print(f"🎬 타이밍 기반 비디오 렌더링 시작")
-            print(f"  - 타이밍: {timing_path}")
-            print(f"  - 이미지: {image_dir}")
-            print(f"  - 출력: {output_video_path}")
+            generated_videos = {}
+            errors = []
             
-            # 타이밍 기반 비디오 생성
-            success = self.ffmpeg_renderer.create_video_from_timing(
-                timing_path, output_video_path, image_dir
-            )
+            # 선택된 스크립트 타입에 따라 처리할 타입 결정
+            script_type_mapping = {
+                "인트로": ("인트로", "intro", "intro"),
+                "회화": ("회화", "conversation", "conversation"),
+                "엔딩": ("엔딩", "ending", "ending")
+            }
             
-            if success and os.path.exists(output_video_path):
+            if selected_script_type not in script_type_mapping:
+                return {"success": False, "message": f"지원하지 않는 스크립트 타입입니다: {selected_script_type}"}
+            
+            # 선택된 스크립트 타입만 처리
+            script_types = [script_type_mapping[selected_script_type]]
+            
+            print(f"🎯 선택된 스크립트 타입: {selected_script_type}")
+            print(f"🚀 비디오 렌더링 프로세스 시작...")
+            
+            for korean_name, english_name, image_subdir in script_types:
+                print(f"🎬 {korean_name} 비디오 렌더링 시작")
+                
+                # 타이밍 파일 경로
+                timing_path = os.path.join(output_dir, "timing", f"{identifier}_{english_name}.json")
+                
+                # 이미지 디렉토리 경로
+                image_dir = os.path.join(output_dir, image_subdir)
+                
+                # 비디오 출력 경로
+                output_video_path = os.path.join(video_dir, f"{identifier}_{english_name}.mp4")
+                
+                print(f"  - 타이밍: {timing_path}")
+                print(f"  - 이미지: {image_dir}")
+                print(f"  - 출력: {output_video_path}")
+                
+                # 파일 존재 확인
+                if not os.path.exists(timing_path):
+                    error_msg = f"{korean_name} 타이밍 파일을 찾을 수 없습니다: {timing_path}"
+                    print(f"❌ {error_msg}")
+                    errors.append(error_msg)
+                    continue
+                
+                if not os.path.exists(image_dir):
+                    error_msg = f"{korean_name} 이미지 디렉토리를 찾을 수 없습니다: {image_dir}"
+                    print(f"❌ {error_msg}")
+                    errors.append(error_msg)
+                    continue
+                
+                # 타이밍 기반 비디오 생성 (패딩 기능 포함)
+                success = self.ffmpeg_renderer.create_video_from_timing(
+                    timing_path, output_video_path, image_dir, english_name
+                )
+                
+                if success and os.path.exists(output_video_path):
+                    generated_videos[english_name] = output_video_path
+                    print(f"✅ {korean_name} 비디오 생성 완료: {output_video_path}")
+                else:
+                    error_msg = f"{korean_name} 비디오 생성 실패"
+                    print(f"❌ {error_msg}")
+                    errors.append(error_msg)
+            
+            # 결과 반환
+            if generated_videos:
+                print(f"🎉 비디오 렌더링 프로세스 완료! {len(generated_videos)}개 비디오 생성됨")
                 return {
                     "success": True,
-                    "message": f"타이밍 기반 비디오 생성 완료: {output_video_path}",
-                    "video_path": output_video_path
+                    "message": f"비디오 렌더링 완료: {len(generated_videos)}개 비디오 생성",
+                    "generated_videos": generated_videos,
+                    "errors": errors
                 }
             else:
-                return {"success": False, "message": "타이밍 기반 비디오 생성 실패"}
+                print(f"❌ 비디오 렌더링 프로세스 실패: 생성된 비디오가 없습니다")
+                return {
+                    "success": False, 
+                    "message": "모든 비디오 생성 실패",
+                    "errors": errors
+                }
                 
         except Exception as e:
             print(f"❌ 타이밍 기반 비디오 렌더링 실패: {e}")
             return {"success": False, "message": f"오류: {e}"}
+    

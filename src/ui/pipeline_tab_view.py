@@ -397,6 +397,18 @@ class PipelineTabView(ctk.CTkFrame):
             width=100, height=30
         )
         load_button.pack(side="left", padx=(0, 10))
+        
+        # 스무스 전환 옵션 추가
+        self.smooth_transition_var = tk.BooleanVar(value=False)
+        smooth_checkbox = ctk.CTkCheckBox(
+            script_tab_frame,
+            text="스무스 전환",
+            variable=self.smooth_transition_var,
+            fg_color=config.COLOR_THEME["button"],
+            hover_color=config.COLOR_THEME["button_hover"],
+            text_color=config.COLOR_THEME["text"]
+        )
+        smooth_checkbox.pack(side="right", padx=(10, 0))
     
     def _create_pipeline_controls_section(self):
         """파이프라인 제어 섹션 생성"""
@@ -406,15 +418,15 @@ class PipelineTabView(ctk.CTkFrame):
         button_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         button_frame.pack(pady=15)
         
+
         buttons = {
             "📋 Manifest 생성": (self._create_manifest, "#3498DB", "#2980B9"),
             "🎵 오디오 생성": (self._create_audio, "#3498DB", "#2980B9"),
             "📝 자막 이미지 생성": (self._create_subtitles, "#3498DB", "#2980B9"),
-            "⏰ 타임라인 생성": (self._create_timeline, "#3498DB", "#2980B9"),
-            "🎬 비디오 렌더링": (self._render_video, "#3498DB", "#2980B9"),
-            "⚡ 타이밍 기반 렌더링": (self._timing_based_render, "#E74C3C", "#C0392B"),
+            "🎬 비디오 렌더링": (self._timing_based_render, "#3498DB", "#2980B9"),
             "🔗 최종 병합": (self._merge_final_video, "#3498DB", "#2980B9"),
-            "🚀 자동 생성": (self._auto_generation, "#3498DB", "#2980B9")
+            "🚀 자동 생성": (self._auto_generation, "#3498DB", "#2980B9"),
+            "❌ 종료": (self._exit_program, "#E74C3C", "#C0392B")
         }
 
         for text, (command, fg_color, hover_color) in buttons.items():
@@ -643,59 +655,7 @@ class PipelineTabView(ctk.CTkFrame):
         thread = threading.Thread(target=self.pipeline_manager.create_subtitles, args=(script_type, self.output_text,)) 
         thread.start()
 
-    def _create_timeline(self):
-        """타임라인 생성"""
-        if not PIPELINE_AVAILABLE:
-            messagebox.showerror("오류", "파이프라인 모듈을 사용할 수 없습니다.")
-            return
-        
-        script_type = self.script_var.get()
-        thread = threading.Thread(target=self.pipeline_manager.create_timeline, args=(script_type, self.output_text,)) 
-        thread.start()
 
-    def _render_video(self):
-        """비디오 렌더링 - 제작 사양서에 따른 회화/인트로/엔딩 비디오 생성"""
-        # 프로젝트 설정 검증
-        project_name = self.root.data_page.project_name_var.get() if self.root and hasattr(self.root, 'data_page') else ""
-        identifier = self.root.data_page.identifier_var.get() if self.root and hasattr(self.root, 'data_page') else ""
-        
-        if not project_name or not identifier:
-            self._add_output_message("❌ 프로젝트명과 식별자를 먼저 설정해주세요.", "ERROR")
-            return
-        
-        self._add_output_message("🎬 비디오 렌더링 시작...", "INFO")
-        
-        def run_render():
-            try:
-                # UI 데이터 수집
-                ui_data = self._collect_ui_data()
-                
-                # 파이프라인 실행
-                result = self.pipeline_manager.run_pipeline_from_ui_data(ui_data)
-                
-                if result.get('success', False):
-                    self._add_output_message("✅ 비디오 렌더링 완료!", "SUCCESS")
-                    
-                    # 생성된 비디오 파일들 표시
-                    generated_files = result.get('generated_files', {})
-                    if generated_files.get("video"):
-                        self._add_output_message(f"📁 최종 비디오: {generated_files['video']}", "INFO")
-                    if generated_files.get("intro_video"):
-                        self._add_output_message(f"📁 인트로 비디오: {generated_files['intro_video']}", "INFO")
-                    if generated_files.get("conversation_video"):
-                        self._add_output_message(f"📁 회화 비디오: {generated_files['conversation_video']}", "INFO")
-                    if generated_files.get("ending_video"):
-                        self._add_output_message(f"📁 엔딩 비디오: {generated_files['ending_video']}", "INFO")
-                else:
-                    self._add_output_message("❌ 비디오 렌더링 실패", "ERROR")
-                    for error in result.get('errors', []):
-                        self._add_output_message(f"  - {error}", "ERROR")
-                
-            except Exception as e:
-                self._add_output_message(f"❌ 비디오 렌더링 중 오류 발생: {e}", "ERROR")
-        
-        # 백그라운드에서 실행
-        threading.Thread(target=run_render, daemon=True).start()
 
     def _collect_ui_data(self):
         """UI에서 데이터를 수집하여 파이프라인에 전달"""
@@ -718,7 +678,7 @@ class PipelineTabView(ctk.CTkFrame):
             return {}
 
     def _auto_generation(self):
-        """자동 생성 - A~G 단계를 순차적으로 자동 실행"""
+        """자동 생성 - 개별 생성 후 병합 방식으로 처리"""
         # 프로젝트 설정 검증
         project_name = self.root.data_page.project_name_var.get() if self.root and hasattr(self.root, 'data_page') else ""
         identifier = self.root.data_page.identifier_var.get() if self.root and hasattr(self.root, 'data_page') else ""
@@ -727,63 +687,48 @@ class PipelineTabView(ctk.CTkFrame):
             self._add_output_message("❌ 프로젝트명과 식별자를 먼저 설정해주세요.", "ERROR")
             return
         
-        self._add_output_message("🚀 자동 생성 시작 - 전체 파이프라인 실행...", "INFO")
+        self._add_output_message("🚀 자동 생성 시작 - 개별 생성 후 병합 방식...", "INFO")
+        self._run_individual_generation()
+
+
+    def _run_individual_generation(self):
+        """개별 생성 후 병합 방식으로 자동 생성 - 기존 버튼 함수들을 순차 실행"""
         
-        def run_auto_generation():
+        def run_individual_generation():
             try:
-                # UI 데이터 수집
-                ui_data = self._collect_ui_data()
-                
-                # 1. 매니페스트 생성
+                # 1. 매니페스트 생성 (기존 버튼 함수 사용)
                 self._add_output_message("📋 1단계: 매니페스트 생성...", "INFO")
-                manifest_result = self.pipeline_manager.run_manifest_creation(ui_data)
-                if not manifest_result.get('success', False):
-                    self._add_output_message("❌ 매니페스트 생성 실패", "ERROR")
-                    return
+                self._create_manifest()
+                self._add_output_message("✅ 매니페스트 생성 완료", "SUCCESS")
                 
-                # 2. 오디오 생성
+                # 2. 오디오 생성 (기존 버튼 함수 사용)
                 self._add_output_message("🎵 2단계: 오디오 생성...", "INFO")
-                audio_result = self.pipeline_manager.run_audio_generation(ui_data)
-                if not audio_result.get('success', False):
-                    self._add_output_message("❌ 오디오 생성 실패", "ERROR")
-                    return
+                self._create_audio()
+                self._add_output_message("✅ 오디오 생성 완료", "SUCCESS")
                 
-                # 3. 자막 이미지 생성
+                # 3. 자막 이미지 생성 (기존 버튼 함수 사용)
                 self._add_output_message("📝 3단계: 자막 이미지 생성...", "INFO")
-                subtitle_result = self.pipeline_manager.run_subtitle_creation(ui_data)
-                if not subtitle_result.get('success', False):
-                    self._add_output_message("❌ 자막 이미지 생성 실패", "ERROR")
-                    return
+                self._create_subtitles()
+                self._add_output_message("✅ 자막 이미지 생성 완료", "SUCCESS")
                 
-                # 4. 타임라인 생성
-                self._add_output_message("⏰ 4단계: 타임라인 생성...", "INFO")
-                timeline_result = self.pipeline_manager.run_timeline_creation(ui_data)
-                if not timeline_result.get('success', False):
-                    self._add_output_message("❌ 타임라인 생성 실패", "ERROR")
-                    return
+                # 4. 비디오 렌더링 (기존 버튼 함수 사용)
+                self._add_output_message("🎬 4단계: 비디오 렌더링...", "INFO")
+                self._timing_based_render()
+                self._add_output_message("✅ 비디오 렌더링 완료", "SUCCESS")
                 
-                # 5. 비디오 렌더링
-                self._add_output_message("🎬 5단계: 비디오 렌더링...", "INFO")
-                video_result = self.pipeline_manager.run_video_rendering(ui_data)
-                if not video_result.get('success', False):
-                    self._add_output_message("❌ 비디오 렌더링 실패", "ERROR")
-                    return
-                
-                # 6. 최종 병합
-                self._add_output_message("🔗 6단계: 최종 병합...", "INFO")
-                merge_result = self.pipeline_manager.create_final_merged_video(project_name, identifier, f"output/{project_name}/{identifier}")
-                if not merge_result:
-                    self._add_output_message("❌ 최종 병합 실패", "ERROR")
-                    return
-                
+                # 5. 최종 병합 (기존 버튼 함수 사용)
+                self._add_output_message("🔗 5단계: 최종 병합...", "INFO")
+                self._merge_final_video()
                 self._add_output_message("✅ 자동 생성 완료! 모든 단계가 성공적으로 완료되었습니다.", "SUCCESS")
-                self._add_output_message(f"📁 최종 비디오: {merge_result}", "INFO")
                 
             except Exception as e:
-                self._add_output_message(f"❌ 자동 생성 중 오류 발생: {e}", "ERROR")
+                self._add_output_message(f"❌ 개별 자동 생성 중 오류 발생: {e}", "ERROR")
+                import traceback
+                traceback.print_exc()
         
         # 백그라운드에서 실행
-        threading.Thread(target=run_auto_generation, daemon=True).start()
+        threading.Thread(target=run_individual_generation, daemon=True).start()
+
     
     def _timing_based_render(self):
         """타이밍 기반 비디오 렌더링 - 타임라인 생성 생략"""
@@ -794,21 +739,35 @@ class PipelineTabView(ctk.CTkFrame):
             self._add_output_message("❌ 프로젝트명과 식별자를 먼저 설정해주세요.", "ERROR")
             return
         
-        self._add_output_message("⚡ 타이밍 기반 비디오 렌더링 시작...", "INFO")
-        
         def run_timing_based_render():
             try:
                 ui_data = self._collect_ui_data()
+                selected_script = ui_data.get('script_type', '알 수 없음')
+                self._add_output_message(f"🎬 비디오 렌더링 시작... (선택된 스크립트: {selected_script})", "INFO")
+                self._add_output_message(f"🔍 렌더링 파라미터: {json.dumps(ui_data, ensure_ascii=False, indent=2)}", "DEBUG")
                 result = self.pipeline_manager.run_timing_based_video_rendering(ui_data)
                 
                 if result.get('success', False):
-                    self._add_output_message("✅ 타이밍 기반 비디오 렌더링 완료!", "SUCCESS")
-                    self._add_output_message(f"📁 비디오 파일: {result.get('video_path', '')}", "INFO")
+                    self._add_output_message("✅ 비디오 렌더링 완료!", "SUCCESS")
+                    
+                    # 생성된 비디오 파일들 표시
+                    generated_videos = result.get('generated_videos', {})
+                    for video_type, video_path in generated_videos.items():
+                        korean_name = {"intro": "인트로", "conversation": "회화", "ending": "엔딩"}.get(video_type, video_type)
+                        self._add_output_message(f"📁 {korean_name} 비디오: {video_path}", "INFO")
+                    
+                    # 오류가 있다면 표시
+                    errors = result.get('errors', [])
+                    for error in errors:
+                        self._add_output_message(f"⚠️ {error}", "WARNING")
                 else:
-                    self._add_output_message(f"❌ 타이밍 기반 비디오 렌더링 실패: {result.get('message', '')}", "ERROR")
+                    self._add_output_message(f"❌ 비디오 렌더링 실패: {result.get('message', '')}", "ERROR")
+                    errors = result.get('errors', [])
+                    for error in errors:
+                        self._add_output_message(f"  - {error}", "ERROR")
                     
             except Exception as e:
-                self._add_output_message(f"❌ 타이밍 기반 렌더링 중 오류 발생: {e}", "ERROR")
+                self._add_output_message(f"❌ 비디오 렌더링 중 오류 발생: {e}", "ERROR")
         
         threading.Thread(target=run_timing_based_render, daemon=True).start()
 
@@ -1076,7 +1035,14 @@ class PipelineTabView(ctk.CTkFrame):
         def run_merge():
             try:
                 output_dir = os.path.join("output", project_name, identifier)
-                result = self.pipeline_manager.create_final_merged_video(project_name, identifier, output_dir)
+                smooth_transition = self.smooth_transition_var.get()
+                
+                if smooth_transition:
+                    self._add_output_message("🎬 스무스 전환 효과로 병합 중...", "INFO")
+                else:
+                    self._add_output_message("🔗 기본 방식으로 병합 중...", "INFO")
+                
+                result = self.pipeline_manager.create_final_merged_video(project_name, identifier, output_dir, smooth_transition)
                 if result:
                     self._add_output_message("✅ 최종 비디오 병합 완료!", "SUCCESS")
                     self._add_output_message(f"📁 최종 비디오: {result}", "INFO")
@@ -1087,3 +1053,20 @@ class PipelineTabView(ctk.CTkFrame):
         
         thread = threading.Thread(target=run_merge)
         thread.start()
+
+    def _exit_program(self):
+        """프로그램 종료"""
+        if messagebox.askyesno("프로그램 종료", "정말로 프로그램을 종료하시겠습니까?"):
+            self._add_output_message("👋 프로그램을 종료합니다...", "INFO")
+            # 모든 활성 프로세스 종료
+            if hasattr(self.root, 'cancel_event'):
+                self.root.cancel_event.set()
+            if hasattr(self.root, 'active_processes'):
+                for process in self.root.active_processes:
+                    try:
+                        process.terminate()
+                    except:
+                        pass
+            # 메인 윈도우 종료
+            self.root.quit()
+            self.root.destroy()

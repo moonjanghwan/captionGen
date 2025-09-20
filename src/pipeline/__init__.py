@@ -30,7 +30,13 @@ from .settings import (
 from .ffmpeg import FFmpegRenderer, PipelineManager
 
 # UI 통합 시스템
-from .ui_integrated_manager import UIIntegratedPipelineManager
+
+# 플러그인 시스템
+from .plugins import (
+    BasePlugin, PluginResult, PluginConfig,
+    PluginManager, IntroPlugin, ConversationPlugin, EndingPlugin
+)
+from .plugin_based_manager import PluginBasedPipelineManager
 
 # 테스트 시스템
 from .testing import TestRunner, SettingReflectionTest, SystemIntegrationTest, PerformanceTest
@@ -74,6 +80,16 @@ __all__ = [
     # UI Integration
     "UIIntegratedPipelineManager",
     "UIPipelineConfig",
+    
+    # Plugin System
+    "BasePlugin",
+    "PluginResult", 
+    "PluginConfig",
+    "PluginManager",
+    "IntroPlugin",
+    "ConversationPlugin",
+    "EndingPlugin",
+    "PluginBasedPipelineManager",
     
     # 테스트 시스템
     "TestRunner",

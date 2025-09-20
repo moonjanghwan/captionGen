@@ -3,7 +3,8 @@
 import os
 import json
 import subprocess
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
+from PIL import Image
 
 class VideoGenerator:
     """
@@ -23,148 +24,7 @@ class VideoGenerator:
         except subprocess.CalledProcessError:
             raise RuntimeError("FFmpeg 실행 중 오류가 발생했습니다.")
     
-    def create_video_from_timeline(self, timeline_path: str, output_video_path: str) -> bool:
-        """
-        타임라인 JSON 파일을 읽어 최종 비디오를 렌더링합니다. (수정된 overlay 방식)
-        
-        Args:
-            timeline_path (str): timeline.json 파일 경로
-            output_video_path (str): 최종 MP4 비디오 저장 경로
-            
-        Returns:
-            bool: 성공 여부
-        """
-        print("--- 🎬 [비디오 렌더링] 시작 (Overlay 방식) ---")
-        
-        try:
-            with open(timeline_path, 'r', encoding='utf-8') as f:
-                timeline_data = json.load(f)
-            print(f"✅ 타임라인 데이터 로드 완료: {timeline_path}")
-        except (FileNotFoundError, json.JSONDecodeError) as e:
-            print(f"🔥🔥🔥 [오류] 타임라인 파일 로드 또는 파싱 실패: {e}")
-            return False
 
-        # 1. 필수 데이터 검증
-        if not self._validate_timeline_data(timeline_data):
-            return False
-
-        # 2. FFmpeg에 필요한 입력 파일 리스트와 필터 그래프 생성
-        audio_input = timeline_data.get('final_audio_path')
-        if not os.path.exists(audio_input):
-            print(f"🔥🔥🔥 [오류] 최종 오디오 파일을 찾을 수 없습니다: {audio_input}")
-            return False
-
-        image_inputs = []
-        filter_complex_parts = []
-        
-        resolution = timeline_data.get('resolution', '1920x1080')
-        total_duration = timeline_data.get('total_duration', 30.0)
-        
-        # 첫 번째 입력(검은 화면)을 베이스로 사용
-        stream_counter = 1
-        overlay_stream = "0:v"
-
-        # --- 상세 로깅 시작 ---
-        log_messages = []
-        log_messages.append("="*50)
-        log_messages.append("🎬 FFMPEG 렌더링 타이밍 정보")
-        log_messages.append("="*50)
-        log_messages.append("아래 정보는 FFmpeg에 전달되는 각 이미지의 표시 시간입니다.")
-        log_messages.append("이 시간과 타이밍 파일의 시간을 비교하여 동기화를 확인하세요.")
-        log_messages.append("-"*50)
-
-        for i, clip in enumerate(timeline_data['timeline']):
-            image_path = clip.get("image_path")
-            if not (image_path and os.path.exists(image_path)):
-                log_messages.append(f"  ⚠️ [경고] 이미지 파일을 찾을 수 없습니다: {image_path}, 이 클립을 건너뜁니다.")
-                continue
-
-            image_inputs.extend(['-i', image_path])
-            start_time = clip['start_time']
-            end_time = clip['end_time']
-            
-            log_messages.append(f"  - 이미지: {os.path.basename(image_path)}")
-            log_messages.append(f"    - 시작: {start_time:.3f}초")
-            log_messages.append(f"    - 종료: {end_time:.3f}초")
-            log_messages.append(f"    - 유지: {end_time-start_time:.3f}초")
-            log_messages.append("  "+"-"*20)
-
-            current_image_stream = f"{stream_counter}:v"
-            next_overlay_stream = f"ovr{stream_counter}"
-            
-            filter_complex_parts.append(
-                f"[{overlay_stream}][{current_image_stream}]overlay=enable='between(t,{start_time},{end_time})'[{next_overlay_stream}];"
-            )
-            overlay_stream = next_overlay_stream
-            stream_counter += 1
-        
-        log_messages.append("="*50 + "\n")
-
-        # 로그를 콘솔과 파일에 저장
-        log_output = "\n".join(log_messages)
-        print(log_output)
-        try:
-            log_file_path = os.path.join("output", "rendering_log.txt")
-            os.makedirs("output", exist_ok=True)
-            with open(log_file_path, 'w', encoding='utf-8') as f:
-                f.write(log_output)
-            print(f"✅ 상세 렌더링 로그를 파일에 저장했습니다: {log_file_path}")
-        except Exception as e:
-            print(f"⚠️ 상세 렌더링 로그 파일 저장에 실패했습니다: {e}")
-        # --- 상세 로깅 종료 ---
-            
-        if not image_inputs:
-            print("🔥🔥🔥 [오류] 타임라인에 유효한 이미지가 하나도 없습니다.")
-            return False
-
-        filter_complex_string = "".join(filter_complex_parts).rstrip(';')
-        
-        # 3. 최종 FFmpeg 명령어 생성 및 실행
-        command = [
-            'ffmpeg', '-y',
-            '-f', 'lavfi', '-i', f"color=c=black:s={resolution}:d={total_duration}",
-            *image_inputs,
-            '-i', audio_input,
-            '-filter_complex', filter_complex_string,
-            '-map', f'[{overlay_stream}]',
-            '-map', f'{stream_counter}:a',
-            '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
-            '-c:a', 'aac',
-            '-t', str(total_duration), # 오디오 길이에 맞게 비디오 길이 제한
-            output_video_path
-        ]
-        
-        print("🚀 [FFmpeg] 실행 명령어:")
-        formatted_cmd = " \
-  ".join(command)
-        print(formatted_cmd)
-
-        try:
-            subprocess.run(command, check=True, capture_output=True, text=True)
-            print(f"✅ [성공] 비디오 생성 완료: {output_video_path}")
-            return True
-        except subprocess.CalledProcessError as e:
-            print("🔥🔥🔥 [오류] FFmpeg 실행 중 오류 발생! 🔥🔥🔥")
-            print(e.stderr)
-            return False
-    
-    def _validate_timeline_data(self, timeline_data: Dict) -> bool:
-        """타임라인 데이터 유효성 검증"""
-        required_fields = ['timeline', 'final_audio_path', 'resolution', 'total_duration']
-        for field in required_fields:
-            if field not in timeline_data:
-                print(f"🔥🔥🔥 [오류] 필수 필드 누락: {field}")
-                return False
-        
-        if not timeline_data['timeline']:
-            print("🔥🔥🔥 [오류] 타임라인이 비어있습니다.")
-            return False
-            
-        if timeline_data['total_duration'] <= 0:
-            print("🔥🔥🔥 [오류] 총 재생시간(total_duration)이 유효하지 않습니다.")
-            return False
-
-        return True
     
     
     
@@ -226,130 +86,204 @@ class VideoGenerator:
             print(f"🔥🔥🔥 [오류] 간단 비디오 생성 중 예상치 못한 오류: {e}")
             return False
     
-    def create_video_from_timing(self, timing_path: str, output_video_path: str, image_dir: str) -> bool:
+    def create_video_from_timing(self, timing_path: str, output_video_path: str, image_dir: str, script_type: str = None, background_color: str = "black") -> bool:
         """
         타이밍 JSON 파일을 직접 사용하여 오디오와 싱크가 맞는 비디오를 생성합니다.
+        (v2) FFmpeg concat demuxer와 이미지 전처리로 성능 및 안정성 최적화.
         """
-        print("--- 🎬 [타이밍 기반 비디오 렌더링] 시작 ---")
-        
+        print(f"--- 🎬 [타이밍 기반 비디오 렌더링] 시작 (Concat 방식 v2) - 스크립트 타입: {script_type} ---")
+        temp_dir = None
+        concat_file_path = output_video_path + ".txt"
+
         try:
             with open(timing_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             print(f"✅ 타이밍 데이터 로드 완료: {timing_path}")
-        except (FileNotFoundError, json.JSONDecodeError) as e:
-            print(f"🔥🔥🔥 [오류] 타이밍 파일 로드 또는 파싱 실패: {e}")
-            return False
 
-        segments = data['segments']
-        audio_input = data.get('final_audio_path')
+            audio_input = data.get('final_audio_path')
+            if not audio_input or not os.path.exists(audio_input):
+                print(f"🔥🔥🔥 [오류] 오디오 파일을 찾을 수 없습니다: {audio_input}")
+                return False
 
-        if not audio_input:
-            base_name = os.path.basename(timing_path).replace('_conversation.json', '').replace('_intro.json', '').replace('_ending.json', '')
-            audio_input = os.path.join(os.path.dirname(os.path.dirname(timing_path)), "mp3", f"{base_name}_conversation.mp3")
+            # 1. 전처리 단계: 모든 이미지를 동일한 속성으로 만들기
+            target_resolution = tuple(map(int, data.get('resolution', '1920x1080').split('x')))
+            temp_dir = os.path.join(os.path.dirname(output_video_path), "temp_images_for_concat")
+            os.makedirs(temp_dir, exist_ok=True)
+            print(f"⚙️ 이미지 전처리 시작... (목표 해상도: {target_resolution})")
 
-        if not os.path.exists(audio_input):
-            print(f"🔥🔥🔥 [오류] 최종 오디오 파일을 찾을 수 없습니다: {audio_input}")
-            return False
+            # 배경 이미지 전처리
+            background_image_path = self._find_background_image(script_type, timing_path)
+            processed_bg_path = os.path.join(temp_dir, "bg.png")
+            try:
+                if background_image_path and os.path.exists(background_image_path):
+                    with Image.open(background_image_path) as img:
+                        img.resize(target_resolution, Image.Resampling.LANCZOS).save(processed_bg_path, 'PNG')
+                else:
+                    Image.new('RGBA', target_resolution, (0,0,0,255)).save(processed_bg_path, 'PNG')
+            except Exception as img_e:
+                print(f"⚠️ 배경 이미지 처리 실패, 검은색 배경으로 대체: {img_e}")
+                Image.new('RGBA', target_resolution, (0,0,0,255)).save(processed_bg_path, 'PNG')
+
+            # 2. Concat 파일 내용 생성
+            padding_duration = 1.0
+            concat_content = f"file '{os.path.abspath(processed_bg_path)}'\nduration {padding_duration}\n"
             
-        # 1. FFmpeg에 필요한 입력 파일 리스트와 필터 그래프 생성
-        image_inputs = []
-        filter_complex_parts = []
-        
-        resolution = data.get('resolution', '1920x1080')
-        total_duration = data.get('total_duration', 30.0)
-        
-        stream_counter = 1
-        overlay_stream = "0:v"
+            content_segments = [seg for seg in data.get('segments', []) if not seg.get('is_background', False)]
+            for i, segment in enumerate(content_segments):
+                image_path_from_timeline = segment.get("image_path")
+                if image_path_from_timeline and os.path.exists(image_path_from_timeline):
+                    image_path = image_path_from_timeline
+                else:
+                    image_path = os.path.join(image_dir, segment.get("name"))
 
-        # --- 상세 로깅 시작 ---
-        log_messages = []
-        log_messages.append("="*50)
-        log_messages.append("🎬 FFMPEG 렌더링 타이밍 정보 (from timing.json)")
-        log_messages.append("="*50)
-        log_messages.append("아래 정보는 FFmpeg에 전달되는 각 이미지의 표시 시간입니다.")
-        log_messages.append("이 시간과 타이밍 파일의 시간을 비교하여 동기화를 확인하세요.")
-        log_messages.append("-"*50)
+                if not os.path.exists(image_path):
+                    print(f"  ⚠️ [경고] 이미지 파일을 찾을 수 없습니다: {image_path}, 이 세그먼트를 건너뜁니다.")
+                    continue
+                
+                processed_img_path = os.path.join(temp_dir, f"frame_{i:04d}.png")
+                try:
+                    with Image.open(image_path) as img:
+                        if img.size != target_resolution:
+                            img.resize(target_resolution, Image.Resampling.LANCZOS).save(processed_img_path, 'PNG')
+                        else:
+                            import shutil
+                            shutil.copy(image_path, processed_img_path)
+                except Exception as img_e:
+                    print(f"⚠️ 자막 이미지 처리 실패, 건너뜁니다: {img_e}")
+                    continue
 
-        for i, segment in enumerate(segments):
-            scene_id = segment.get("name")
-            image_path_from_timeline = segment.get("image_path")
+                duration = segment['end_time'] - segment['start_time']
+                if duration > 0:
+                    concat_content += f"file '{os.path.abspath(processed_img_path)}'\nduration {duration}\n"
 
-            if image_path_from_timeline and os.path.exists(image_path_from_timeline):
-                 image_path = image_path_from_timeline
-            else:
-                image_filename = scene_id
-                image_path = os.path.join(image_dir, image_filename)
+            concat_content += f"file '{os.path.abspath(processed_bg_path)}'\nduration {padding_duration}\n"
 
-            if not os.path.exists(image_path):
-                log_messages.append(f"  ⚠️ [경고] 이미지 파일을 찾을 수 없습니다: {image_path}, 이 세그먼트를 건너뜁니다.")
-                continue
+            # 3. Concat 파일 저장
+            with open(concat_file_path, 'w', encoding='utf-8') as f:
+                f.write(concat_content)
+            print(f"✅ Concat 파일 생성 완료: {concat_file_path}")
 
-            image_inputs.extend(['-i', image_path])
-            start_time = segment['start_time']
-            end_time = segment['end_time']
+            # 4. 오디오 필터 생성 (패딩 처리)
+            audio_filter = f"adelay={int(padding_duration*1000)}|{int(padding_duration*1000)},apad=pad_len={int(44100*padding_duration)}"
+
+            # 5. 최종 FFmpeg 명령어 생성 및 실행
+            command = [
+                'ffmpeg', '-y',
+                '-f', 'concat', '-safe', '0', '-i', concat_file_path,
+                '-i', audio_input,
+                '-filter_complex', f"[1:a]{audio_filter}[a]",
+                '-map', '0:v', '-map', '[a]',
+                '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
+                '-c:a', 'aac', '-ar', '44100', '-ac', '2',
+                '-shortest',
+                output_video_path
+            ]
             
-            log_messages.append(f"  - 이미지: {os.path.basename(image_path)}")
-            log_messages.append(f"    - 시작: {start_time:.3f}초")
-            log_messages.append(f"    - 종료: {end_time:.3f}초")
-            log_messages.append(f"    - 유지: {end_time-start_time:.3f}초")
-            log_messages.append("  "+"-"*20)
-            
-            current_image_stream = f"{stream_counter}:v"
-            next_overlay_stream = f"ovr{stream_counter}"
-            
-            filter_complex_parts.append(
-                f"[{overlay_stream}][{current_image_stream}]overlay=enable='between(t,{start_time},{end_time})'[{next_overlay_stream}];"
-            )
-            overlay_stream = next_overlay_stream
-            stream_counter += 1
+            print("🚀 [FFmpeg] 실행 명령어 (Concat 방식 v2):")
+            print(" ".join(command))
+            print("🔄 FFmpeg 실행 중...")
 
-        log_messages.append("="*50 + "\n")
-
-        # 로그를 콘솔과 파일에 저장
-        log_output = "\n".join(log_messages)
-        print(log_output)
-        try:
-            log_file_path = os.path.join("output", "rendering_log.txt")
-            os.makedirs("output", exist_ok=True)
-            with open(log_file_path, 'w', encoding='utf-8') as f:
-                f.write(log_output)
-            print(f"✅ 상세 렌더링 로그를 파일에 저장했습니다: {log_file_path}")
-        except Exception as e:
-            print(f"⚠️ 상세 렌더링 로그 파일 저장에 실패했습니다: {e}")
-        # --- 상세 로깅 종료 ---
-            
-        if not image_inputs:
-            print("🔥🔥🔥 [오류] 타임라인에 유효한 이미지가 하나도 없습니다.")
-            return False
-
-        filter_complex_string = "".join(filter_complex_parts).rstrip(';')
-        
-        # 2. 최종 FFmpeg 명령어 생성
-        command = [
-            'ffmpeg', '-y',
-            '-f', 'lavfi', '-i', f"color=c=black:s={resolution}:d={total_duration}",
-            *image_inputs,
-            '-i', audio_input,
-            '-filter_complex', filter_complex_string,
-            '-map', f'[{overlay_stream}]',
-            '-map', f'{len(image_inputs)//2+1}:a',
-            '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
-            '-c:a', 'aac',
-            '-t', str(total_duration),
-            output_video_path
-        ]
-        
-        print("🚀 [FFmpeg] 실행 명령어:")
-        formatted_cmd = " \
-  ".join(command)
-        print(formatted_cmd)
-
-        # 3. FFmpeg 실행
-        try:
-            subprocess.run(command, check=True, capture_output=True, text=True)
+            subprocess.run(command, check=True, capture_output=False)
             print(f"✅ [성공] 비디오 생성 완료: {output_video_path}")
             return True
-        except subprocess.CalledProcessError as e:
-            print("🔥🔥🔥 [오류] FFmpeg 실행 중 오류 발생! 🔥🔥🔥")
-            print(e.stderr)
+
+        except Exception as e:
+            print(f"🔥🔥🔥 [오류] 비디오 생성 중 예외 발생! 🔥🔥🔥")
+            print(f"  - 오류 타입: {type(e).__name__}")
+            print(f"  - 오류 메시지: {e}")
             return False
+        finally:
+            # 임시 파일 및 디렉토리 정리
+            if os.path.exists(concat_file_path):
+                os.remove(concat_file_path)
+            if temp_dir and os.path.exists(temp_dir):
+                import shutil
+                shutil.rmtree(temp_dir)
+    
+    def _find_background_image(self, script_type: str = None, timing_path: str = None) -> Optional[str]:
+        """
+        UI 설정에서 배경 이미지 파일을 찾아서 경로를 반환
+        script_type: 'intro', 'conversation', 'ending' 중 하나
+        """
+        try:
+            print(f"🔍 배경 이미지 찾기 시작 - 스크립트 타입: {script_type}")
+            
+            # UI 설정에서 배경 이미지 가져오기
+            tab_backgrounds = self._get_current_background_settings(timing_path)
+            print(f"🔍 로드된 배경 설정: {tab_backgrounds}")
+            
+            if not tab_backgrounds:
+                print("⚠️ UI 배경 설정을 찾을 수 없습니다.")
+                return None
+            
+            # 스크립트 타입별 매핑
+            script_type_mapping = {
+                'intro': '인트로 설정',
+                'conversation': '회화 설정', 
+                'ending': '엔딩 설정'
+            }
+            
+            # 스크립트 타입이 지정되지 않은 경우, 파일명에서 추출 시도
+            if not script_type:
+                # 현재 처리 중인 파일에서 스크립트 타입 추출
+                # 이는 create_video_from_timing에서 호출할 때 전달받아야 함
+                print("⚠️ 스크립트 타입이 지정되지 않았습니다.")
+                return None
+            
+            # 해당 스크립트 타입의 배경 설정 가져오기
+            tab_name = script_type_mapping.get(script_type)
+            print(f"🔍 탭 이름: {tab_name}")
+            
+            if not tab_name or tab_name not in tab_backgrounds:
+                print(f"⚠️ {script_type}에 해당하는 배경 설정을 찾을 수 없습니다.")
+                print(f"🔍 사용 가능한 탭들: {list(tab_backgrounds.keys())}")
+                return None
+            
+            background_settings = tab_backgrounds[tab_name]
+            print(f"🔍 {tab_name} 배경 설정: {background_settings}")
+            
+            if background_settings and background_settings.get('enabled', False):
+                bg_path = background_settings.get('value', '')
+                if bg_path and os.path.exists(bg_path):
+                    print(f"✅ {script_type} 배경 이미지 발견: {bg_path}")
+                    return bg_path
+                else:
+                    print(f"⚠️ {script_type} 배경 이미지 파일이 존재하지 않습니다: {bg_path}")
+            else:
+                print(f"⚠️ {script_type} 배경 설정이 비활성화되어 있습니다.")
+            
+            return None
+            
+        except Exception as e:
+            print(f"❌ 배경 이미지 찾기 중 오류: {e}")
+            return None
+
+    def _get_current_background_settings(self, timing_path: str = None):
+        """
+        현재 활성화된 탭의 배경 설정을 가져오기
+        """
+        try:
+            if not timing_path:
+                print("❌ 타이밍 경로가 제공되지 않아 설정을 찾을 수 없습니다.")
+                return None
+
+            # timing_path로부터 project_dir 유추: output/project/id/timing/file.json -> output/project/id
+            project_dir = os.path.dirname(os.path.dirname(timing_path))
+            settings_file = os.path.join(project_dir, "_text_settings.json")
+            
+            print(f"🔍 설정 파일 경로: {settings_file}")
+
+            if os.path.exists(settings_file):
+                import json
+                with open(settings_file, 'r', encoding='utf-8') as f:
+                    settings_data = json.load(f)
+                
+                # 탭별 배경 설정에서 현재 스크립트 타입에 맞는 설정 찾기
+                tab_backgrounds = settings_data.get('common', {}).get('tab_backgrounds', {})
+                return tab_backgrounds
+                
+            return None
+            
+        except Exception as e:
+            print(f"❌ 배경 설정 로드 중 오류: {e}")
+            return None

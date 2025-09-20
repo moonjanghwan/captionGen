@@ -505,6 +505,9 @@ class AudioGenerator:
 
             timing_info["final_audio_path"] = final_audio_path
             
+            # 배경 이미지 세그먼트 추가 기능 제거 (FFmpeg에서 패딩 처리)
+            print(f"🎨 배경 이미지 세그먼트 추가 기능 제거됨 - FFmpeg에서 패딩 처리")
+            
             for p in segment_paths_for_merge:
                 try:
                     os.remove(p)
@@ -523,6 +526,7 @@ class AudioGenerator:
             print(f"❌ [통합] 오디오 및 타이밍 생성 실패: {e}")
             print(traceback.format_exc())
             return None, None
+
 
     def save_precise_timing_info(self, timing_info: Dict, output_path: str) -> bool:
         """정확한 타이밍 정보를 JSON 파일로 저장"""

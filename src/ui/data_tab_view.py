@@ -121,7 +121,7 @@ class DataTabView(ctk.CTkFrame):
         script_selector_frame.grid(row=0, column=0, padx=10, pady=5, sticky="ew")
         _, self.script_selector_combo = create_labeled_widget(
             script_selector_frame, "스크립트 선택", 30, "combo",
-            {"values": ["회화 스크립트", "타이틀 스크립트", "썸네일 스크립트", "인트로 스크립트", "엔딩 스크립트", "키워드 스크립트"],
+            {"values": ["회화 스크립트", "대화 스크립트", "타이틀 스크립트", "썸네일 스크립트", "인트로 스크립트", "엔딩 스크립트", "키워드 스크립트"],
              "fg_color": config.COLOR_THEME["widget"]}
         )
         self.script_selector_combo.master.pack(side="left")
@@ -138,14 +138,16 @@ class DataTabView(ctk.CTkFrame):
         self.script_textbox = ctk.CTkTextbox(self.script_display_frame, fg_color=config.COLOR_THEME["widget"])
         self.script_textbox.grid(row=0, column=0, sticky="nsew")
 
-        # CSV 그리드 (ttk.Treeview)
-        self.csv_tree = ttk.Treeview(self.script_display_frame, columns=("순번", "원어", "학습어", "읽기"), show="headings")
-        # 컬럼 폭: 순번(고정 50), 나머지 3개는 동일 비율 가변
-        for col in ("순번", "원어", "학습어", "읽기"):
+        # CSV 그리드 (ttk.Treeview) - 대화 스크립트용
+        self.csv_tree = ttk.Treeview(self.script_display_frame, columns=("순번", "역할", "화자", "원어", "학습어"), show="headings")
+        # 컬럼 폭 설정
+        for col in ("순번", "역할", "화자", "원어", "학습어"):
             self.csv_tree.heading(col, text=col)
         self.csv_tree.column("순번", width=50, minwidth=50, stretch=False, anchor="center")
-        for col in ("원어", "학습어", "읽기"):
-            self.csv_tree.column(col, width=200, stretch=True, anchor="w")
+        self.csv_tree.column("역할", width=80, minwidth=80, stretch=False, anchor="center")
+        self.csv_tree.column("화자", width=120, minwidth=120, stretch=False, anchor="w")
+        self.csv_tree.column("원어", width=250, stretch=True, anchor="w")
+        self.csv_tree.column("학습어", width=250, stretch=True, anchor="w")
         self.csv_scroll_y = ttk.Scrollbar(self.script_display_frame, orient="vertical", command=self.csv_tree.yview)
         self.csv_tree.configure(yscrollcommand=self.csv_scroll_y.set)
         self.csv_tree.grid(row=0, column=0, sticky="nsew")
@@ -153,6 +155,9 @@ class DataTabView(ctk.CTkFrame):
         # 초기에는 숨김
         self.csv_tree.grid_remove()
         self.csv_scroll_y.grid_remove()
+        
+        # CSV 붙여넣기를 위한 컨텍스트 메뉴 설정
+        self._setup_csv_context_menu()
 
         # --- 1.3. 메시지 윈도우 ---
         self.message_textbox = ctk.CTkTextbox(self, fg_color=config.COLOR_THEME["widget"])
@@ -359,6 +364,14 @@ class DataTabView(ctk.CTkFrame):
                 else:
                     self.log_message("[데이터] dialogueCsv가 없어 표시할 수 없습니다.")
                     self._show_text_content("")
+            elif selected == "대화 스크립트":
+                # 대화 스크립트 선택 시 CSV 뷰로 전환
+                print("DEBUG: 대화 스크립트 선택됨 - CSV 뷰로 전환")
+                self._switch_to_csv_view()
+                # 기존 데이터 클리어
+                for item in self.csv_tree.get_children():
+                    self.csv_tree.delete(item)
+                self._add_message("📋 대화 스크립트 모드: CSV 데이터를 붙여넣으세요 (Ctrl+V 또는 우클릭 메뉴)", "INFO")
             else:
                 if selected == "타이틀 스크립트":
                     titles = data.get("videoTitleSuggestions", [])
@@ -381,6 +394,8 @@ class DataTabView(ctk.CTkFrame):
                 else:
                     content = ""
                 self._show_text_content(content)
+                # 다른 스크립트 타입 선택 시 텍스트 뷰로 전환
+                self._switch_to_text_view()
 
             self._update_audio_buttons_state()
         except Exception as e:
@@ -411,9 +426,11 @@ class DataTabView(ctk.CTkFrame):
         # RFC4180 호환: 큰따옴표로 감싸진 필드 처리
         reader = csv.reader(io.StringIO(dialogue_csv))
         rows = list(reader)
-        # 헤더 제거
-        if rows and [c.strip('"') for c in rows[0][:4]] == ["순번", "원어", "학습어", "읽기"]:
-            rows = rows[1:]
+        # 헤더 제거 (대화 스크립트용: 순번, 역할, 화자, 원어, 학습어)
+        if rows and len(rows[0]) >= 5:
+            header = [c.strip('"') for c in rows[0][:5]]
+            if header == ["순번", "역할", "화자", "원어", "학습어"]:
+                rows = rows[1:]
         for row in rows:
             normalized = [c.strip('"') for c in row]
             padded = (normalized + [""] * 4)[:4]
@@ -743,3 +760,175 @@ class DataTabView(ctk.CTkFrame):
                     self.root.unregister_process(process)
             except Exception:
                 pass
+
+    def _setup_csv_context_menu(self):
+        """CSV 붙여넣기를 위한 컨텍스트 메뉴 설정"""
+        # 텍스트 박스에 컨텍스트 메뉴 바인딩
+        self.script_textbox.bind("<Button-3>", self._show_csv_context_menu)
+        self.script_textbox.bind("<Control-v>", self._handle_csv_paste)
+        
+        # CSV 트리뷰에도 컨텍스트 메뉴 바인딩
+        self.csv_tree.bind("<Button-3>", self._show_csv_context_menu)
+        self.csv_tree.bind("<Control-v>", self._handle_csv_paste)
+
+    def _show_csv_context_menu(self, event):
+        """CSV 컨텍스트 메뉴 표시"""
+        try:
+            context_menu = tk.Menu(self, tearoff=0)
+            context_menu.add_command(label="CSV 붙여넣기", command=self._handle_csv_paste)
+            context_menu.add_separator()
+            context_menu.add_command(label="복사", command=self._copy_selection)
+            context_menu.add_command(label="잘라내기", command=self._cut_selection)
+            context_menu.add_command(label="붙여넣기", command=self._paste_text)
+            
+            # 메뉴 표시
+            context_menu.tk_popup(event.x_root, event.y_root)
+        except Exception as e:
+            print(f"컨텍스트 메뉴 오류: {e}")
+
+    def _handle_csv_paste(self, event=None):
+        """CSV 데이터 붙여넣기 처리"""
+        try:
+            # 클립보드에서 데이터 가져오기
+            clipboard_data = self.clipboard_get()
+            
+            # CSV 형태인지 확인
+            if self._is_csv_format(clipboard_data):
+                # CSV 데이터를 파싱하여 그리드에 표시
+                self._parse_and_display_csv(clipboard_data)
+                self._add_message("✅ CSV 데이터가 성공적으로 붙여넣어졌습니다.", "SUCCESS")
+            else:
+                # 일반 텍스트로 처리
+                self._paste_text()
+                
+        except tk.TclError:
+            # 클립보드가 비어있거나 접근할 수 없는 경우
+            self._add_message("⚠️ 클립보드에 데이터가 없습니다.", "WARNING")
+        except Exception as e:
+            self._add_message(f"❌ CSV 붙여넣기 오류: {e}", "ERROR")
+
+    def _is_csv_format(self, data):
+        """데이터가 CSV 형태인지 확인"""
+        try:
+            lines = data.strip().split('\n')
+            if len(lines) < 2:
+                return False
+            
+            # 첫 번째 줄이 헤더인지 확인
+            first_line = lines[0].strip()
+            expected_headers = ["순번", "역할", "화자", "원어", "학습어"]
+            
+            # CSV 형태인지 간단히 확인 (탭이나 쉼표로 구분)
+            if '\t' in first_line or ',' in first_line:
+                return True
+            
+            # 헤더가 예상 형태인지 확인
+            if any(header in first_line for header in expected_headers):
+                return True
+                
+            return False
+        except Exception:
+            return False
+
+    def _parse_and_display_csv(self, csv_data):
+        """CSV 데이터를 파싱하여 그리드에 표시"""
+        try:
+            # 기존 데이터 클리어
+            for item in self.csv_tree.get_children():
+                self.csv_tree.delete(item)
+            
+            # CSV 데이터 파싱
+            lines = csv_data.strip().split('\n')
+            
+            # 첫 번째 줄이 헤더인지 확인하고 건너뛰기
+            start_index = 0
+            if self._is_header_line(lines[0]):
+                start_index = 1
+            
+            # 데이터 행 처리
+            for i, line in enumerate(lines[start_index:], start=1):
+                if not line.strip():
+                    continue
+                    
+                # 탭이나 쉼표로 구분
+                if '\t' in line:
+                    fields = line.split('\t')
+                else:
+                    fields = line.split(',')
+                
+                # 필드 정리 (따옴표 제거)
+                cleaned_fields = []
+                for field in fields:
+                    field = field.strip()
+                    if field.startswith('"') and field.endswith('"'):
+                        field = field[1:-1]
+                    cleaned_fields.append(field)
+                
+                # 필드 수가 맞는지 확인 (5개: 순번, 역할, 화자, 원어, 학습어)
+                if len(cleaned_fields) >= 5:
+                    # 순번이 비어있으면 자동으로 번호 부여
+                    if not cleaned_fields[0] or cleaned_fields[0] == "":
+                        cleaned_fields[0] = str(i)
+                    
+                    # 그리드에 추가
+                    self.csv_tree.insert("", "end", values=cleaned_fields[:5])
+                elif len(cleaned_fields) >= 4:
+                    # 4개 필드인 경우 순번 자동 추가
+                    row_data = [str(i)] + cleaned_fields[:4]
+                    self.csv_tree.insert("", "end", values=row_data)
+            
+            # 대화 스크립트 모드로 전환
+            self._switch_to_csv_view()
+            
+        except Exception as e:
+            self._add_message(f"❌ CSV 파싱 오류: {e}", "ERROR")
+
+    def _is_header_line(self, line):
+        """헤더 라인인지 확인"""
+        header_keywords = ["순번", "역할", "화자", "원어", "학습어", "번호", "role", "speaker"]
+        return any(keyword in line.lower() for keyword in header_keywords)
+
+    def _switch_to_csv_view(self):
+        """CSV 그리드 뷰로 전환"""
+        self.script_textbox.grid_remove()
+        self.csv_tree.grid(row=0, column=0, sticky="nsew")
+        self.csv_scroll_y.grid(row=0, column=1, sticky="ns")
+
+    def _switch_to_text_view(self):
+        """텍스트 뷰로 전환"""
+        self.csv_tree.grid_remove()
+        self.csv_scroll_y.grid_remove()
+        self.script_textbox.grid(row=0, column=0, sticky="nsew")
+
+    def _copy_selection(self):
+        """선택된 텍스트 복사"""
+        try:
+            if self.script_textbox.selection_present():
+                self.script_textbox.event_generate("<<Copy>>")
+            elif self.csv_tree.selection():
+                # CSV 그리드에서 선택된 행 복사
+                selected_items = self.csv_tree.selection()
+                if selected_items:
+                    item = selected_items[0]
+                    values = self.csv_tree.item(item, "values")
+                    csv_text = "\t".join(str(v) for v in values)
+                    self.clipboard_clear()
+                    self.clipboard_append(csv_text)
+        except Exception as e:
+            self._add_message(f"❌ 복사 오류: {e}", "ERROR")
+
+    def _cut_selection(self):
+        """선택된 텍스트 잘라내기"""
+        try:
+            if self.script_textbox.selection_present():
+                self.script_textbox.event_generate("<<Cut>>")
+        except Exception as e:
+            self._add_message(f"❌ 잘라내기 오류: {e}", "ERROR")
+
+    def _paste_text(self):
+        """일반 텍스트 붙여넣기"""
+        try:
+            if self.script_textbox.winfo_viewable():
+                self.script_textbox.event_generate("<<Paste>>")
+        except Exception as e:
+            self._add_message(f"❌ 붙여넣기 오류: {e}", "ERROR")

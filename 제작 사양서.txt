@@ -1262,8 +1262,357 @@ UI 감정 선택 - 사용자 커스터마이징
  SSML에 화자를 넣지 말고, Google TTS 를 호출 할 때 화자를 넣어서 호출 하는 방식으로  
  감정 표현만 SSML 에 넣고 화자는 나중에 포함해서 요청 하는 형식으로 만들어
 
+자동 생성 버튼
+    - 인트로, 회화, 엔딩의 비디오 생성을 일괄적으로 생성 하고 merge하여 최종본을 만든다.
+    - 지금까지 작성된 프로세스 매니페스트 생성,오디오 생성,자막 이미지 생성,비디오 렌더링을
+        인트로,회화,엔딩에 대해서 적용을 하여 생성 한다.
+    - 생성된 비디오들을 합쳐서 최종 병합 버튼의 기능을 수행하여 최종본을 만든다.
 
-프로그램 정리 (v)
+프로그램 정리 (v1.2로 복귀 가능) - ✅ 완료
 
- 타임라인 생성 버튼을 없애고 함수도 정리 해 줘.
- 비디오 렌더링 버튼을 없애고 타이밍 기반 렌더링을 비디오 렌더링으로 이름을 바꾸고 칼라도 다른 버튼과 갖게 해 줘.
+ 1. ✅ 사용하지 않는 타임라인 생성 버튼을 없애고 함수도 정리 완료
+ 2. ✅ 비디오 렌더링 버튼을 없애고 타이밍 기반 렌더링을 비디오 렌더링으로 이름을 바꾸고 칼라도 다른 버튼과 갖게 완료
+ 3. ✅ 자동 생성 버튼 다음에 종료 버튼을 만들고 프로그램 종료 기능을 넣어 완료
+ 4. 매니페스트 생성 버튼을 없애고 오디오 생성 버튼을 누를 때 
+    매니페스트 생성 기능을 먼저 수행하고 오디오 생성 기능을 수행 한다.
+5. ✅ 자동 생성 버튼을 프로그램을 손대지 말고 지금 있는 버튼 오프 레이션의 시퀀스로 
+    자동으로 만들 수 있도록 코딩 완료
+6. ✅ 버튼의 칼라를 모두 매니페스트 생성 버튼의 칼라와 갖게 완료
+7. ✅ 비디오 렌더링 기능을 인트로, 회화, 엔딩을 모두 처리하도록 개선 완료
+8. ✅ 비디오 렌더링 시 앞과 뒤에 1초의 배경 화면과 무음을 넣고 비디오를 만드는 기능으로 수정 완료
+9. ✅ QuickTime Player 호환성 개선 - FFmpeg 출력 파라미터 최적화로 프리뷰 문제 해결 완료
+10. ✅ UI와 패딩 기능 연결 완료 - 비디오 렌더링 버튼이 패딩 기능이 포함된 함수를 호출하도록 수정 완료
+11. ✅ 대화 스크립트 CSV 붙여넣기 기능 구현 완료 - 그리드 형태로 CSV 데이터 표시 및 편집 가능
+
+
+터미널 로그와 현재 시스템 구조를 분석하여 플러그인 아키텍처로 전환하는 TODO 리스트
+
+
+    현재 시스템 분석 및 플러그인 아키텍처 설계
+    플러그인 기본 구조 생성 (base_plugin.py, plugin_manager.py)
+    인트로 플러그인 구현 (라인별 처리, 33.83초 오디오)
+    회화 플러그인 구현 (Screen 1/2 구조, 71.53초 오디오)
+    엔딩 플러그인 구현 (라인별 처리)
+    플러그인 등록 및 관리 시스템 구축
+    PipelineManager를 플러그인 기반으로 리팩토링
+    UI에서 플러그인 시스템과 연동하도록 수정
+    플러그인별 설정 관리 시스템 구현
+    플러그인 시스템 테스트 및 검증
+    
+�� 플러그인 아키텍처 전환 TODO 리스트
+    �� 현재 상황 분석
+        터미널 로그를 보면 현재 시스템이 다음과 같이 작동하고 있습니다:
+        인트로: 라인별 처리 (6개 라인, 33.83초)
+        회화: Screen 1/2 구조 (5개 장면, 71.53초)
+        엔딩: 라인별 처리 (예상)
+        각 스크립트 타입마다 다른 처리 로직이 필요하므로 플러그인 아키텍처가 적합합니다.
+
+    🎯 플러그인 아키텍처의 장점
+        1. 확장성: 새로운 스크립트 타입 추가가 용이
+        2. 유지보수성: 각 스크립트 타입별 로직이 독립적으로 관리
+        3. 재사용성: 공통 기능은 기본 클래스에서 상속
+        4. 테스트 용이성: 각 플러그인을 독립적으로 테스트 가능
+        5. 설정 관리: 플러그인별 개별 설정 가능
+
+📁 예상 디렉토리 구조
+
+    src/pipeline/plugins/
+    ├── __init__.py
+    ├── base_plugin.py          # 기본 플러그인 클래스
+    ├── intro_plugin.py         # 인트로 처리 플러그인
+    ├── conversation_plugin.py  # 회화 처리 플러그인
+    ├── ending_plugin.py        # 엔딩 처리 플러그인
+    └── plugin_manager.py       # 플러그인 관리자
+
+�� 마이그레이션 전략
+    1. 점진적 전환: 기존 시스템을 유지하면서 플러그인을 병렬로 개발
+    2. 호환성 보장: 기존 UI와 API 호환성 유지
+    3. 단계적 교체: 플러그인이 완성되면 기존 로직을 교체
+    
+    이 TODO 리스트를 통해 현재의 복잡한 스크립트 타입별 처리 로직을 깔끔하고 확장 가능한 플러그인 
+    시스템으로 전환할 수 있습니다. 
+    각 단계별로 진행하면서 기존 기능의 안정성을 보장하면서도 새로운 아키텍처의 장점을 활용할 수 있습니다.
+
+
+
+🎉 플러그인 시스템 전환 완료!
+
+✅ 완성된 기능들
+    1. 플러그인 아키텍처 설계
+        BasePlugin 베이스 클래스
+        PluginManager 중앙 관리자
+        PluginIntegrationAdapter 호환성 어댑터
+
+    2. 스크립트 타입별 플러그인 구현
+        인트로 플러그인: 라인별 처리 (3개 문장, 33.83초 오디오)
+        회화 플러그인: Screen 1/2 구조 (2개 장면, 71.53초 오디오)
+        엔딩 플러그인: 라인별 처리 (2개 문장)
+
+    3. 제작 사양서 준수
+        Screen 1: 순번 + 원어
+        Screen 2: 순번 + 원어 + 학습어 + 읽기
+        화자 순서: 원어 → 학습어1 → 학습어2 → 학습어3 → 학습어4
+        화자간 1초 무음, 행간 1초 무음
+
+    4. 기존 시스템 호환성
+        기존 UI와 API 호환성 유지
+        점진적 전환 가능
+        기존 시스템과 병렬 사용 가능
+
+�� 플러그인 시스템의 장점
+
+    1. 확장성: 새로운 스크립트 타입 추가가 용이
+    2. 유지보수성: 각 스크립트 타입별 로직이 독립적으로 관리
+    3. 재사용성: 공통 기능은 기본 클래스에서 상속
+    4. 테스트 용이성: 각 플러그인을 독립적으로 테스트 가능
+    5. 설정 관리: 플러그인별 개별 설정 가능
+
+📁 생성된 파일 구조
+
+    test_output/test_plugin_project/test_plugin_project/
+    ├── manifest/
+    │   ├── test_plugin_project_intro.json
+    │   ├── test_plugin_project_conversation.json
+    │   └── test_plugin_project_ending.json
+    ├── mp3/
+    │   ├── test_plugin_project_intro.mp3
+    │   ├── test_plugin_project_conversation.mp3
+    │   └── test_plugin_project_ending.mp3
+    ├── SSML/
+    │   ├── test_plugin_project_intro.ssml
+    │   ├── test_plugin_project_conversation.ssml
+    │   └── test_plugin_project_ending.ssml
+    ├── subtitles/
+    │   ├── intro/ (3개 이미지)
+    │   ├── conversation/ (4개 이미지: Screen1, Screen2)
+    │   └── ending/ (2개 이미지)
+    └── mp4/
+        ├── test_plugin_project_intro.mp4
+        ├── test_plugin_project_conversation.mp4
+        └── test_plugin_project_ending.mp4
+        
+🚀 사용 방법
+
+기존 시스템을 유지하면서 플러그인 시스템을 사용하려면:
+    test_output/test_plugin_project/test_plugin_project/
+    ├── manifest/
+    │   ├── test_plugin_project_intro.json
+    │   ├── test_plugin_project_conversation.json
+    │   └── test_plugin_project_ending.json
+    ├── mp3/
+    │   ├── test_plugin_project_intro.mp3
+    │   ├── test_plugin_project_conversation.mp3
+    │   └── test_plugin_project_ending.mp3
+    ├── SSML/
+    │   ├── test_plugin_project_intro.ssml
+    │   ├── test_plugin_project_conversation.ssml
+    │   └── test_plugin_project_ending.ssml
+    ├── subtitles/
+    │   ├── intro/ (3개 이미지)
+    │   ├── conversation/ (4개 이미지: Screen1, Screen2)
+    │   └── ending/ (2개 이미지)
+    └── mp4/
+        ├── test_plugin_project_intro.mp4
+        ├── test_plugin_project_conversation.mp4
+        └── test_plugin_project_ending.mp4
+
+이제 기존 시스템을 유지하면서 플러그인 방식으로 전환이 완료되었습니다! 🎊
+
+
+✅ 자동 생성 기능 개선 완료!
+
+🚀 개선된 자동 생성 과정
+    이제 자동 생성 버튼을 클릭하면 다음과 같은 완전한 파이프라인이 실행됩니다:
+
+�� 1단계: 매니페스트 생성
+    인트로, 회화, 엔딩 스크립트를 모두 처리하는 매니페스트 생성
+
+🎵 2단계: 오디오 생성
+    인트로, 회화, 엔딩에 대한 오디오 파일 생성
+    각각의 타이밍 정보 생성
+
+�� 3단계: 자막 이미지 생성
+    인트로: 라인별 자막 이미지
+    회화: Screen 1/2 구조의 자막 이미지
+    엔딩: 라인별 자막 이미지
+
+🎬 4단계: 비디오 렌더링 (개선됨!)
+    인트로 비디오 생성 ({식별자}_intro.mp4)
+    회화 비디오 생성 ({식별자}_conversation.mp4)
+    엔딩 비디오 생성 ({식별자}_ending.mp4)
+
+🔗 5단계: 최종 병합
+    인트로 + 회화 + 엔딩 비디오를 하나로 병합
+    최종 비디오 생성 ({프로젝트명}_final.mp4)
+
+�� 주요 개선사항
+    1. 전체 처리: 이제 자동 생성이 인트로, 회화, 엔딩을 모두 처리합니다
+    2. 개별 비디오: 각 스크립트 타입별로 개별 비디오가 생성됩니다
+    3. 최종 병합: 모든 비디오가 하나의 최종 비디오로 병합됩니다
+    4. 상세 로그: 각 단계별로 생성된 파일들이 출력 창에 표시됩니다
+    5. 오류 처리: 일부 비디오 생성이 실패해도 다른 비디오는 계속 생성됩니다
+
+📁 최종 출력 파일 구조
+
+    output/{프로젝트명}/{식별자}/mp4/
+    ├── {식별자}_intro.mp4          ✅ 인트로 비디오
+    ├── {식별자}_conversation.mp4   ✅ 회화 비디오  
+    ├── {식별자}_ending.mp4         ✅ 엔딩 비디오
+    └── {프로젝트명}_final.mp4      ✅ 최종 병합 비디오
+
+이제 자동 생성 버튼 하나로 전체 파이프라인이 완전히 실행되어 최종 비디오까지 완성됩니다! 🎉
+
+## ✅ 스무스 전환 기능 추가 완료!
+
+### 🎬 스무스 전환 효과 (오디오 겹치지 않는 방식)
+- **오디오 길이 자동 측정**: 각 비디오의 실제 오디오 길이를 ffprobe로 측정
+- **오디오 끝에서 전환 시작**: 첫 번째 비디오의 오디오가 끝나기 1초 전에 전환 시작
+- **다음 오디오 시작 전 완료**: 두 번째 비디오의 오디오가 시작하기 전에 전환 완료
+- **1초간 페이드 인/아웃** 효과로 자연스러운 연결
+- **오디오 순차 재생**: 오디오는 겹치지 않고 순차적으로 재생 (크로스페이드 없음)
+- **비디오만 스무스 전환**: 정지 화면 간에만 부드러운 페이드 전환
+
+### ⚙️ 사용자 옵션
+- **스무스 전환 체크박스**: UI에서 스무스 전환 효과 활성화/비활성화 가능
+- **기본값**: 스무스 전환 활성화 (True)
+- **대안**: 체크 해제 시 기본 concat 방식 사용
+
+### 🔧 기술적 구현
+- **ffprobe**: 각 비디오의 오디오 길이 자동 측정
+- **FFmpeg xfade 필터**: 비디오 간 부드러운 전환 (오디오 기반 offset)
+- **acrossfade 필터**: 오디오 간 부드러운 전환
+- **3단계 전환**: 
+  - 인트로→회화: 인트로 오디오 끝 1초 전 (35.00초)
+  - 회화→엔딩: 회화 오디오 끝 1초 전 (102.92초)
+- **타임아웃 설정**: 5분 제한으로 무한 대기 방지
+- **오류 처리**: 오디오 측정 실패 시 기본 concat 방식으로 자동 전환
+
+### 📊 성능 비교
+- **스무스 전환**: 약간 더 오래 걸리지만 시각적 품질 향상
+- **기본 concat**: 빠르지만 갑작스러운 전환
+- **사용자 선택**: 상황에 따라 적절한 방식 선택 가능
+
+### 🎬 스무스 전환용 패딩 기능 추가
+- **비디오 렌더링 시 패딩 추가**: 각 비디오 앞뒤로 1초의 배경 화면과 무음 추가
+- **패딩 목적**: 스무스 전환 시 오디오가 잘리는 문제 해결
+- **패딩 구조**: 
+  - 앞 1초: 배경 이미지 + 무음 (오디오 지연 시작)
+  - 원본 콘텐츠: 기존 타이밍 그대로 (실제 오디오 재생)
+  - 뒤 1초: 배경 이미지 + 무음 (오디오 패딩 추가)
+- **배경 이미지**: 검은 화면 대신 실제 배경 이미지 사용 (assets/background/ 폴더)
+- **오디오 처리**: adelay와 apad 필터로 앞뒤 무음 구간 생성
+- **전환 시점 조정**: 패딩을 고려하여 스무스 전환 시점 자동 계산
+- **결과**: 더 자연스럽고 부드러운 비디오 전환 효과
+
+
+
+대화 생성
+
+
+1. 온라인으로 항공권 구매하기 -> 제목
+상황 설명:                -> 제거
+한국인 승객 민지가 항공사 웹사이트에서 항공권을 구매하려고 하다가 문제가 생겨 
+고객 서비스 상담원 Sarah와 실시간 채팅으로 대화를 나누는 상황입니다.        -> 내레이션
+영어회화:                  -> 제거
+Minji: Hello, I'm having trouble booking a flight ticket on your website.  -> 학습어 1
+	안녕하세요, 귀사 웹사이트에서 항공권 예약하는 데 문제가 있어요.                       -> 원어
+Sarah: Hello! I'm Sarah, how can I assist you with your booking today?     
+	안녕하세요! 저는 사라입니다. 오늘 예약 관련해서 어떻게 도와드릴까요?                    -> 학습어 2
+Minji: I'm trying to book a round-trip ticket from Seoul to London, but the payment keeps failing.
+	서울에서 런던으로 가는 왕복 항공권을 예약하려고 하는데 결제가 계속 실패해요.
+Sarah: I apologize for the inconvenience. Could you provide me with your booking reference number?
+	불편을 드려 죄송합니다. 예약 참고 번호를 알려주시겠어요?
+Minji: Yes, it's KE789456.
+	네, KE789456입니다.
+Sarah: Thank you. I can see you're trying to pay with a credit card. Sometimes international transactions need to be authorized first. Have you informed your bank?
+	감사합니다. 신용카드로 결제하려고 하시는 것 같네요. 가끔 해외 거래는 사전 승인이 필요합니다. 은행에 알려보셨나요?
+Minji: Oh, I haven't. Should I call my bank first?
+	아, 아니요. 은행에 먼저 전화해야 하나요?
+Sarah: Yes, that would be helpful. Once you've authorized the payment with your bank, please try again or I can help process the payment for you directly.
+	네, 그게 도움이 될 거예요. 은행에서 결제를 승인한 후에 다시 시도하시거나 제가 직접 결제를 도와드릴 수도 있어요. 
+
+1. 타이틀 : 대화의 내용과 맞는 배경을 사용하고 크게 제목을 타이트로 쓴다.
+2. 인트로 : 대화의 내용에 맞는 상황을 배경으로 여자 앵커가 상황 설명을 읽는다.
+3. 대화 : 회화 읽기 -> 자세히 읽기 -> 회화 읽기
+    - 학습어 1 화자 : 여성1, 학습어 2 화자 : 남성1, 학습어 3 화자 : 여성2, 학습어 4 화자 : 남성2 
+    - 화자의 이름을 따라 학습어 화자를 결정한다. (예 : minji : 여성1, Sarah : 여성2)
+    - 회화 읽기 : 학습어를 학습어 화자 1, 학습어 화자 2 가 대화 형식으로 학습어만 읽는다.
+    - 자세히 읽기 : 원어 -> 학습어 1 -> 학습어 -> 학습어 3 -> 학습어 4
+    화자 단위로 페이지를 만들며 화자의 순서는 원어를 원어 화자가 읽고, 학습어를 화자 1,2,3,4 가 차례로
+    학습어를 읽는다.
+
+원어 -> 학습어 1 -> 학습어 -> 학습어 3 -> 학습어 4
+2. 오디오
+3. 자막
+
+
+대화 제작 탭 UI
+
+1. 대화 스크립트 만들기 (CSV 부쳐 넣기)
+
+    대화 스크립트를 선택하면 파이프라인 탭과 데이터 탭 의 스크립트 창에 다음과 같은 : CSV 파일을 그리드 형태로 붙여 넣는다
+    각각의 스크립트 창은 편집이 가능하도록 한다.
+    행 구성은  순번,역할,화자,원어,학습어의 형태로 만든다.
+    
+    순번,역할,화자,원어,학습어
+    1,Minji,학습어 화자 1,"","Hello, I'm having trouble booking a flight ticket on your website."
+    2,Minji,원어 화자,"안녕하세요, 귀사 웹사이트에서 항공권 예약하는 데 문제가 있어요.",""
+    3,Sarah,학습어 화자 3,"","Hello! I'm Sarah, how can I assist you with your booking today?"
+    4,Sarah,원어 화자,"안녕하세요! 저는 사라입니다. 오늘 예약 관련해서 어떻게 도와드릴까요?",""
+    5,Minji,학습어 화자 1,"","I'm trying to book a round-trip ticket from Seoul to London, but the payment keeps failing."
+    6,Minji,원어 화자,"서울에서 런던으로 가는 왕복 항공권을 예약하려고 하는데 결제가 계속 실패해요.",""
+    7,Sarah,학습어 화자 3,"","I apologize for the inconvenience. Could you provide me with your booking reference number?"
+    8,Sarah,원어 화자,"불편을 드려 죄송합니다. 예약 참고 번호를 알려주시겠어요?",""
+    9,Minji,학습어 화자 1,"","Yes, it's KE789456."
+    10,Minji,원어 화자,"네, KE789456입니다.",""
+    11,Sarah,학습어 화자 3,"","Thank you. I can see you're trying to pay with a credit card. Sometimes international transactions need to be authorized first. Have you informed your bank?"
+    12,Sarah,원어 화자,"감사합니다. 신용카드로 결제하려고 하시는 것 같네요. 가끔 해외 거래는 사전 승인이 필요합니다. 은행에 알려보셨나요?",""
+    13,Minji,학습어 화자 1,"","Oh, I haven't. Should I call my bank first?"
+    14,Minji,원어 화자,"아, 아니요. 은행에 먼저 전화해야 하나요?",""
+    15,Sarah,학습어 화자 3,"","Yes, that would be helpful. Once you've authorized the payment with your bank, please try again or I can help process the payment for you directly."
+    16,Sarah,원어 화자,"네, 그게 도움이 될 거예요. 은행에서 결제를 승인한 후에 다시 시도하시거나 제가 직접 결제를 도와드릴 수도 있어요.",""
+
+    이것을 대화창에 그리드 형태로 붙여놓도록 한다.
+
+## ✅ 구현 완료된 기능
+
+### 📋 **대화 스크립트 CSV 붙여넣기 기능**
+
+1. **스크립트 선택 옵션 추가**
+   - "대화 스크립트" 옵션이 스크립트 선택 콤보박스에 추가됨
+
+2. **CSV 그리드 구조**
+   - 컬럼: `순번`, `역할`, `화자`, `원어`, `학습어`
+   - 각 컬럼의 폭이 최적화되어 표시
+
+3. **CSV 붙여넣기 방법**
+   - **Ctrl+V**: 키보드 단축키로 CSV 붙여넣기
+   - **우클릭 메뉴**: "CSV 붙여넣기" 옵션
+   - 자동으로 CSV 형태 감지하여 그리드로 변환
+
+4. **스마트 파싱**
+   - 탭(`\t`) 또는 쉼표(`,`) 구분자 자동 인식
+   - 따옴표로 감싸진 필드 자동 처리
+   - 헤더 라인 자동 감지 및 건너뛰기
+   - 순번 자동 부여 (비어있는 경우)
+
+5. **편집 기능**
+   - 그리드 형태로 표시된 데이터 편집 가능
+   - 텍스트 뷰와 CSV 뷰 간 자동 전환
+
+## 🚀 **사용 방법**
+
+1. **데이터 탭**에서 스크립트 선택을 **"대화 스크립트"**로 변경
+2. CSV 데이터를 클립보드에 복사
+3. **Ctrl+V** 또는 **우클릭 → CSV 붙여넣기** 실행
+4. 자동으로 그리드 형태로 표시됨
+
+## 📝 **지원하는 CSV 형태**
+
+```
+순번,역할,화자,원어,학습어
+1,Minji,학습어 화자 1,"","Hello, I'm having trouble booking a flight ticket on your website."
+2,Minji,원어 화자,"안녕하세요, 귀사 웹사이트에서 항공권 예약하는 데 문제가 있어요.",""
+```
+
+이 기능은 파이프라인 탭과 데이터 탭 모두에서 사용 가능하며, 각각의 스크립트 창에서 편집이 가능합니다.

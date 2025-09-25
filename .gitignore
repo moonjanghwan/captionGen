@@ -1,17 +1,12 @@
-# 가상 환경 폴더
+.DS_Store
 .venv/
-
-# API 키 및 민감 정보 파일
-.env
-credentials.json
-
-# 파이썬 캐시 파일
 __pycache__/
 *.pyc
-
-# IDE/에디터 설정 파일
+*.pyo
+*.log
 .vscode/
-.idea/
-
-./output/
-./assets/
+temp/
+test_output/
+test_results/
+test_results_v2/
+output/

@@ -3,1573 +3,550 @@ from src import config
 import tkinter as tk
 import os
 import json
-import glob
 from tkinter import filedialog
+from tkinter import colorchooser # Color chooser import
 from src.ui.ui_utils import create_labeled_widget
-# SubtitleGenerator는 삭제됨 - PNGRenderer 사용 # Import SubtitleGenerator
-from PIL import Image, ImageDraw, ImageFont, ImageColor, ImageFilter # Keep PIL imports for _make_base_canvas and other direct uses
-
-
-
+import traceback
 
 class ImageTabView(ctk.CTkFrame):
+    # 명세에 따른 새로운 기본값
+    defaults = {
+        "conversation": {
+            "main_background": {"type": "이미지", "value": "/Users/janghwanmoon/Projects/captionGen/assets/background/shubham-dhage-1pK0lHvVaeM-unsplash.jpg"},
+            "line_spacing": {"ratio": 0.8},
+            "background_box": {"type": "없음", "color": "#000000", "alpha": 0.2, "margin": 2},
+            "shadow": {"useBlur": True, "thick": 2, "color": "#000000", "blur": 8, "offx": 2, "offy": 2, "alpha": 0.6},
+            "border": {"thick": 2, "color": "#000000"},
+            "행수": "4", "비율": "16:9", "해상도": "1920x1080" ,
+            "rows": [
+                {"행": "순번", "x": 50, "y": 50, "w": 1820, "크기(pt)": 80, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFFFF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": False, "쉐도우": False, "외곽선": False},
+                {"행": "원어", "x": 50, "y": 150, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#00FFFF", "좌우 정렬": "Center", "상하 정렬": "Top", "바탕": False, "쉐도우": False, "외곽선": False},
+                {"행": "학습어", "x": 50, "y": 450, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Noto Sans KR Bold", "색상": "#FF00FF", "좌우 정렬": "Center", "상하 정렬": "Top", "바탕": False, "쉐도우": False, "외곽선": False},
+                {"행": "읽기", "x": 50, "y": 750, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFF00", "좌우 정렬": "Center", "상하 정렬": "Top", "바탕": False, "쉐도우": False, "외곽선": False},
+            ]
+        },
+        "thumbnail": {
+            "main_background": {"type": "이미지", "value": ""},
+            "line_spacing": {"ratio": 1.0},
+            "background_box": {"type": "블록", "color": "#000000", "alpha": 0.7, "margin": 10},
+            "shadow": {"useBlur": True, "thick": 5, "color": "#FFFFFF", "blur": 10, "offx": 0, "offy": 0, "alpha": 0.5},
+            "border": {"thick": 0, "color": "#000000"},
+            "행수": "4", "비율": "16:9", "해상도": "1920x1080" ,
+            "rows": [
+                {"행": "제목", "x": 50, "y": 50, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFFFF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": True, "쉐도우": True, "외곽선": False},
+                {"행": "부제목", "x": 50, "y": 200, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#00FFFF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": True, "쉐도우": True, "외곽선": False},
+                {"행": "설명", "x": 50, "y": 350, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FF00FF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": True, "쉐도우": True, "외곽선": False},
+                {"행": "태그", "x": 50, "y": 500, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFF00", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": True, "쉐도우": True, "외곽선": False},
+            ]
+        },
+        "intro": {
+            "main_background": {"type": "색상", "value": "#111111"},
+            "line_spacing": {"ratio": 1.2},
+            "background_box": {"type": "없음", "color": "#000000", "alpha": 0.5, "margin": 5},
+            "shadow": {"useBlur": False, "thick": 2, "color": "#FFFFFF", "blur": 5, "offx": 2, "offy": 2, "alpha": 0.8},
+            "border": {"thick": 1, "color": "#FFFFFF"},
+            "행수": "1", "비율": "16:9", "해상도": "1920x1080" ,
+            "rows": [{"행": "인트로", "x": 50, "y": 50, "w": 1820, "크기(pt)": 80, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFFFF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": True, "쉐도우": True, "외곽선": True}]
+        },
+        "ending": {
+            "main_background": {"type": "색상", "value": "#222222"},
+            "line_spacing": {"ratio": 1.2},
+            "background_box": {"type": "없음", "color": "#000000", "alpha": 0.5, "margin": 5},
+            "shadow": {"useBlur": True, "thick": 3, "color": "#000000", "blur": 5, "offx": 3, "offy": 3, "alpha": 0.7},
+            "border": {"thick": 0, "color": "#000000"},
+            "행수": "1", "비율": "16:9", "해상도": "1920x1080" ,
+            "rows": [{"행": "엔딩", "x": 50, "y": 50, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFFFF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": False, "쉐도우": True, "외곽선": False}]
+        },
+        "dialogue": {
+            "main_background": {"type": "색상", "value": "#000000"},
+            "line_spacing": {"ratio": 0.8},
+            "background_box": {"type": "블록", "color": "#000000", "alpha": 0.5, "margin": 5},
+            "shadow": {"useBlur": True, "thick": 2, "color": "#000000", "blur": 8, "offx": 2, "offy": 2, "alpha": 0.6},
+            "border": {"thick": 2, "color": "#000000"},
+            "행수": "3", "비율": "16:9", "해상도": "1920x1080" ,
+            "rows": [
+                {"행": "원어", "x": 50, "y": 250, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFFFF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": True, "쉐도우": False, "외곽선": False},
+                {"행": "학습어1", "x": 50, "y": 550, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFFFF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": True, "쉐도우": False, "외곽선": False},
+                {"행": "학습어2", "x": 50, "y": 850, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFFFF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": True, "쉐도우": False, "외곽선": False},
+            ]
+        },
+    }
+
     def __init__(self, parent, root=None):
         super().__init__(parent, fg_color="transparent")
         self.root = root
+        self.current_script_name = None
+
+        try:
+            config_path = os.path.join(config.BASE_DIR, 'config.json')
+            with open(config_path, 'r', encoding='utf-8') as f:
+                self.app_config = json.load(f)
+            self.font_options = list(self.app_config.get("fonts", {}).keys())
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.app_config = {}
+            self.font_options = ["Arial"] # Fallback
+
+        self.defaults = self._get_updated_defaults()
+        
+        # _text_settings.json 파일에서 설정 로드 시도
+        try:
+            text_settings_path = os.path.join(config.BASE_DIR, '_text_settings.json')
+            if os.path.exists(text_settings_path):
+                with open(text_settings_path, 'r', encoding='utf-8') as f:
+                    saved_settings = json.load(f)
+                print(f"✅ [UI] _text_settings.json 파일에서 설정 로드 완료")
+                print(f"🔍 [UI] 로드된 설정 키들: {list(saved_settings.keys())}")
+                
+                # 저장된 설정으로 script_settings 초기화
+                self.script_settings = {}
+                for script_type, settings in saved_settings.items():
+                    self.script_settings[script_type] = settings.copy()
+                    print(f"🔍 [UI] {script_type} 설정 로드: {list(settings.keys())}")
+            else:
+                print(f"⚠️ [UI] _text_settings.json 파일이 없어서 기본 설정을 사용합니다.")
+                self.script_settings = {key: value.copy() for key, value in self.defaults.items()}
+        except Exception as e:
+            print(f"⚠️ [UI] _text_settings.json 로드 실패: {e}")
+            print(f"🔍 [UI] 기본 설정을 사용합니다.")
+            self.script_settings = {key: value.copy() for key, value in self.defaults.items()}
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1) # 텍스트 설정 탭
+        self.grid_rowconfigure(1, weight=1)
 
-        # --- 3.1. 공통 설정 섹션 ---
-        common_settings_frame = ctk.CTkFrame(self, fg_color=config.COLOR_THEME["widget"])
-        common_settings_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
-        self._create_common_settings_widgets(common_settings_frame)
+        selector_frame = ctk.CTkFrame(self, fg_color=config.COLOR_THEME["widget"])
+        selector_frame.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="ew")
+        self._create_script_selector(selector_frame)
 
-        # --- 3.2. 텍스트 설정 ---
-        self.tab_view = ctk.CTkTabview(self, anchor="nw", border_width=1, 
-                                       fg_color=config.COLOR_THEME["widget"],
-                                       segmented_button_fg_color=config.COLOR_THEME["background"],
-                                       segmented_button_selected_color="#E67E22",
-                                       segmented_button_selected_hover_color="#F39C12",
-                                       segmented_button_unselected_color="#2C3E50",
-                                       text_color=config.COLOR_THEME["text"])
-        self.tab_view.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
-        self._create_text_settings_tabs(self.tab_view)
+        settings_grid_frame = ctk.CTkFrame(self, fg_color="transparent")
+        settings_grid_frame.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
+        
+        initial_script = self.script_selector.get()
+        self.settings_grid = TextSettingsTab(settings_grid_frame, self.defaults[initial_script], self.font_options, self._open_color_picker)
+        self.settings_grid.pack(expand=True, fill="both")
 
-        # --- 3.3 메시지 창 (JSON 뷰어) ---
-        self.json_viewer = ctk.CTkTextbox(self, fg_color=config.COLOR_THEME["widget"])
-        self.json_viewer.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
+        self.json_viewer = tk.Text(self, height=20, bg="black", fg="white", insertbackground="white", relief="flat", borderwidth=0)
+        self.json_viewer.grid(row=2, column=0, padx=10, pady=5, sticky="nsew")
 
-        # --- 3.4. 콘트롤 버튼 섹션 ---
         control_button_frame = ctk.CTkFrame(self, fg_color=config.COLOR_THEME["widget"])
         control_button_frame.grid(row=3, column=0, padx=10, pady=10, sticky="ew")
         self._create_control_buttons(control_button_frame)
 
-        # 프로그램 실행 시 저장 파일 자동 로드 시도
-        try:
-            self.after(300, self._auto_load_settings_if_available)
-        except Exception:
-            pass
+        self.current_script_name = self.script_selector.get()
+        self.after(100, self._on_click_load_settings)
 
-        # Font map for TextRenderer
-        self.font_map = {
-            "Noto Sans KR": os.path.expanduser("~/Library/Fonts/NotoSansKR-Regular.ttf"),
-            "KoPubWorld돋움체": os.path.expanduser("~/Library/Fonts/KoPubWorld Dotum Medium.ttf"),
-            "KoPubWorld바탕체": os.path.expanduser("~/Library/Fonts/KoPubWorld Batang Medium.ttf")
-        }
-
-    # SubtitleGenerator는 삭제됨 - PNGRenderer 사용
-    # def _get_subtitle_generator(self) -> SubtitleGenerator:
-    #     """Helper to get an instance of SubtitleGenerator with current settings."""
-    #     # 삭제된 기능
-
-        def _make_base_canvas(self, width: int, height: int):
-            try:
-                kind = (self.bg_type_var.get() or "").strip()
-                value = (self.w_bg_value.get() or "").strip()
-                base = None
-                # 배경 타입: 이미지/동영상/색상 처리
-                if kind == "이미지" and value and os.path.isfile(value):
-                    from PIL import Image
-                    img = Image.open(value).convert('RGBA')
-                    iw, ih = img.size
-                    # cover fit
-                    scale = max(width / max(1, iw), height / max(1, ih))
-                    new_w, new_h = int(iw * scale), int(ih * scale)
-                    img = img.resize((new_w, new_h))
-                    left = max(0, (new_w - width) // 2)
-                    top = max(0, (new_h - height) // 2)
-                    img = img.crop((left, top, left + width, top + height))
-                    base = img
-                elif kind == "동영상" and value and os.path.isfile(value):
-                    import tempfile, subprocess
-                    from PIL import Image
-                    with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
-                        tmp_path = tmp.name
-                    try:
-                        # 첫 프레임 추출
-                        cmd = ['ffmpeg', '-y', '-loglevel', 'error', '-ss', '0', '-i', value, '-frames:v', '1', tmp_path]
-                        subprocess.run(cmd, check=True)
-                        img = Image.open(tmp_path).convert('RGBA')
-                        iw, ih = img.size
-                        scale = max(width / max(1, iw), height / max(1, ih))
-                        new_w, new_h = int(iw * scale), int(ih * scale)
-                        img = img.resize((new_w, new_h))
-                        left = max(0, (new_w - width) // 2)
-                        top = max(0, (new_h - height) // 2)
-                        img = img.crop((left, top, left + width, top + height))
-                        base = img
-                    except Exception:
-                        base = None
-                    finally:
-                        try:
-                            os.remove(tmp_path)
-                        except Exception:
-                            pass
-                elif kind == "색상":
-                    # 색상 문자열로 RGBA 배경 생성
-                    from PIL import Image, ImageColor
-                    try:
-                        rgb = ImageColor.getrgb(value or "#000000")
-                    except Exception:
-                        rgb = (0, 0, 0)
-                    base = Image.new('RGBA', (width, height), (rgb[0], rgb[1], rgb[2], 255))
-                if base is None:
-                    # 기본 회색 바탕
-                    from PIL import Image
-                    base = Image.new('RGBA', (width, height), (128,128,128,255))
-                return base
-            except Exception:
-                from PIL import Image
-                return Image.new('RGBA', (width, height), (128,128,128,255))
-
-    def _create_common_settings_widgets(self, parent):
-        
-        from src.ui.ui_utils import create_labeled_widget
-
-        # 1행
-        row1 = ctk.CTkFrame(parent, fg_color="transparent")
-        row1.pack(fill="x", padx=10, pady=2, anchor="w")
-        ctk.CTkLabel(row1, text="배경 설정:").pack(side="left", padx=(0, 10))
-        self.bg_type_var = tk.StringVar(value="색상")
-        ctk.CTkRadioButton(row1, text="색상", variable=self.bg_type_var, value="색상").pack(side="left", padx=5)
-        ctk.CTkRadioButton(row1, text="이미지", variable=self.bg_type_var, value="이미지").pack(side="left", padx=5)
-        ctk.CTkRadioButton(row1, text="동영상", variable=self.bg_type_var, value="동영상").pack(side="left", padx=5)
-        _, self.w_bg_value = create_labeled_widget(row1, "배경값", 48)
-        button_kwargs = {"fg_color": config.COLOR_THEME["button"], "hover_color": config.COLOR_THEME["button_hover"], "text_color": config.COLOR_THEME["text"]}
-        self.btn_browse = ctk.CTkButton(row1, text="찾아보기", width=80, command=self._on_click_browse, **button_kwargs)
-        self.btn_browse.pack(side="left", padx=(0,5))
-        try:
-            self.bg_type_var.trace_add("write", lambda *args: self._on_bg_type_change())
-        except Exception:
-            pass
-        
-        # 초기 상태 적용
-        self._on_bg_type_change()
-        
-        # 2행
-        row2 = ctk.CTkFrame(parent, fg_color="transparent")
-        row2.pack(fill="x", padx=10, pady=2, anchor="w")
-        ctk.CTkLabel(row2, text="바탕 설정:").pack(side="left", padx=(0, 10))
-        self.section_checkbox_var = tk.BooleanVar(value=False)
-        _, self.section_checkbox = create_labeled_widget(row2, "구간", 5, "checkbox", {"variable": self.section_checkbox_var})
-        _, self.w_bg = create_labeled_widget(row2, "바탕색", 15)
-        self.w_bg.insert(0, "#000000")
-        _, self.w_alpha = create_labeled_widget(row2, "투명도", 10)
-        self.w_alpha.insert(0, "1.0")
-        _, self.w_margin = create_labeled_widget(row2, "여백", 10, "entry", {"justify": "center"})
-        self.w_margin.insert(0, "5")
-        _, self.w_line_spacing = create_labeled_widget(row2, "행간비율", 10, "entry", {"justify": "center"})
-        self.w_line_spacing.insert(0, "0.8")
-        
-        # 배경 설정 변경 이벤트 바인딩 (모든 위젯 생성 후)
-        self.w_bg_value.bind('<KeyRelease>', self._on_background_changed)
-        self.w_bg.bind('<KeyRelease>', self._on_background_changed)
-        self.w_alpha.bind('<KeyRelease>', self._on_background_changed)
-        self.w_margin.bind('<KeyRelease>', self._on_background_changed)
-        self.w_line_spacing.bind('<KeyRelease>', self._on_background_changed)
-
-        # 3행
-        row3 = ctk.CTkFrame(parent, fg_color="transparent")
-        row3.pack(fill="x", padx=10, pady=2, anchor="w")
-        ctk.CTkLabel(row3, text="쉐도우 설정:").pack(side="left", padx=(0, 10))
-        # 블러 사용 여부 체크박스
-        self.shadow_blur_enabled = tk.BooleanVar(value=True)
-        ctk.CTkCheckBox(row3, text="블러", variable=self.shadow_blur_enabled, command=lambda: [self._on_shadow_blur_toggle(), self._update_common_states()]).pack(side="left", padx=(0,8))
-        _, self.w_shadow_thick = create_labeled_widget(row3, "두께", 6)
-        self.w_shadow_thick.insert(0, "2")
-        _, self.w_shadow_color = create_labeled_widget(row3, "쉐도우 색상", 10)
-        self.w_shadow_color.insert(0, "#000000")
-        _, self.w_shadow_blur = create_labeled_widget(row3, "블러", 4)
-        self.w_shadow_blur.insert(0, "8")
-        _, self.w_shadow_offx = create_labeled_widget(row3, "오프셋X", 4)
-        self.w_shadow_offx.insert(0, "2")
-        _, self.w_shadow_offy = create_labeled_widget(row3, "오프셋Y", 4)
-        self.w_shadow_offy.insert(0, "2")
-        _, self.w_shadow_alpha = create_labeled_widget(row3, "불투명도", 5)
-        self.w_shadow_alpha.insert(0, "0.6")
-        # 두께 변경 시 블러 기본값 재추천
-        try:
-            self.w_shadow_thick.bind("<FocusOut>", lambda e: self._maybe_apply_shadow_defaults())
-        except Exception:
-            pass
-        
-        # 4행
-        row4 = ctk.CTkFrame(parent, fg_color="transparent")
-        row4.pack(fill="x", padx=10, pady=2, anchor="w")
-        ctk.CTkLabel(row4, text="외곽선 설정:").pack(side="left", padx=(0, 10))
-        _, self.w_border_thick = create_labeled_widget(row4, "두께", 6)
-        self.w_border_thick.insert(0, "2")
-        _, self.w_border_color = create_labeled_widget(row4, "외곽선 색상", 10)
-        self.w_border_color.insert(0, "#000000")
-
-        # 초기 상태 반영
-        self._update_common_states()
-
-    def _update_common_states(self):
-        # 공통 설정 입력은 항상 활성화
-        def set_state(widget):
-            try:
-                widget.configure(state="normal")
-            except Exception:
-                pass
-        set_state(self.w_bg)
-        set_state(self.w_alpha)
-        set_state(self.w_margin)
-        set_state(self.w_shadow_thick)
-        set_state(self.w_shadow_color)
-        # 블러 on/off에 따라 세부 파라미터 활성화
-        try:
-            enabled = bool(self.shadow_blur_enabled.get())
-        except Exception:
-            enabled = True
-        for w in [self.w_shadow_blur, self.w_shadow_offx, self.w_shadow_offy, self.w_shadow_alpha]:
-            try:
-                w.configure(state=("normal" if enabled else "disabled"))
-            except Exception:
-                pass
-        set_state(self.w_border_thick)
-        set_state(self.w_border_color)
-
-    def _maybe_apply_shadow_defaults(self):
-        try:
-            if not bool(self.shadow_blur_enabled.get()):
-                return
-            # 두께/색상 기반 표준값 추천
-            try:
-                thick = max(0, int(float(self.w_shadow_thick.get() or 0)))
-            except Exception:
-                thick = 2
-            try:
-                color = self.w_shadow_color.get() or "#000000"
-            except Exception:
-                color = "#000000"
-            # 추천 규칙: blur ~ max(8, thick*2), off ~ max(2, round(thick*0.8)), alpha ~ 0.6
-            blur = max(8, thick * 2)
-            off = max(2, int(round(thick * 0.8)))
-            # 값 반영(비워져 있거나 기본값일 때만 덮어쓰기)
-            def is_default_like(s, defaults):
-                return (s is None) or (str(s).strip() == "") or (str(s).strip() in defaults)
-            if is_default_like(self.w_shadow_blur.get(), ["8", "0"]):
-                self.w_shadow_blur.delete(0, tk.END)
-                self.w_shadow_blur.insert(0, str(blur))
-            if is_default_like(self.w_shadow_offx.get(), ["2", "0"]):
-                self.w_shadow_offx.delete(0, tk.END)
-                self.w_shadow_offx.insert(0, str(off))
-            if is_default_like(self.w_shadow_offy.get(), ["2", "0"]):
-                self.w_shadow_offy.delete(0, tk.END)
-                self.w_shadow_offy.insert(0, str(off))
-            # alpha는 기본 0.6 유지
-            if is_default_like(self.w_shadow_alpha.get(), ["0.6", "1", "0.0"]):
-                self.w_shadow_alpha.delete(0, tk.END)
-                self.w_shadow_alpha.insert(0, "0.6")
-        except Exception:
-            pass
-
-    def _on_shadow_blur_toggle(self):
-        try:
-            if bool(self.shadow_blur_enabled.get()):
-                self._maybe_apply_shadow_defaults()
-        except Exception:
-            pass
-
-    def _create_text_settings_tabs(self, tab_view):
-        # Default 값: 제작 사양서 기반
-        defaults = {
-            "회화 설정": {"행수": "4", "비율": "16:9", "해상도": "1920x1080", "rows": [
-                {"행": "순번", "x": 50, "y": 50, "w": 1820, "크기(pt)": 80, "폰트(pt)": "Arial Bold", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "원어", "x": 50, "y": 150, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Helvetica", "색상": "#00FFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "학습어", "x": 50, "y": 450, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Noto Sans KR Bold", "색상": "#FF00FF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "읽기", "x": 50, "y": 750, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Times New Roman", "색상": "#FFFF00", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-            ]},
-            "썸네일 설정": {"행수": "4", "비율": "16:9", "해상도": "1920x1080", "rows": [
-                {"행": "1행", "x": 50, "y": 50, "w": 924, "크기(pt)": 100, "폰트(pt)": "Arial", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "2행", "x": 50, "y": 200, "w": 924, "크기(pt)": 100, "폰트(pt)": "Helvetica Neue", "색상": "#00FFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "3행", "x": 50, "y": 350, "w": 924, "크기(pt)": 100, "폰트(pt)": "Georgia", "색상": "#FF00FF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "4행", "x": 50, "y": 500, "w": 924, "크기(pt)": 100, "폰트(pt)": "Apple SD Gothic Neo", "색상": "#FFFF00", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-            ]},
-            "인트로 설정": {"행수": "1", "비율": "16:9", "해상도": "1920x1080", "rows": [{"행": "1행", "x": 50, "y": 980, "w": 1820, "크기(pt)": 80, "폰트(pt)": "Arial Bold", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Center", "상하 정렬": "Center"}]},
-            "엔딩 설정": {"행수": "1", "비율": "16:9", "해상도": "1920x1080", "rows": [{"행": "1행", "x": 50, "y": 980, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Helvetica", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Center", "상하 정렬": "Center"}]},
-            "대화 설정": {"행수": "3", "비율": "16:9", "해상도": "1920x1080", "rows": [
-                {"행": "원어", "x": 50, "y": 250, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Times New Roman", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "학습어1", "x": 50, "y": 550, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Georgia", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-                {"행": "학습어2", "x": 50, "y": 850, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Arial Italic", "색상": "#FFFFFF", "굵기": "Bold", "좌우 정렬": "Left", "상하 정렬": "Top"},
-            ]},
-        }
-        # 기본 텍스트 설정 저장 + 각 탭 위젯 인스턴스 보관
-        self.default_text_configs = defaults
-        self.text_tabs = {}
-        
-        # 탭별 배경 설정 저장소 초기화
-        self.tab_background_settings = {}
-        for name in defaults.keys():
-            self.tab_background_settings[name] = {
-                "enabled": False,
-                "type": "색상",
-                "value": "#000000",
-                "color": "#000000",
-                "alpha": "1.0",
-                "margin": "5"  # 기본값, 나중에 공통 설정에서 상속받음
-            }
-        
-        for name, default_data in defaults.items():
-            tab = tab_view.add(name)
-            inst = TextSettingsTab(tab, default_data)
-            inst.pack(expand=True, fill="both")
-            self.text_tabs[name] = inst
-        
-        # 탭 변경 이벤트 바인딩
-        self.tab_view.configure(command=self._on_tab_changed)
-
-    def _on_tab_changed(self):
-        """탭이 변경될 때 호출되는 함수"""
-        try:
-            # 현재 선택된 탭 가져오기
-            selected_tab_name = self.tab_view.get()
-            
-            print("=" * 60)
-            print(f"🔄 탭 변경됨: {selected_tab_name}")
-            print("=" * 60)
-            
-            # 현재 모든 탭별 설정 상태 출력
-            print("📋 현재 모든 탭별 배경 설정:")
-            for tab_name, settings in self.tab_background_settings.items():
-                print(f"   {tab_name}: {settings}")
-            
-            # 현재 탭의 배경 설정을 UI에 로드
-            if selected_tab_name in self.tab_background_settings:
-                bg_settings = self.tab_background_settings[selected_tab_name]
-                print(f"🎯 로드할 설정: {bg_settings}")
-                
-                # 배경 설정을 UI에 적용
-                self.bg_type_var.set(bg_settings.get("type", "색상"))
-                self.w_bg_value.delete(0, tk.END)
-                self.w_bg_value.insert(0, bg_settings.get("value", ""))
-                self.w_bg.delete(0, tk.END)
-                self.w_bg.insert(0, bg_settings.get("color", "#000000"))
-                self.w_alpha.delete(0, tk.END)
-                self.w_alpha.insert(0, str(bg_settings.get("alpha", "1.0")))
-                self.w_margin.delete(0, tk.END)
-                self.w_margin.insert(0, str(bg_settings.get("margin", "5")))
-                
-                print(f"✅ 탭 '{selected_tab_name}'의 배경 설정 UI에 적용 완료")
-                print(f"   - 타입: {self.bg_type_var.get()}")
-                print(f"   - 값: {self.w_bg_value.get()}")
-                print(f"   - 색상: {self.w_bg.get()}")
-                print(f"   - 투명도: {self.w_alpha.get()}")
-                print(f"   - 여백: {self.w_margin.get()}")
-            else:
-                print(f"❌ 탭 '{selected_tab_name}'의 설정을 찾을 수 없음")
-                
-        except Exception as e:
-            print(f"❌ 탭 변경 처리 중 오류: {e}")
-            import traceback
-            traceback.print_exc()
-
-    def _on_background_changed(self, event=None):
-        """배경 설정 변경 시 호출되는 이벤트 핸들러"""
-        try:
-            # 🔥🔥🔥 [탭별 배경 마진 실시간 동기화] 공통 배경 마진 변경 시 탭별 배경 마진도 동기화 🔥🔥🔥
-            try:
-                common_margin = self.w_margin.get()
-                if common_margin:
-                    for tab_name in self.tab_background_settings.keys():
-                        self.tab_background_settings[tab_name]["margin"] = common_margin
-                    print(f"✅ [실시간 동기화] 탭별 배경 마진 업데이트: {common_margin}px")
-            except Exception as margin_error:
-                print(f"⚠️ [실시간 동기화] 마진 동기화 중 오류: {margin_error}")
-            
-            # 기존 배경 변경 로직
-            self._update_common_states()
-            
-            # 🔥 UI 연동 강화: 실시간 설정 반영
-            self._notify_settings_changed()
-            
-        except Exception as e:
-            print(f"❌ 배경 설정 변경 처리 중 오류: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    def _notify_settings_changed(self):
-        """설정 변경 시 PNGRenderer에 알림"""
-        try:
-            print("🔄 [UI 연동] 설정 변경 감지 - PNGRenderer에 알림")
-            
-            # 현재 설정을 가져와서 로깅
-            current_settings = self.get_all_settings()
-            print(f"📋 [UI 연동] 변경된 설정 키: {list(current_settings.keys())}")
-            
-            # 탭별 배경 설정 상태 로깅
-            tab_backgrounds = current_settings.get('common', {}).get('tab_backgrounds', {})
-            if tab_backgrounds:
-                print("🎨 [UI 연동] 탭별 배경 설정 상태:")
-                for tab_name, bg_settings in tab_backgrounds.items():
-                    enabled = bg_settings.get('enabled', False)
-                    print(f"   - {tab_name}: {'✅ 활성' if enabled else '❌ 비활성'}")
-            
-            # JSON 뷰어에 현재 설정 표시
-            self._update_json_viewer_with_current_settings()
-            
-        except Exception as e:
-            print(f"❌ [UI 연동] 설정 변경 알림 중 오류: {e}")
-    
-    def _update_json_viewer_with_current_settings(self):
-        """JSON 뷰어에 현재 설정 상태 표시"""
-        try:
-            current_settings = self.get_all_settings()
-            
-            display_text = "🔄 실시간 설정 상태\n"
-            display_text += "=" * 50 + "\n\n"
-            display_text += "📋 현재 UI 설정:\n"
-            display_text += json.dumps(current_settings, indent=2, ensure_ascii=False)
-            
-            self.json_viewer.delete("1.0", tk.END)
-            self.json_viewer.insert("1.0", display_text)
-            
-        except Exception as e:
-            print(f"❌ JSON 뷰어 업데이트 중 오류: {e}")
-
-    def _on_background_changed_original(self, event=None):
-        """배경 설정이 변경될 때 호출되는 함수"""
-        try:
-            # 현재 선택된 탭 가져오기
-            current_tab = self.tab_view.get()
-            if not current_tab:
-                print("❌ 현재 선택된 탭이 없음")
-                return
-            
-            print("=" * 50)
-            print(f"🔄 배경 설정 변경됨 (탭: {current_tab})")
-            print("=" * 50)
-            
-            # 현재 UI의 배경 설정을 현재 탭에 저장
-            if current_tab in self.tab_background_settings:
-                new_settings = {
-                    "enabled": True,
-                    "type": self.bg_type_var.get(),
-                    "value": self.w_bg_value.get(),
-                    "color": self.w_bg.get(),
-                    "alpha": self.w_alpha.get(),
-                    "margin": self.w_margin.get()
-                }
-                
-                print(f"💾 저장할 설정: {new_settings}")
-                self.tab_background_settings[current_tab] = new_settings
-                
-                print(f"✅ 탭 '{current_tab}'의 배경 설정 저장 완료")
-                print("📋 저장 후 모든 탭별 설정:")
-                for tab_name, settings in self.tab_background_settings.items():
-                    print(f"   {tab_name}: {settings}")
-            else:
-                print(f"❌ 탭 '{current_tab}'이 설정 저장소에 없음")
-                
-        except Exception as e:
-            print(f"❌ 배경 설정 변경 처리 중 오류: {e}")
-            import traceback
-            traceback.print_exc()
-
-    def _create_control_buttons(self, parent):
-        button_kwargs = {"fg_color": config.COLOR_THEME["button"], "hover_color": config.COLOR_THEME["button_hover"], "text_color": config.COLOR_THEME["text"]}
-        ctk.CTkButton(parent, text="🎨 실시간 미리보기", command=self._on_click_realtime_preview, **button_kwargs).pack(side="left", padx=10, pady=10)
-        ctk.CTkButton(parent, text="미리보기", command=self._on_click_preview, **button_kwargs).pack(side="left", padx=10, pady=10)
-        ctk.CTkButton(parent, text="비디오 생성", command=self._on_click_video, **button_kwargs).pack(side="left", padx=10, pady=10)
-        ctk.CTkButton(parent, text="탭별 설정 확인", command=self._on_click_show_tab_settings, **button_kwargs).pack(side="left", padx=10, pady=10)
-        ctk.CTkButton(parent, text="설정 읽기", command=self._on_click_load_settings, **button_kwargs).pack(side="right", padx=10, pady=10)
-        ctk.CTkButton(parent, text="설정 저장", command=self._on_click_save_settings, **button_kwargs).pack(side="right", padx=10, pady=10)
-
-    def _on_click_show_tab_settings(self):
-        """탭별 설정을 확인하는 함수"""
-        try:
-            print("=" * 80)
-            print("📋 현재 모든 탭별 배경 설정 상태")
-            print("=" * 80)
-            
-            current_tab = self.tab_view.get()
-            print(f"🎯 현재 선택된 탭: {current_tab}")
-            print()
-            
-            # 상세한 탭별 설정 정보 출력
-            for tab_name, settings in self.tab_background_settings.items():
-                status = "✅ 활성" if settings.get("enabled", False) else "❌ 비활성"
-                print(f"📌 {tab_name} ({status}):")
-                print(f"   - 타입: {settings.get('type', 'N/A')}")
-                print(f"   - 값: {settings.get('value', 'N/A')}")
-                print(f"   - 색상: {settings.get('color', 'N/A')}")
-                print(f"   - 투명도: {settings.get('alpha', 'N/A')}")
-                print(f"   - 여백: {settings.get('margin', 'N/A')}")
-                print()
-            
-            # JSON 뷰어에 상세한 정보 표시
-            display_text = "=" * 60 + "\n"
-            display_text += "📋 탭별 배경 설정 상세 정보\n"
-            display_text += "=" * 60 + "\n\n"
-            
-            for tab_name, settings in self.tab_background_settings.items():
-                status = "✅ 활성" if settings.get("enabled", False) else "❌ 비활성"
-                display_text += f"📌 {tab_name} ({status}):\n"
-                display_text += f"   - 타입: {settings.get('type', 'N/A')}\n"
-                display_text += f"   - 값: {settings.get('value', 'N/A')}\n"
-                display_text += f"   - 색상: {settings.get('color', 'N/A')}\n"
-                display_text += f"   - 투명도: {settings.get('alpha', 'N/A')}\n"
-                display_text += f"   - 여백: {settings.get('margin', 'N/A')}\n\n"
-            
-            display_text += "=" * 60 + "\n"
-            display_text += "📄 JSON 형식:\n"
-            display_text += "=" * 60 + "\n"
-            
-            import json
-            formatted_settings = json.dumps(self.tab_background_settings, indent=2, ensure_ascii=False)
-            display_text += formatted_settings
-            
-            self.json_viewer.delete("1.0", tk.END)
-            self.json_viewer.insert("1.0", display_text)
-            
-        except Exception as e:
-            print(f"❌ 탭별 설정 확인 중 오류: {e}")
-            import traceback
-            traceback.print_exc()
-
-    def get_all_settings(self):
-        try:
-            tabs_payload = {name: tab.get_settings() for name, tab in (self.text_tabs or {}).items()}
-        except Exception:
-            tabs_payload = {}
+    def _get_updated_defaults(self):
         return {
-            "version": 1,
-            "common": self._collect_common_settings(),
-            "tabs": tabs_payload,
+            "conversation": {
+                "main_background": {"type": "이미지", "value": "/Users/janghwanmoon/Projects/captionGen/assets/background/shubham-dhage-1pK0lHvVaeM-unsplash.jpg"},
+                "line_spacing": {"ratio": 0.8},
+                "background_box": {"type": "없음", "color": "#000000", "alpha": 0.2, "margin": 2},
+                "shadow": {"useBlur": True, "thick": 2, "color": "#000000", "blur": 8, "offx": 2, "offy": 2, "alpha": 0.6},
+                "border": {"thick": 2, "color": "#000000"},
+                "행수": "4", "비율": "16:9", "해상도": "1920x1080" ,
+                "rows": [
+                    {"행": "순번", "x": 50, "y": 50, "w": 1820, "크기(pt)": 80, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFFFF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": False, "쉐도우": False, "외곽선": False},
+                    {"행": "원어", "x": 50, "y": 150, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#00FFFF", "좌우 정렬": "Center", "상하 정렬": "Top", "바탕": False, "쉐도우": False, "외곽선": False},
+                    {"행": "학습어", "x": 50, "y": 450, "w": 1820, "크기(pt)": 100, "폰트(pt)": "Noto Sans KR Bold", "색상": "#FF00FF", "좌우 정렬": "Center", "상하 정렬": "Top", "바탕": False, "쉐도우": False, "외곽선": False},
+                    {"행": "읽기", "x": 50, "y": 750, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFF00", "좌우 정렬": "Center", "상하 정렬": "Top", "바탕": False, "쉐도우": False, "외곽선": False},
+                ]
+            },
+            "thumbnail": {
+                "main_background": {"type": "이미지", "value": ""},
+                "line_spacing": {"ratio": 1.0},
+                "background_box": {"type": "블록", "color": "#000000", "alpha": 0.7, "margin": 10},
+                "shadow": {"useBlur": True, "thick": 5, "color": "#FFFFFF", "blur": 10, "offx": 0, "offy": 0, "alpha": 0.5},
+                "border": {"thick": 0, "color": "#000000"},
+                "행수": "4", "비율": "16:9", "해상도": "1920x1080" ,
+                "rows": [
+                    {"행": "제목", "x": 50, "y": 50, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFFFF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": True, "쉐도우": True, "외곽선": False},
+                    {"행": "부제목", "x": 50, "y": 200, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#00FFFF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": True, "쉐도우": True, "외곽선": False},
+                    {"행": "설명", "x": 50, "y": 350, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FF00FF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": True, "쉐도우": True, "외곽선": False},
+                    {"행": "태그", "x": 50, "y": 500, "w": 924, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFF00", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": True, "쉐도우": True, "외곽선": False},
+                ]
+            },
+            "intro": {
+                "main_background": {"type": "색상", "value": "#111111"},
+                "line_spacing": {"ratio": 1.2},
+                "background_box": {"type": "없음", "color": "#000000", "alpha": 0.5, "margin": 5},
+                "shadow": {"useBlur": False, "thick": 2, "color": "#FFFFFF", "blur": 5, "offx": 2, "offy": 2, "alpha": 0.8},
+                "border": {"thick": 1, "color": "#FFFFFF"},
+                "행수": "1", "비율": "16:9", "해상도": "1920x1080" ,
+                "rows": [{"행": "인트로", "x": 50, "y": 50, "w": 1820, "크기(pt)": 80, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFFFF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": True, "쉐도우": True, "외곽선": True}]
+            },
+            "ending": {
+                "main_background": {"type": "색상", "value": "#222222"},
+                "line_spacing": {"ratio": 1.2},
+                "background_box": {"type": "없음", "color": "#000000", "alpha": 0.5, "margin": 5},
+                "shadow": {"useBlur": True, "thick": 3, "color": "#000000", "blur": 5, "offx": 3, "offy": 3, "alpha": 0.7},
+                "border": {"thick": 0, "color": "#000000"},
+                "행수": "1", "비율": "16:9", "해상도": "1920x1080" ,
+                "rows": [{"행": "엔딩", "x": 50, "y": 50, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFFFF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": False, "쉐도우": True, "외곽선": False}]
+            },
+            "dialogue": {
+                "main_background": {"type": "색상", "value": "#000000"},
+                "line_spacing": {"ratio": 0.8},
+                "background_box": {"type": "블록", "color": "#000000", "alpha": 0.5, "margin": 5},
+                "shadow": {"useBlur": True, "thick": 2, "color": "#000000", "blur": 8, "offx": 2, "offy": 2, "alpha": 0.6},
+                "border": {"thick": 2, "color": "#000000"},
+                "행수": "3", "비율": "16:9", "해상도": "1920x1080" ,
+                "rows": [
+                    {"행": "원어", "x": 50, "y": 250, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFFFF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": True, "쉐도우": False, "외곽선": False},
+                    {"행": "학습어1", "x": 50, "y": 550, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFFFF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": True, "쉐도우": False, "외곽선": False},
+                    {"행": "학습어2", "x": 50, "y": 850, "w": 1820, "크기(pt)": 100, "폰트(pt)": "KoPubWorld돋움체 Bold", "색상": "#FFFFFF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": True, "쉐도우": False, "외곽선": False},
+                ]
+            },
         }
 
-    
+    def _create_script_selector(self, parent):
+        parent.grid_columnconfigure(1, weight=0)
+        ctk.CTkLabel(parent, text="스크립트 선택:").pack(side="left", padx=(10, 10), pady=10)
+        
+        script_names = list(self.defaults.keys())
+        self.script_selector = ctk.CTkComboBox(parent, values=script_names, width=200, command=self._on_script_selected)
+        self.script_selector.set(script_names[0])
+        self.script_selector.pack(side="left", padx=(0, 10), pady=10)
 
-    def apply_all_settings(self, data: dict):
-        if not isinstance(data, dict):
+    def _on_script_selected(self, selected_script_name: str):
+        if self.current_script_name == selected_script_name:
             return
-        self._apply_common_settings((data or {}).get("common", {}))
-        tabs = (data or {}).get("tabs", {})
-        for name, tabdata in tabs.items():
-            inst = (self.text_tabs or {}).get(name)
-            if inst:
-                inst.apply_settings(tabdata)
 
-    def _log_json_object(self, title: str, obj: dict):
-        try:
-            pretty = json.dumps(obj, ensure_ascii=False, indent=2)
-            print(f"{title}:\n{pretty}")
-            self._log_json(f"{title}:\n{pretty}")
-        except Exception:
-            try:
-                print(f"{title}: {obj}")
-            except Exception:
-                pass
+        # 1. Save the current UI state (which belongs to the old script) under the OLD script name.
+        if self.current_script_name:
+            self.script_settings[self.current_script_name] = self.settings_grid.get_settings()
+            print(f"💾 [메모리 저장] '{self.current_script_name}' 스크립트의 UI 상태를 메모리에 저장했습니다.")
 
-    def _collect_common_settings(self):
-        return {
-            "bg": {
-                "enabled": True,
-                "color": self.w_bg.get(),
-                "alpha": self.w_alpha.get(),
-                "margin": self.w_margin.get(),
-                "type": self.bg_type_var.get(),
-                "value": self.w_bg_value.get(),
-            },
-            "tab_backgrounds": self.tab_background_settings,  # 탭별 배경 설정 추가
-            "line_spacing": {
-                "ratio": self.w_line_spacing.get(),
-            },
-            "shadow": {
-                "enabled": True,
-                "thick": self.w_shadow_thick.get(),
-                "color": self.w_shadow_color.get(),
-                "blur": self.w_shadow_blur.get(),
-                "offx": self.w_shadow_offx.get(),
-                "offy": self.w_shadow_offy.get(),
-                "alpha": self.w_shadow_alpha.get(),
-                "useBlur": bool(self.shadow_blur_enabled.get()) if hasattr(self, 'shadow_blur_enabled') else True,
-            },
-            "border": {
-                "enabled": True,
-                "thick": self.w_border_thick.get(),
-                "color": self.w_border_color.get(),
-            }
-        }
+        # 2. Apply the settings for the NEW script name to the UI.
+        self._apply_settings_from_memory_to_ui(selected_script_name)
+        
+        # 3. Finally, update the current script name to the NEW one.
+        self.current_script_name = selected_script_name
 
-    def _apply_common_settings(self, data):
-        try:
-            # 탭별 배경 설정 로드
-            tab_backgrounds = (data or {}).get("tab_backgrounds", {})
-            if tab_backgrounds:
-                self.tab_background_settings.update(tab_backgrounds)
-                print(f"✅ 탭별 배경 설정 로드됨: {self.tab_background_settings}")
-            
-            bg = (data or {}).get("bg", {})
-            self.bg_type_var.set(bg.get("type", "색상"))
-            self.w_bg_value.delete(0, tk.END)
-            self.w_bg_value.insert(0, bg.get("value", ""))
-            self.w_bg.delete(0, tk.END)
-            self.w_bg.insert(0, bg.get("color", "#808080"))
-            self.w_alpha.delete(0, tk.END)
-            self.w_alpha.insert(0, str(bg.get("alpha", "1.0")))
-            try:
-                self.w_margin.delete(0, tk.END)
-                self.w_margin.insert(0, str(bg.get("margin", "2")))
-                
-                # 🔥🔥🔥 [탭별 배경 마진 동기화] 공통 배경 마진을 탭별 배경 마진에 적용 🔥🔥🔥
-                common_margin = str(bg.get("margin", "2"))
-                for tab_name in self.tab_background_settings.keys():
-                    self.tab_background_settings[tab_name]["margin"] = common_margin
-                print(f"✅ 탭별 배경 마진 동기화: {common_margin}px")
-                
-            except Exception:
-                pass
-            
-            # 🔥🔥🔥 [행간 비율 적용] 설정에서 행간 비율을 가져와서 UI에 적용 🔥🔥🔥
-            try:
-                line_spacing = (data or {}).get("line_spacing", {})
-                self.w_line_spacing.delete(0, tk.END)
-                self.w_line_spacing.insert(0, str(line_spacing.get("ratio", "0.8")))
-                print(f"✅ 행간 비율 적용: {line_spacing.get('ratio', '0.8')}")
-            except Exception:
-                pass
-            sh = (data or {}).get("shadow", {})
-            self.w_shadow_thick.delete(0, tk.END)
-            self.w_shadow_thick.insert(0, str(sh.get("thick", "2")))
-            self.w_shadow_color.delete(0, tk.END)
-            self.w_shadow_color.insert(0, sh.get("color", "#000000"))
-            # 추가 쉐도우 파라미터
-            try:
-                self.w_shadow_blur.delete(0, tk.END)
-                self.w_shadow_blur.insert(0, str(sh.get("blur", "8")))
-                self.w_shadow_offx.delete(0, tk.END)
-                self.w_shadow_offx.insert(0, str(sh.get("offx", "2")))
-                self.w_shadow_offy.delete(0, tk.END)
-                self.w_shadow_offy.insert(0, str(sh.get("offy", "2")))
-                self.w_shadow_alpha.delete(0, tk.END)
-                self.w_shadow_alpha.insert(0, str(sh.get("alpha", "0.6")))
-                if hasattr(self, 'shadow_blur_enabled'):
-                    try:
-                        self.shadow_blur_enabled.set(bool(sh.get("useBlur", True)))
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-            bd = (data or {}).get("border", {})
-            self.w_border_thick.delete(0, tk.END)
-            self.w_border_thick.insert(0, str(bd.get("thick", "2")))
-            self.w_border_color.delete(0, tk.END)
-            self.w_border_color.insert(0, bd.get("color", "#000000"))
-        finally:
-            self._update_common_states()
+    def _initialize_settings(self):
+        self.script_settings = {key: value.copy() for key, value in self.defaults.items()}
+        print("[초기화] 인메모리 설정이 기본값으로 초기화되었습니다.")
+
+    def _save_ui_to_memory(self):
+        if not self.current_script_name: return
+        self.script_settings[self.current_script_name] = self.settings_grid.get_settings()
+        print(f"💾 [메모리 저장] '{self.current_script_name}' 스크립트의 UI 상태를 메모리에 저장했습니다.")
+        self._update_json_viewer()
+
+    def _apply_settings_from_memory_to_ui(self, script_name):
+        if script_name not in self.script_settings:
+            print(f"❌ [UI 적용 실패] '{script_name}'에 대한 설정이 메모리에 없습니다.")
+            return
+        
+        settings = self.script_settings[script_name]
+        self.settings_grid.apply_settings(settings)
+        print(f"🎨 [UI 적용] '{script_name}' 스크립트의 설정을 화면에 표시합니다.")
+        self._update_json_viewer()
 
     def _on_click_save_settings(self):
         try:
-            if not getattr(self, 'root', None):
-                return
-            project_name = self.root.data_page.project_name_var.get()
-            identifier = self.root.data_page.identifier_var.get()
-            out_dir = os.path.join(config.OUTPUT_PATH, project_name, identifier)
-            os.makedirs(out_dir, exist_ok=True)
-            payload = self.get_all_settings()
-            path = os.path.join(out_dir, "_text_settings.json")
+            self._save_ui_to_memory()
+            path = os.path.join(config.BASE_DIR, "_text_settings.json")
             with open(path, "w", encoding="utf-8") as f:
-                json.dump(payload, f, ensure_ascii=False, indent=2)
-            self._log_json(f"[설정 저장] 완료: {path}")
-            print(f"[설정 저장] {path}")
-            self._log_json_object("[설정 저장 데이터]", payload)
-            
-            # 저장 후 자동으로 다시 로드하여 UI에 반영
-            self._auto_load_settings_if_available()
-            self._log_json("[설정 저장] 자동 재로드 완료")
-            
+                json.dump(self.script_settings, f, ensure_ascii=False, indent=2)
+            self._update_json_viewer(f"✅ 모든 설정이 {os.path.basename(path)} 에 저장되었습니다.")
         except Exception as e:
-            self._log_json(f"[설정 저장 오류] {e}")
-            print(f"[설정 저장 오류] {e}")
-
-    def _on_click_realtime_preview(self):
-        """실시간 미리보기 기능 - PNGRenderer와 연동"""
-        try:
-            print("🎨 [실시간 미리보기] 시작...")
-            
-            # 현재 UI 설정을 가져와서 PNGRenderer로 전달
-            current_settings = self.get_all_settings()
-            print(f"📋 [실시간 미리보기] 현재 설정: {list(current_settings.keys())}")
-            
-            # PNGRenderer 초기화
-            from src.pipeline.renderers.png_renderer import PNGRenderer
-            
-            # 설정 구조 변환
-            settings_dict = {
-                "common": current_settings.get("common", {}),
-                "tabs": current_settings.get("tabs", {})
-            }
-            
-            print("🚀 [실시간 미리보기] PNGRenderer 초기화 중...")
-            renderer = PNGRenderer(settings_dict)
-            
-            # 테스트 데이터로 미리보기 이미지 생성
-            test_data = {
-                "native_script": "안녕하세요!",
-                "learning_script": "Hello!",
-                "reading_script": "안녕하세요! Hello!"
-            }
-            
-            # 미리보기 이미지 생성
-            output_dir = "test_output/realtime_preview"
-            os.makedirs(output_dir, exist_ok=True)
-            
-            # 회화 이미지 미리보기
-            conversation_path = os.path.join(output_dir, "realtime_conversation.png")
-            success = renderer.create_conversation_image(
-                test_data, 
-                conversation_path, 
-                (1920, 1080), 
-                settings_dict
-            )
-            
-            if success:
-                print(f"✅ [실시간 미리보기] 회화 이미지 생성 완료: {conversation_path}")
-                
-                # 인트로 이미지 미리보기
-                intro_path = os.path.join(output_dir, "realtime_intro.png")
-                success = renderer.create_intro_ending_image(
-                    "실시간 미리보기 테스트입니다.",
-                    intro_path,
-                    (1920, 1080),
-                    "인트로"
-                )
-                
-                if success:
-                    print(f"✅ [실시간 미리보기] 인트로 이미지 생성 완료: {intro_path}")
-                    
-                    # JSON 뷰어에 결과 표시
-                    result_text = "🎨 실시간 미리보기 결과\n"
-                    result_text += "=" * 50 + "\n\n"
-                    result_text += f"✅ 회화 이미지: {conversation_path}\n"
-                    result_text += f"✅ 인트로 이미지: {intro_path}\n\n"
-                    result_text += "📋 사용된 설정:\n"
-                    result_text += json.dumps(renderer.get_current_settings(), indent=2, ensure_ascii=False)
-                    
-                    self.json_viewer.delete("1.0", tk.END)
-                    self.json_viewer.insert("1.0", result_text)
-                    
-                    print("🎉 [실시간 미리보기] 완료!")
-                else:
-                    print("❌ [실시간 미리보기] 인트로 이미지 생성 실패")
-            else:
-                print("❌ [실시간 미리보기] 회화 이미지 생성 실패")
-                
-        except Exception as e:
-            print(f"❌ [실시간 미리보기] 오류 발생: {e}")
-            import traceback
+            self._update_json_viewer(f"❌ 설정 저장 중 오류 발생:\n{e}")
             traceback.print_exc()
-            
-            # 오류 메시지를 JSON 뷰어에 표시
-            error_text = f"❌ 실시간 미리보기 오류\n"
-            error_text += "=" * 50 + "\n\n"
-            error_text += f"오류: {str(e)}\n\n"
-            error_text += "상세 정보는 콘솔을 확인하세요."
-            
-            self.json_viewer.delete("1.0", tk.END)
-            self.json_viewer.insert("1.0", error_text)
 
     def _on_click_load_settings(self):
         try:
-            if not getattr(self, 'root', None):
-                return
-            project_name = self.root.data_page.project_name_var.get()
-            identifier = self.root.data_page.identifier_var.get()
-            out_dir = os.path.join(config.OUTPUT_PATH, project_name, identifier)
-            path = os.path.join(out_dir, "_text_settings.json")
+            path = os.path.join(config.BASE_DIR, "_text_settings.json")
             if not os.path.isfile(path):
-                self._log_json(f"[설정 읽기] 파일 없음: {path}")
-                print(f"[설정 읽기] 파일 없음: {path}")
-                return
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            self.apply_all_settings(data)
-            self._log_json(f"[설정 읽기] 완료: {path}")
-            print(f"[설정 읽기] {path}")
-            self._log_json_object("[설정 읽기 데이터]", data)
-        except Exception as e:
-            self._log_json(f"[설정 읽기 오류] {e}")
-            print(f"[설정 읽기 오류] {e}")
-
-    def _auto_load_settings_if_available(self):
-        try:
-            if not getattr(self, 'root', None):
-                return
-            data_page = getattr(self.root, 'data_page', None)
-            if not data_page:
-                return
-            project_name = getattr(data_page, 'project_name_var', None)
-            identifier = getattr(data_page, 'identifier_var', None)
-            if not project_name or not identifier:
-                return
-            project_name = project_name.get()
-            identifier = identifier.get()
-            if not project_name or not identifier:
-                return
-            out_dir = os.path.join(config.OUTPUT_PATH, project_name, identifier)
-            path = os.path.join(out_dir, "_text_settings.json")
-            if os.path.isfile(path):
+                self._initialize_settings()
+            else:
                 with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                self.apply_all_settings(data)
-                self._log_json(f"[자동 로드] {path} 적용")
-                print(f"[자동 로드] {path}")
-                self._log_json_object("[자동 로드 데이터]", data)
+                    self.script_settings = json.load(f)
+            
+            self._apply_settings_from_memory_to_ui(self.script_selector.get())
+            self._update_json_viewer(f"✅ 설정을 불러왔습니다.")
         except Exception as e:
-            try:
-                print(f"[자동 로드 오류] {e}")
-            except Exception:
-                pass
-    def _on_click_preview(self):
+            self._update_json_viewer(f"❌ 설정 파일 로드 중 오류 발생:\n{e}")
+            self._initialize_settings()
+            self._apply_settings_from_memory_to_ui(self.script_selector.get())
+
+    def _update_json_viewer(self, message=None):
         try:
-            print("[미리보기] 버튼 클릭")
-            if not getattr(self, 'root', None):
-                print("[미리보기] root 미연결 - 종료")
-                return
-            
-            project_name = self.root.data_page.project_name_var.get()
-            identifier = self.root.data_page.identifier_var.get()
-            out_dir = os.path.join(config.OUTPUT_PATH, project_name, identifier)
-            os.makedirs(out_dir, exist_ok=True)
-            
-            data = getattr(self.root.data_page, 'generated_data', None) or {}
-            dialogue_csv = (data.get('fullVideoScript') or {}).get('dialogueCsv') or data.get('dialogueCsv')
-            
-            if not dialogue_csv:
-                self._log_json('[미리보기] dialogueCsv가 없습니다. 데이터 생성/읽기를 먼저 수행하세요.')
-                print('[미리보기] dialogueCsv 없음 - 종료')
-                return
-
-            subtitle_generator = self._get_subtitle_generator()
-            
-            # Generate conversation frames
-            dialog_dir = os.path.join(out_dir, 'dialog')
-            os.makedirs(dialog_dir, exist_ok=True)
-            
-            # Parse dialogue_csv
-            import csv, io as _io
-            reader = csv.reader(_io.StringIO(dialogue_csv))
-            entries = list(reader)
-            if entries and [c.strip('"') for c in entries[0][:4]] == ["순번","원어","학습어","읽기"]:
-                entries = entries[1:]
-
-            conversation_settings = self.get_all_settings()["tabs"]["회화 설정"]
-            
-            # Assuming a simple scene structure for conversation frames
-            # Each row in CSV becomes a "scene" for conversation generation
-            conversation_scenes = []
-            for idx, row in enumerate(entries):
-                cols = [c.strip('"') for c in row]
-                seq = cols[0] if len(cols) > 0 else ''
-                native = cols[1] if len(cols) > 1 else ''
-                learning = cols[2] if len(cols) > 2 else ''
-                reading = cols[3] if len(cols) > 3 else ''
-                
-                conversation_scenes.append({
-                    "id": f"conversation_{idx+1}",
-                    "type": "conversation",
-                    "content": {
-                        "order": seq,
-                        "native_script": native,
-                        "learning_script": learning,
-                        "reading_script": reading
-                    }
-                })
-            
-            # Call _generate_conversation_frames for each conversation scene
-            frame_counter = 0
-            for scene in conversation_scenes:
-                frames = subtitle_generator._generate_conversation_frames(scene, frame_counter, 30, dialog_dir)
-                frame_counter += len(frames)
-
-            # Generate thumbnail images
-            self.generate_thumbnail_images()
-            
-            # Generate intro images
-            self.generate_intro_images()
-            
-            # Generate ending images
-            self.generate_ending_images()
-            
-            print("[미리보기] 완료")
+            current_script = self.script_selector.get()
+            display_data = self.script_settings.get(current_script, {})
+            header = f"🔄 '{current_script}' 스크립트 실시간 설정 상태"
+            if message: header = message
+            display_text = f"{header}\n{'=' * 50}\n\n{json.dumps(display_data, indent=2, ensure_ascii=False)}"
+            self.json_viewer.delete("1.0", tk.END)
+            self.json_viewer.insert("1.0", display_text)
         except Exception as e:
-            try:
-                self._log_json(f"[미리보기 오류] {e}")
-                print(f"[미리보기 오류] {e}")
-            except Exception:
-                pass
+            print(f"❌ JSON 뷰어 업데이트 중 오류: {e}")
 
-    def generate_thumbnail_images(self):
-        """썸네일 설정과 AI 데이터의 thumbnailTextVersions를 사용해 썸네일 이미지를 생성합니다."""
-        if not getattr(self, 'root', None):
-            return
-        
-        project_name = self.root.data_page.project_name_var.get()
-        identifier = self.root.data_page.identifier_var.get()
-        out_dir = os.path.join(config.OUTPUT_PATH, project_name, identifier)
-        
-        thumbnail_settings = self.get_all_settings()["tabs"]["썸네일 설정"]
-        
-        try:
-            subtitle_generator = self._get_subtitle_generator()
-            subtitle_generator.generate_thumbnail_frames(project_name, identifier, out_dir, thumbnail_settings)
-            self._log_json('[썸네일] 생성 완료')
-            print('[썸네일] 생성 완료')
-        except Exception as e:
-            self._log_json(f'[썸네일 오류] {e}')
-            print(f'[썸네일 오류] {e}')
+    def _create_control_buttons(self, parent):
+        button_kwargs = {"fg_color": config.COLOR_THEME["button"], "hover_color": config.COLOR_THEME["button_hover"], "text_color": config.COLOR_THEME["text"]}
+        ctk.CTkButton(parent, text="설정 저장", command=self._on_click_save_settings, **button_kwargs).pack(side="left", padx=(10, 5), pady=10)
+        ctk.CTkButton(parent, text="설정 읽기", command=self._on_click_load_settings, **button_kwargs).pack(side="left", padx=5, pady=10)
 
-    def generate_intro_images(self):
-        """인트로 설정과 introScript를 사용해 인트로 이미지를 생성합니다."""
-        if not getattr(self, 'root', None):
-            return
-        
-        project_name = self.root.data_page.project_name_var.get()
-        identifier = self.root.data_page.identifier_var.get()
-        out_dir = os.path.join(config.OUTPUT_PATH, project_name, identifier)
-        
-        intro_text = (self.root.data_page.generated_data.get('introScript') or '').strip()
-        if not intro_text:
-            self._log_json('[인트로] introScript가 없습니다.')
-            print('[인트로] introScript 없음')
-            return
-        
-        intro_settings = self.get_all_settings()["tabs"]["인트로 설정"]
-        
-        try:
-            subtitle_generator = self._get_subtitle_generator()
-            # Create a dummy scene for intro generation
-            intro_scene = {
-                "id": "intro_scene",
-                "type": "intro",
-                "full_script": intro_text
-            }
-            # _generate_intro_ending_frames expects a scene dict
-            subtitle_generator._generate_intro_ending_frames(intro_scene, 0, 30, os.path.join(out_dir, "intro"))
-            self._log_json('[인트로] 생성 완료')
-            print('[인트로] 생성 완료')
-        except Exception as e:
-            self._log_json(f'[인트로 오류] {e}')
-            print(f'[인트로 오류] {e}')
+    def activate(self):
+        print("🖼️ 이미지 설정 탭 활성화")
+        self._apply_settings_from_memory_to_ui(self.script_selector.get())
 
-    def generate_ending_images(self):
-        """엔딩 설정과 endingScript를 사용해 엔딩 이미지를 생성합니다."""
-        if not getattr(self, 'root', None):
-            return
-        
-        project_name = self.root.data_page.project_name_var.get()
-        identifier = self.root.data_page.identifier_var.get()
-        out_dir = os.path.join(config.OUTPUT_PATH, project_name, identifier)
-        
-        ending_text = (self.root.data_page.generated_data.get('endingScript') or '').strip()
-        if not ending_text:
-            self._log_json('[엔딩] endingScript가 없습니다.')
-            print('[엔딩] endingScript 없음')
-            return
-        
-        ending_settings = self.get_all_settings()["tabs"]["엔딩 설정"]
-        
-        try:
-            subtitle_generator = self._get_subtitle_generator()
-            # Create a dummy scene for ending generation
-            ending_scene = {
-                "id": "ending_scene",
-                "type": "ending",
-                "full_script": ending_text
-            }
-            # _generate_intro_ending_frames expects a scene dict
-            subtitle_generator._generate_intro_ending_frames(ending_scene, 0, 30, os.path.join(out_dir, "ending"))
-            self._log_json('[엔딩] 생성 완료')
-            print('[엔딩] 생성 완료')
-        except Exception as e:
-            self._log_json(f'[엔딩 오류] {e}')
-            print(f'[엔딩 오류] {e}')
-
-    def _on_click_browse(self):
-        try:
-            kind = (self.bg_type_var.get() or "").strip()
-            if kind == "이미지":
-                filetypes = [("Image files", "*.jpg *.jpeg *.png")]
-            elif kind == "동영상":
-                filetypes = [("Video files", "*.mp4")]
-            else:
-                filetypes = [("All files", "*.*")]
-            path = filedialog.askopenfilename(title="파일 선택", filetypes=filetypes)
-            if path:
-                self.w_bg_value.delete(0, tk.END)
-                self.w_bg_value.insert(0, path)
-                # 배경 설정 변경 이벤트 트리거
-                self._on_background_changed()
-        except Exception as e:
-            try:
-                self._log_json(f"[찾아보기 오류] {e}")
-            except Exception:
-                pass
-
-    def _on_bg_type_change(self):
-        try:
-            kind = (self.bg_type_var.get() or "").strip()
-            # 색상 선택: 기본값 표시 및 텍스트 편집 가능, 찾아보기 비활성화
-            if kind == "색상":
-                try:
-                    self.w_bg_value.configure(state="normal")
-                    self.w_bg_value.delete(0, tk.END)
-                    self.w_bg_value.insert(0, "#000000")
-                except Exception:
-                    pass
-                try:
-                    self.btn_browse.configure(state="disabled")
-                except Exception:
-                    pass
-            else:
-                # 이미지/동영상: 경로 입력은 직접 편집도 가능하지만 기본은 비워두고 찾아보기 활성화
-                try:
-                    self.w_bg_value.configure(state="normal")
-                    if not (self.w_bg_value.get() or "").strip():
-                        self.w_bg_value.delete(0, tk.END)
-                except Exception:
-                    pass
-                try:
-                    self.btn_browse.configure(state="normal")
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-    def _on_click_video(self):
-        try:
-            if not getattr(self, 'root', None):
-                return
-            project_name = self.root.data_page.project_name_var.get()
-            identifier = self.root.data_page.identifier_var.get()
-            out_dir = os.path.join(config.OUTPUT_PATH, project_name, identifier)
-            dialog_dir = os.path.join(out_dir, 'dialog')
-            if not os.path.isdir(dialog_dir):
-                self._log_json('[비디오] dialog 폴더에 PNG가 없습니다. 먼저 미리보기를 생성하세요.')
-                return
-            out_mp4 = os.path.join(out_dir, f'{identifier}_dialog_preview.mp4')
-            import subprocess, tempfile, glob, io, wave, struct
-            # 1) 대화 행 로드
-            data = getattr(self.root.data_page, 'generated_data', None) or {}
-            dialogue_csv = (data.get('fullVideoScript') or {}).get('dialogueCsv') or data.get('dialogueCsv')
-            if not dialogue_csv:
-                self._log_json('[비디오] dialogueCsv가 없습니다. 데이터 생성/읽기를 먼저 수행하세요.')
-                return
-            lines = [row for row in dialogue_csv.splitlines() if row.strip()][1:]
-            # 2) 화자/언어 설정 확보 (DataTabView 로직 준용)
-            speaker_page = getattr(self.root, 'speaker_page', None)
-            if not speaker_page:
-                self._log_json('[비디오] 화자 설정 탭을 먼저 구성하세요.')
-                return
-            native_voice_name = speaker_page.native_speaker_dropdown.get()
-            learner_voice_names = [w["dropdown"].get() for w in speaker_page.learner_speaker_widgets]
-            native_lang_code = speaker_page.native_lang_code
-            learning_lang_code = speaker_page.learning_lang_code
-            if not native_voice_name or not learner_voice_names or not native_lang_code or not learning_lang_code:
-                # DataTabView를 통해 언어 설정 로드
-                data_page = getattr(self.root, 'data_page', None)
-                if not data_page:
-                    self._log_json('[비디오] 데이터 탭을 찾을 수 없습니다.')
-                    return
-                n_code, l_code = data_page.get_selected_language_codes()
-                speaker_page.update_language_settings(
-                    native_lang_code=n_code,
-                    learning_lang_code=l_code,
-                    project_name=project_name,
-                    identifier=identifier
-                )
-                native_voice_name = speaker_page.native_speaker_dropdown.get()
-                learner_voice_names = [w["dropdown"].get() for w in speaker_page.learner_speaker_widgets]
-                native_lang_code = speaker_page.native_lang_code
-                learning_lang_code = speaker_page.learning_lang_code
-            # 보정: 기본 화자 채우기
-            from src import api_services
-            if (not native_voice_name) and native_lang_code:
-                voices = api_services.get_voices_for_language(native_lang_code)
-                if voices:
-                    native_voice_name = voices[0]
-                    speaker_page.native_speaker_dropdown.set(native_voice_name)
-            if (not learner_voice_names) and learning_lang_code:
-                voices = api_services.get_voices_for_language(learning_lang_code)
-                if voices:
-                    if not speaker_page.learner_speaker_widgets:
-                        speaker_page._update_learner_speakers_ui(1)
-                    speaker_page.learner_speaker_widgets[0]["dropdown"].set(voices[0])
-                    learner_voice_names = [w["dropdown"].get() for w in speaker_page.learner_speaker_widgets]
-            if not native_voice_name or not learner_voice_names:
-                self._log_json('[비디오] 화자 정보를 확인하세요.')
-                return
-            # 3) 오디오 세그먼트 생성 + 길이 측정
-            def synth_wav_bytes(text: str, lang: str, voice: str) -> bytes:
-                return api_services.synthesize_speech(text, lang, voice, audio_encoding="LINEAR16", sample_rate_hz=16000) or b""
-            def silence_wav(duration_sec: float = 1.0, sample_rate: int = 16000) -> bytes:
-                num_samples = int(sample_rate * duration_sec)
-                buf = io.BytesIO()
-                with wave.open(buf, 'wb') as wf:
-                    wf.setnchannels(1)
-                    wf.setsampwidth(2)
-                    wf.setframerate(sample_rate)
-                    silence_frame = struct.pack('<h', 0)
-                    for _ in range(num_samples):
-                        wf.writeframes(silence_frame)
-                return buf.getvalue()
-            def wav_duration_seconds(wav_bytes: bytes) -> float:
-                if not wav_bytes:
-                    return 0.0
-                with wave.open(io.BytesIO(wav_bytes), 'rb') as wf:
-                    frames = wf.getnframes()
-                    rate = wf.getframerate()
-                    if rate <= 0:
-                        return 0.0
-                    return frames / float(rate)
-            def concat_wav(segments: list[bytes]) -> bytes:
-                import wave as _wave
-                out = io.BytesIO()
-                with _wave.open(out, 'wb') as wf_out:
-                    wf_out.setnchannels(1)
-                    wf_out.setsampwidth(2)
-                    wf_out.setframerate(16000)
-                    for seg in segments:
-                        with _wave.open(io.BytesIO(seg), 'rb') as wf_in:
-                            wf_out.writeframes(wf_in.readframes(wf_in.getnframes()))
-                return out.getvalue()
-            def write_wav(wav_bytes: bytes, out_wav_path: str):
-                with open(out_wav_path, 'wb') as f:
-                    f.write(wav_bytes)
-            rows = []
-            import csv, io as _io
-            reader = csv.reader(_io.StringIO(dialogue_csv))
-            entries = list(reader)
-            if entries and [c.strip('"') for c in entries[0][:4]] == ["순번","원어","학습어","읽기"]:
-                entries = entries[1:]
-            for row in entries:
-                cols = [c.strip('"') for c in row]
-                seq = cols[0] if len(cols) > 0 else ''
-                native = cols[1] if len(cols) > 1 else ''
-                learning = cols[2] if len(cols) > 2 else ''
-                reading = cols[3] if len(cols) > 3 else ''
-                rows.append((seq, native, learning, reading))
-            # 4) 프레임별 지속시간 계산 및 오디오 결합 세그먼트 준비
-            a_b_frames: list[tuple[str, float]] = []
-            audio_segments: list[bytes] = []
-            gap = silence_wav(1.0)
-            for idx, (_seq, native_text, learning_text, _reading_text) in enumerate(rows, start=1):
-                # A: native
-                a_png = os.path.join(dialog_dir, f"{identifier}_{idx:03d}_a.png")
-                b_png = os.path.join(dialog_dir, f"{identifier}_{idx:03d}_b.png")
-                nat_wav = synth_wav_bytes(native_text, native_lang_code, native_voice_name) if native_text.strip() else b""
-                nat_dur = wav_duration_seconds(nat_wav)
-                if nat_wav:
-                    audio_segments.append(nat_wav)
-                    audio_segments.append(gap)
-                # A 프레임은 원어 구간 + 화자간 무음 1초까지 포함
-                a_b_frames.append((a_png, max(0.1, nat_dur + 1.0)))
-                # B: learners
-                b_total = 0.0
-                if learning_text.strip():
-                    num_learners = len(learner_voice_names)
-                    for i, vname in enumerate(learner_voice_names):
-                        lwav = synth_wav_bytes(learning_text, learning_lang_code, vname)
-                        ldur = wav_duration_seconds(lwav)
-                        if lwav:
-                            audio_segments.append(lwav)
-                            # 화자 간 무음: 마지막 화자 뒤에는 추가하지 않음
-                            if i < num_learners - 1:
-                                audio_segments.append(gap)
-                        b_total += ldur
-                        if i < num_learners - 1:
-                            b_total += 1.0  # 화자 사이 무음
-                a_b_frames.append((b_png, max(0.1, b_total)))
-            # 5) 오디오 MP3 저장
-            if not audio_segments:
-                self._log_json('[비디오] 생성된 오디오 세그먼트가 없습니다.')
-                return
-            combined_wav = concat_wav(audio_segments)
-            out_wav = os.path.join(out_dir, f"{identifier}_dialog.wav")
-            write_wav(combined_wav, out_wav)
-            # 6) 배경 이미지 준비 및 비디오 생성
-            # 배경 이미지/색상으로 base 비디오 생성
-            bg_kind = (self.bg_type_var.get() or "").strip()
-            bg_value = (self.w_bg_value.get() or "").strip()
-            
-            # 해상도 추출
-            resolution = self._get_current_resolution()
-            width, height = map(int, resolution.split('x'))
-            
-            # 배경 base 비디오 생성
-            base_video_path = os.path.join(out_dir, f"{identifier}_base.mp4")
-            if bg_kind == "색상" and bg_value:
-                # 색상 배경으로 1초 비디오 생성
-                cmd_base = [
-                    'ffmpeg', '-y', '-loglevel', 'error',
-                    '-f', 'lavfi',
-                    '-i', f'color=c={bg_value}:s={width}x{height}:d=1',
-                    '-pix_fmt', 'yuv420p',
-                    base_video_path
-                ]
-            elif bg_kind == "이미지" and bg_value and os.path.isfile(bg_value):
-                # 이미지 배경으로 1초 비디오 생성
-                cmd_base = [
-                    'ffmpeg', '-y', '-loglevel', 'error',
-                    '-loop', '1',
-                    '-i', bg_value,
-                    '-t', '1',
-                    '-vf', f'scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2',
-                    '-pix_fmt', 'yuv420p',
-                    base_video_path
-                ]
-            elif bg_kind == "동영상" and bg_value and os.path.isfile(bg_value):
-                # 동영상 배경으로 1초 비디오 생성 (첫 프레임 사용)
-                cmd_base = [
-                    'ffmpeg', '-y', '-loglevel', 'error',
-                    '-i', bg_value,
-                    '-ss', '0',
-                    '-t', '1',
-                    '-vf', f'scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2',
-                    '-pix_fmt', 'yuv420p',
-                    base_video_path
-                ]
-            else:
-                # 기본 검은색 배경
-                cmd_base = [
-                    'ffmpeg', '-y', '-loglevel', 'error',
-                    '-f', 'lavfi',
-                    '-i', f'color=c=black:s={width}x{height}:d=1',
-                    '-pix_fmt', 'yuv420p',
-                    base_video_path
-                ]
-            
-            subprocess.run(cmd_base, check=True)
-            
-            # 7) 각 프레임을 배경 위에 overlay하여 최종 비디오 생성
-            temp_videos = []
-            for idx, (png_path, duration) in enumerate(a_b_frames):
-                temp_video = os.path.join(out_dir, f"{identifier}_temp_{idx:03d}.mp4")
-                temp_videos.append(temp_video)
-                
-                # PNG를 배경 위에 overlay하여 비디오 생성
-                cmd_overlay = [
-                    'ffmpeg', '-y', '-loglevel', 'error',
-                    '-i', base_video_path,
-                    '-i', png_path,
-                    '-filter_complex', f'[0:v][1:v]overlay=0:0:shortest=1',
-                    '-t', str(duration),
-                    '-pix_fmt', 'yuv420p',
-                    temp_video
-                ]
-                subprocess.run(cmd_overlay, check=True)
-            
-            # 8) concat 리스트 작성 후 최종 비디오 생성
-            with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.txt') as listf:
-                for temp_video in temp_videos:
-                    listf.write(f"file '{temp_video}'\n")
-                list_path = listf.name
-            
-            cmd_final = [
-                'ffmpeg', '-y', '-loglevel', 'error',
-                '-f', 'concat', '-safe', '0', '-i', list_path,
-                '-i', out_wav,
-                '-pix_fmt', 'yuv420p',
-                '-shortest',
-                out_mp4
-            ]
-            subprocess.run(cmd_final, check=True)
-            
-            # 임시 파일들 정리
-            os.remove(list_path)
-            os.remove(base_video_path)
-            for temp_video in temp_videos:
-                os.remove(temp_video)
-            self._log_json(f'[비디오] 생성 완료: {out_mp4}')
-        except Exception as e:
-            self._log_json(f'[비디오 오류] {e}')
-
-    def _log_json(self, message: str):
-        try:
-            self.json_viewer.insert('end', message + "\n")
-            self.json_viewer.see('end')
-        except Exception:
-            pass
-
-    def _get_current_resolution(self):
-        """현재 선택된 해상도를 반환합니다."""
-        try:
-            # 현재 활성화된 텍스트 설정 탭에서 해상도 가져오기
-            current_tab = self.tab_view.get()
-            if current_tab in self.text_tabs:
-                tab = self.text_tabs[current_tab]
-                if hasattr(tab, '_controls') and "해상도" in tab._controls:
-                    resolution = tab._controls["해상도"].get()
-                    if resolution and 'x' in resolution:
-                        return resolution
-        except Exception:
-            pass
-        
-        # 기본값 반환
-        return "1920x1080"
+    def _open_color_picker(self, entry_widget):
+        color_code = colorchooser.askcolor(title="색상 선택")
+        if color_code[1]: # color_code[1] is the hex string
+            entry_widget.delete(0, tk.END)
+            entry_widget.insert(0, color_code[1].upper())
 
 class TextSettingsTab(ctk.CTkFrame):
-    def __init__(self, parent, default_data):
-        super().__init__(parent, fg_color=config.COLOR_THEME["widget"])
+    def __init__(self, parent, default_data, font_options, open_color_picker_callback):
+        super().__init__(parent, fg_color="transparent")
+        self.font_options = font_options
+        self.open_color_picker_callback = open_color_picker_callback
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+        self.recreate_widgets(default_data)
+
+    def recreate_widgets(self, data):
+        for widget in self.winfo_children():
+            widget.destroy()
         self._controls = {}
         self._grid_widgets = []
         
-        # --- 상단 컨트롤 ---
-        top_controls_frame = ctk.CTkFrame(self, fg_color="transparent")
-        top_controls_frame.grid(row=0, column=0, padx=10, pady=5, sticky="ew")
+        self.bg_type_var = tk.StringVar(value=data.get("main_background", {}).get("type", "색상"))
+        self.shadow_blur_enabled = tk.BooleanVar(value=data.get("shadow", {}).get("useBlur", True))
+        self.bg_box_type_var = tk.StringVar(value=data.get("background_box", {}).get("type", "없음"))
+
+        scrollable_frame = ctk.CTkScrollableFrame(self, fg_color="black")
+        scrollable_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         
-        rows_params = {
-            "values": [str(i) for i in range(1, 11)],
-            "fg_color": config.COLOR_THEME["widget"],
-            "text_color": config.COLOR_THEME["text"]
-        }
-        frame, self._controls["행수"] = create_labeled_widget(top_controls_frame, "텍스트 행수", 6, "combo", rows_params)
-        self._controls["행수"].set(default_data["행수"])
-        frame.pack(side="left", padx=(0, 20))
+        self._create_common_settings_widgets(scrollable_frame, data)
+        self._create_grid_settings_widgets(scrollable_frame, data)
 
-        ratio_params = {
-            "values": ["16:9", "1:1", "9:16"],
-            "fg_color": config.COLOR_THEME["widget"],
-            "text_color": config.COLOR_THEME["text"]
-        }
-        frame, self._controls["비율"] = create_labeled_widget(top_controls_frame, "화면비율", 10, "combo", ratio_params)
-        self._controls["비율"].set(default_data["비율"])
-        frame.pack(side="left", padx=(0, 20))
+    def _on_row_count_changed(self, new_row_count_str: str):
+        try:
+            new_row_count = int(new_row_count_str)
+        except (ValueError, TypeError):
+            return
 
-        resolution_params = {
-            "values": ["1920x1080", "1080x1080", "1080x1920", "1024x768"],
-            "fg_color": config.COLOR_THEME["widget"],
-            "text_color": config.COLOR_THEME["text"]
-        }
-        frame, self._controls["해상도"] = create_labeled_widget(top_controls_frame, "해상도", 15, "combo", resolution_params)
-        self._controls["해상도"].set(default_data["해상도"])
-        frame.pack(side="left", padx=(0, 20))
-
-        # --- 설정 그리드 ---
-        grid_frame = ctk.CTkScrollableFrame(self)
-        grid_frame.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
+        current_settings = self.get_settings()
+        current_rows = current_settings.get("rows", [])
         
-        headers = ["행", "x", "y", "w", "크기(pt)", "폰트(pt)", "색상", "굵기", "좌우 정렬", "상하 정렬", "바탕", "쉐도우", "외곽선"]
-        col_widths = {"행": 5, "x": 5, "y": 5, "w": 6, "크기(pt)": 5, "폰트(pt)": 30, "색상": 10, "굵기": 8, "좌우 정렬": 8, "상하 정렬": 8, "바탕": 6, "쉐도우": 6, "외곽선": 6}
+        default_row_structure = {"행": "N행", "x": 50, "y": 50, "w": 1820, "크기(pt)": 100, "폰트(pt)": self.font_options[0] if self.font_options else "Arial", "색상": "#FFFFFF", "좌우 정렬": "Left", "상하 정렬": "Top", "바탕": False, "쉐도우": False, "외곽선": False}
+
+        while len(current_rows) < new_row_count:
+            new_row = default_row_structure.copy()
+            new_row['행'] = f'{len(current_rows) + 1}행'
+            new_row['y'] = 50 + (len(current_rows) * 100)
+            current_rows.append(new_row)
+        
+        if len(current_rows) > new_row_count:
+            current_rows = current_rows[:new_row_count]
+        
+        current_settings["rows"] = current_rows
+        current_settings["행수"] = new_row_count_str
+        self.recreate_widgets(current_settings)
+
+    def _create_common_settings_widgets(self, parent, data):
+        common_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        common_frame.pack(fill="x", padx=10, pady=5, expand=True)
+        button_kwargs = {"fg_color": config.COLOR_THEME["button"], "hover_color": config.COLOR_THEME["button_hover"], "text_color": config.COLOR_THEME["text"]}
+
+        row1 = ctk.CTkFrame(common_frame, fg_color="transparent"); row1.pack(fill="x", pady=2, anchor="w")
+        ctk.CTkLabel(row1, text="배경 설정:").pack(side="left", padx=(0, 5))
+        bg_type_combo = ctk.CTkComboBox(row1, width=120, variable=self.bg_type_var, values=["색상", "이미지", "동영상"], command=self._on_bg_type_change)
+        bg_type_combo.pack(side="left", padx=5)
+        _, self.w_bg_value = create_labeled_widget(row1, "배경값:", 80); self.w_bg_value.insert(0, data.get("main_background", {}).get("value", "#000000"))
+        self.btn_browse = ctk.CTkButton(row1, text="찾아보기", width=80, command=self._on_click_browse, **button_kwargs); self.btn_browse.pack(side="left", padx=(5,0))
+        self.btn_bg_color_picker = ctk.CTkButton(row1, text="🎨", width=30, command=lambda: self.open_color_picker_callback(self.w_bg_value), **button_kwargs)
+        self.btn_bg_color_picker.pack(side="left", padx=(5,0))
+        self._on_bg_type_change()
+
+        row2 = ctk.CTkFrame(common_frame, fg_color="transparent"); row2.pack(fill="x", pady=2, anchor="w")
+        _, self.w_line_spacing = create_labeled_widget(row2, "텍스트 행간 비율:", 10, "entry", {"justify": "center"}); self.w_line_spacing.insert(0, str(data.get("line_spacing", {}).get("ratio", "0.8")))
+
+        row3 = ctk.CTkFrame(common_frame, fg_color="transparent"); row3.pack(fill="x", pady=2, anchor="w")
+        ctk.CTkLabel(row3, text="바탕 설정:").pack(side="left", padx=(0, 10))
+        _, self.w_bg_box_type = create_labeled_widget(row3, "바탕 형태:", 10, "combo", {"values": ["없음", "텍스트", "블록", "전체"], "variable": self.bg_box_type_var})
+        _, self.w_bg_box_color = create_labeled_widget(row3, "바탕색:", 15); self.w_bg_box_color.insert(0, data.get("background_box", {}).get("color", "#000000"))
+        self.btn_bg_box_color_picker = ctk.CTkButton(row3, text="🎨", width=30, command=lambda: self.open_color_picker_callback(self.w_bg_box_color), **button_kwargs)
+        self.btn_bg_box_color_picker.pack(side="left", padx=(5,0))
+        _, self.w_bg_box_alpha = create_labeled_widget(row3, "투명도:", 10); self.w_bg_box_alpha.insert(0, str(data.get("background_box", {}).get("alpha", "0.2")))
+        _, self.w_bg_box_margin = create_labeled_widget(row3, "여백:", 6); self.w_bg_box_margin.insert(0, str(data.get("background_box", {}).get("margin", "2")))
+
+        row4 = ctk.CTkFrame(common_frame, fg_color="transparent"); row4.pack(fill="x", pady=2, anchor="w")
+        ctk.CTkLabel(row4, text="쉐도우 설정:").pack(side="left", padx=(0, 10))
+        ctk.CTkCheckBox(row4, text="블러", variable=self.shadow_blur_enabled, command=self._update_common_states).pack(side="left", padx=(0,8))
+        _, self.w_shadow_thick = create_labeled_widget(row4, "두께", 6); self.w_shadow_thick.insert(0, str(data.get("shadow", {}).get("thick", "2")))
+        _, self.w_shadow_color = create_labeled_widget(row4, "쉐도우 색상", 10); self.w_shadow_color.insert(0, data.get("shadow", {}).get("color", "#000000"))
+        self.btn_shadow_color_picker = ctk.CTkButton(row4, text="🎨", width=30, command=lambda: self.open_color_picker_callback(self.w_shadow_color), **button_kwargs)
+        self.btn_shadow_color_picker.pack(side="left", padx=(5,0))
+        
+        row5 = ctk.CTkFrame(common_frame, fg_color="transparent"); row5.pack(fill="x", pady=2, anchor="w")
+        ctk.CTkLabel(row5, text="외곽선 설정:").pack(side="left", padx=(0, 10))
+        _, self.w_border_thick = create_labeled_widget(row5, "두께", 6); self.w_border_thick.insert(0, str(data.get("border", {}).get("thick", "2")))
+        _, self.w_border_color = create_labeled_widget(row5, "외곽선 색상", 10); self.w_border_color.insert(0, data.get("border", {}).get("color", "#000000"))
+        self.btn_border_color_picker = ctk.CTkButton(row5, text="🎨", width=30, command=lambda: self.open_color_picker_callback(self.w_border_color), **button_kwargs)
+        self.btn_border_color_picker.pack(side="left", padx=(5,0))
+        
+        self._update_common_states()
+
+    def _create_grid_settings_widgets(self, parent, data):
+        grid_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        grid_frame.pack(fill="x", pady=5, expand=True)
+        
+        top_controls_frame = ctk.CTkFrame(grid_frame, fg_color="transparent"); top_controls_frame.pack(fill="x", pady=5)
+        combo_params = {"fg_color": config.COLOR_THEME["widget"], "text_color": config.COLOR_THEME["text"]}
+        button_kwargs = {"fg_color": config.COLOR_THEME["button"], "hover_color": config.COLOR_THEME["button_hover"], "text_color": config.COLOR_THEME["text"]}
+        
+        # 텍스트 행수
+        frame, self._controls["행수"] = create_labeled_widget(top_controls_frame, "텍스트 행수", 8, "combo", {**combo_params, "values": [str(i) for i in range(1, 11)], "command": self._on_row_count_changed})
+        self._controls["행수"].set(data.get("행수", "1")); frame.pack(side="left", padx=(0, 10))
+        
+        # 화면비율 (복구)
+        frame, self._controls["비율"] = create_labeled_widget(top_controls_frame, "화면비율", 16, "combo", {**combo_params, "values": ["16:9", "1:1", "9:16"]})
+        self._controls["비율"].set(data.get("비율", "16:9")); frame.pack(side="left", padx=(0, 10))
+        
+        # 해상도 (복구)
+        frame, self._controls["해상도"] = create_labeled_widget(top_controls_frame, "해상도", 16, "combo", {**combo_params, "values": ["1920x1080", "1024x768", "1080x1080", "768x1024", "1080x1920"]})
+        self._controls["해상도"].set(data.get("해상도", "1920x1080")); frame.pack(side="left", padx=(0, 20))
+
+        settings_grid = ctk.CTkFrame(grid_frame, fg_color="transparent")
+        settings_grid.pack(fill="both", expand=True, pady=5)
+        
+        headers = ["행", "x", "y", "w", "크기(pt)", "폰트(pt)", "색상", "좌우 정렬", "상하 정렬", "바탕", "쉐도우", "외곽선"]
+        col_widths = {"행": 6, "x": 6, "y": 6, "w": 10, "크기(pt)": 8, "폰트(pt)": 30, "색상": 16, "좌우 정렬": 16, "상하 정렬": 16, "바탕": 6, "쉐도우": 6, "외곽선": 6}
 
         for col, header_text in enumerate(headers):
-            hdr_cell = ctk.CTkLabel(grid_frame, text=header_text, justify="center", anchor="center")
-            hdr_cell.grid(row=0, column=col, padx=2, pady=5, sticky="nsew")
+            ctk.CTkLabel(settings_grid, text=header_text, justify="center", anchor="center").grid(row=0, column=col, padx=2, pady=5, sticky="nsew")
 
-        # PNGRenderer에서 로드된 모든 폰트 옵션 제공
-        font_options = [
-            # 한글 폰트
-            "Noto Sans KR", "Noto Sans KR Bold", 
-            "KoPubWorld돋움체", "KoPubWorld바탕체",
-            "Apple SD Gothic Neo",
-            
-            # 영문 폰트
-            "Arial", "Arial Bold", "Arial Italic", "Arial Bold Italic",
-            "Helvetica", "Helvetica Neue", 
-            "Times New Roman", "Georgia",
-            
-            # 대체 폰트
-            "Noto Sans KR (System)"
-        ]
-        weight_options = ["Light", "Medium", "Bold"]
         h_align_options = ["Left", "Center", "Right"]
         v_align_options = ["Top", "Center", "Bottom"]
 
-        for row_idx, row_data in enumerate(default_data["rows"], start=1):
+        rows_data = data.get("rows", [])
+        
+        for row_idx, row_data in enumerate(rows_data, start=1):
+            row_widgets = {}
             for col_idx, key in enumerate(headers):
-                pixel_width = col_widths.get(key, 10) * 9 
-                params = {"master": grid_frame, "width": pixel_width, 
-                          "fg_color": config.COLOR_THEME["widget"], 
-                          "text_color": config.COLOR_THEME["text"]}
+                pixel_width = col_widths.get(key, 10) * 9
+                params = {"master": settings_grid, "width": pixel_width, "fg_color": config.COLOR_THEME["widget"], "text_color": config.COLOR_THEME["text"]}
                 
+                widget = None
                 if key == "행":
-                    widget = ctk.CTkLabel(grid_frame, text=row_data.get(key), justify="center")
-                elif key in ["폰트(pt)", "굵기", "좌우 정렬", "상하 정렬"]:
-                    if key == "폰트(pt)":
-                        values = font_options
-                    elif key == "굵기":
-                        values = weight_options
-                    elif key == "좌우 정렬":
-                        values = h_align_options
-                    else:
-                        values = v_align_options
-                    widget = ctk.CTkComboBox(**params, values=values)
-                    widget.set(row_data.get(key))
+                    # 행 라벨을 디폴트 값으로 설정
+                    default_labels = ["순번", "원어", "학습어", "읽기"]
+                    default_label = default_labels[row_idx - 1] if row_idx <= len(default_labels) else f"{row_idx}행"
+                    widget = ctk.CTkEntry(**params, justify="center"); widget.insert(0, default_label)
+                elif key in ["폰트(pt)", "좌우 정렬", "상하 정렬"]:
+                    values = {"폰트(pt)": self.font_options, "좌우 정렬": h_align_options, "상하 정렬": v_align_options}[key]
+                    widget = ctk.CTkComboBox(**params, values=values); widget.set(row_data.get(key))
+                elif key == "색상":
+                    color_frame = ctk.CTkFrame(settings_grid, fg_color="transparent")
+                    color_frame.grid(row=row_idx, column=col_idx, padx=1, pady=1, sticky="nsew")
+                    color_entry = ctk.CTkEntry(color_frame, width=pixel_width - 40, justify="center")
+                    color_entry.insert(0, str(row_data.get(key, '')))
+                    color_entry.pack(side="left", fill="x", expand=True)
+                    btn_color_picker = ctk.CTkButton(color_frame, text="🎨", width=30, command=lambda entry=color_entry: self.open_color_picker_callback(entry), **button_kwargs)
+                    btn_color_picker.pack(side="left", padx=(5,0))
+                    row_widgets[key] = color_entry
+                    row_widgets[f"{key}_picker"] = btn_color_picker
+                    widget = color_frame # The widget to grid is the frame
+                elif key in ["바탕", "쉐도우", "외곽선"]:
+                    container = ctk.CTkFrame(settings_grid, fg_color="transparent"); container.grid(row=row_idx, column=col_idx, padx=1, pady=1, sticky="nsew")
+                    container.grid_rowconfigure(0, weight=1); container.grid_columnconfigure(0, weight=1)
+                    val = str(row_data.get(key, "False")).lower() in ["true", "1"]; var = tk.BooleanVar(value=val)
+                    widget = ctk.CTkCheckBox(container, text="", variable=var); widget.grid(row=0, column=0, sticky="")
+                    row_widgets[key] = var
+                    continue
                 else:
-                    if key in ["바탕", "쉐도우", "외곽선"]:
-                        # 중앙정렬 컨테이너에 체크박스 배치
-                        container = ctk.CTkFrame(grid_frame, fg_color="transparent", width=pixel_width)
-                        try:
-                            container.grid_propagate(False)
-                        except Exception:
-                            pass
-                        val = str(row_data.get(key, "False")).lower() in ["true", "1", "yes", "y"]
-                        var = tk.BooleanVar(value=val)
-                        cb = ctk.CTkCheckBox(container, text="", variable=var)
-                        cb.pack(expand=True)
-                        # 헤더 중앙 정렬과 시각적 일치: 컨테이너도 고정 높이 적용
-                        try:
-                            container.configure(height=26)
-                        except Exception:
-                            pass
-                        container.grid(row=row_idx, column=col_idx, padx=1, pady=1)
-                        widget = cb
-                    else:
-                        widget = ctk.CTkEntry(**params, justify="center")
-                        widget.insert(0, str(row_data.get(key, '')))
-                    
-                widget.grid(row=row_idx, column=col_idx, padx=1, pady=1) if not (key in ["바탕", "쉐도우", "외곽선"]) else None
-                self._grid_widgets.append((row_idx, key, widget))
+                    widget = ctk.CTkEntry(**params, justify="center"); widget.insert(0, str(row_data.get(key, '')))
+                
+                if key != "색상": # Color frame is already gridded
+                    widget.grid(row=row_idx, column=col_idx, padx=1, pady=1)
+                if key not in ["바탕", "쉐도우", "외곽선", "색상"]: # Checkboxes and color frame are handled differently
+                    row_widgets[key] = widget
+            self._grid_widgets.append(row_widgets)
 
     def get_settings(self):
+        """현재 UI 위젯들의 상태를 읽어 하나의 설정 딕셔너리로 반환합니다."""
         try:
-            result = {
-                "행수": self._controls.get("행수").get() if self._controls.get("행수") else "",
-                "비율": self._controls.get("비율").get() if self._controls.get("비율") else "",
-                "해상도": self._controls.get("해상도").get() if self._controls.get("해상도") else "",
-                "rows": []
+            # 공통 컨트롤에서 설정값 가져오기
+            bg_type = self.bg_type_var.get()
+            bg_value = self.w_bg_value.get()
+            if bg_type in ["이미지", "동영상"] and hasattr(self, 'w_bg_value_absolute_path'):
+                bg_value = self.w_bg_value_absolute_path
+
+            settings = {
+                "main_background": {"type": bg_type, "value": bg_value},
+                "line_spacing": {"ratio": self.w_line_spacing.get()},
+                "background_box": {"type": self.bg_box_type_var.get(), "color": self.w_bg_box_color.get(), "alpha": self.w_bg_box_alpha.get(), "margin": self.w_bg_box_margin.get()},
+                "shadow": {"useBlur": self.shadow_blur_enabled.get(), "thick": self.w_shadow_thick.get(), "color": self.w_shadow_color.get()},
+                "border": {"thick": self.w_border_thick.get(), "color": self.w_border_color.get()},
+                "행수": self._controls["행수"].get(),
+                "비율": self._controls["비율"].get(),
+                "해상도": self._controls["해상도"].get()
             }
-            # 행 이름 수집
-            row_names = {}
-            for row_idx, key, widget in self._grid_widgets:
-                if key == "행":
-                    row_names[row_idx] = widget.cget("text")
-            # 값 수집
-            row_map = {idx: {"행": name} for idx, name in row_names.items()}
-            for row_idx, key, widget in self._grid_widgets:
-                if key == "행":
-                    continue
-                if isinstance(widget, ctk.CTkCheckBox):
-                    # 체크박스는 True/False 문자열로 저장
-                    val = "True" if widget.get() in [True, "True", "1", 1] else "False"
-                elif isinstance(widget, ctk.CTkComboBox):
-                    val = widget.get()
-                elif isinstance(widget, ctk.CTkEntry):
-                    val = widget.get()
-                else:
-                    val = getattr(widget, 'get', lambda: '')()
-                row_map.setdefault(row_idx, {"행": row_names.get(row_idx, str(row_idx))})
-                row_map[row_idx][key] = val
-            result["rows"] = [row_map[idx] for idx in sorted(row_map.keys())]
-            return result
-        except Exception:
-            return {"행수": "", "비율": "", "해상도": "", "rows": []}
+
+            # 그리드에서 행 데이터 가져오기
+            rows = []
+            for row_widgets in self._grid_widgets:
+                row_data = {}
+                for key, widget in row_widgets.items():
+                    if key == "행":
+                        # 행 라벨을 그대로 유지
+                        text_value = widget.get()
+                        row_data["행"] = text_value
+                    elif isinstance(widget, tk.BooleanVar): 
+                        row_data[key] = widget.get()
+                    elif key.endswith("_picker"): 
+                        continue
+                    elif isinstance(widget, ctk.CTkFrame): # Handle color frame
+                        # Get value from the entry inside the frame
+                        entry_widget = widget.winfo_children()[0] # Assuming entry is the first child
+                        row_data[key] = entry_widget.get()
+                    else: 
+                        row_data[key] = widget.get()
+                rows.append(row_data)
+            settings["rows"] = rows
+            return settings
+            
+        except Exception as e:
+            traceback.print_exc()
+            return {}
 
     def apply_settings(self, data):
-        try:
-            if self._controls.get("행수") and data.get("행수"):
-                self._controls["행수"].set(str(data.get("행수")))
-            if self._controls.get("비율") and data.get("비율"):
-                self._controls["비율"].set(str(data.get("비율")))
-            if self._controls.get("해상도") and data.get("해상도"):
-                self._controls["해상도"].set(str(data.get("해상도")))
-            rows = data.get("rows", [])
-            # row 이름 인덱스 맵 구성
-            rowidx_to_name = {}
-            for row_idx, key, widget in self._grid_widgets:
-                if key == "행":
-                    rowidx_to_name[row_idx] = widget.cget("text")
-            # 위젯에 값 반영
-            for row_idx, key, widget in self._grid_widgets:
-                if key == "행":
-                    continue
-                row_name = rowidx_to_name.get(row_idx)
-                row_data = next((r for r in rows if str(r.get("행")) == str(row_name)), None)
-                if not row_data:
-                    continue
-                val = row_data.get(key)
-                if val is None:
-                    continue
-                if isinstance(widget, ctk.CTkCheckBox):
-                    # 체크박스 복원
-                    val_str = str(val)
-                    if val_str in ["True", "1", "true", "YES", "Yes", "y", "Y"]:
-                        widget.select()
-                    else:
-                        widget.deselect()
-                elif isinstance(widget, ctk.CTkComboBox):
-                    widget.set(str(val))
-                elif isinstance(widget, ctk.CTkEntry):
-                    widget.delete(0, tk.END)
-                    widget.insert(0, str(val))
-        except Exception:
-            pass
+        self.recreate_widgets(data)
 
-    def get_settings(self):
+    def _on_click_browse(self):
         try:
-            result = {
-                "행수": self._controls.get("행수").get() if self._controls.get("행수") else "",
-                "비율": self._controls.get("비율").get() if self._controls.get("비율") else "",
-                "해상도": self._controls.get("해상도").get() if self._controls.get("해상도") else "",
-                "rows": []
-            }
-            # 행 이름 수집
-            row_names = {}
-            for row_idx, key, widget in self._grid_widgets:
-                if key == "행":
-                    row_names[row_idx] = widget.cget("text")
-            # 값 수집
-            row_map = {idx: {"행": name} for idx, name in row_names.items()}
-            for row_idx, key, widget in self._grid_widgets:
-                if key == "행":
-                    continue
-                if isinstance(widget, ctk.CTkCheckBox):
-                    # 체크박스는 True/False 문자열로 저장
-                    val = "True" if widget.get() in [True, "True", "1", 1] else "False"
-                elif isinstance(widget, ctk.CTkComboBox):
-                    val = widget.get()
-                elif isinstance(widget, ctk.CTkEntry):
-                    val = widget.get()
-                else:
-                    val = getattr(widget, 'get', lambda: '')()
-                row_map.setdefault(row_idx, {"행": row_names.get(row_idx, str(row_idx))})
-                row_map[row_idx][key] = val
-            result["rows"] = [row_map[idx] for idx in sorted(row_map.keys())]
-            return result
-        except Exception:
-            return {"행수": "", "비율": "", "해상도": "", "rows": []}
+            kind = self.bg_type_var.get()
+            if kind == "이미지": filetypes = [("Image files", "*.jpg *.jpeg *.png")]
+            elif kind == "동영상": filetypes = [("Video files", "*.mp4")]
+            else: return
+            path = filedialog.askopenfilename(title="파일 선택", filetypes=filetypes)
+            if path:
+                self.w_bg_value_absolute_path = path
+                self.w_bg_value.configure(state="normal")
+                self.w_bg_value.delete(0, tk.END)
+                self.w_bg_value.insert(0, path)
+                if self.bg_type_var.get() in ["이미지", "동영상"]:
+                    self.w_bg_value.configure(state="disabled")
+        except Exception as e: 
+            print(f"[찾아보기 오류] {e}")
 
-    def apply_settings(self, data):
+    def _on_bg_type_change(self, *_):
         try:
-            if self._controls.get("행수") and data.get("행수"):
-                self._controls["행수"].set(str(data.get("행수")))
-            if self._controls.get("비율") and data.get("비율"):
-                self._controls["비율"].set(str(data.get("비율")))
-            if self._controls.get("해상도") and data.get("해상도"):
-                self._controls["해상도"].set(str(data.get("해상도")))
-            rows = data.get("rows", [])
-            # row 이름 인덱스 맵 구성
-            rowidx_to_name = {}
-            for row_idx, key, widget in self._grid_widgets:
-                if key == "행":
-                    rowidx_to_name[row_idx] = widget.cget("text")
-            # 위젯에 값 반영
-            for row_idx, key, widget in self._grid_widgets:
-                if key == "행":
-                    continue
-                row_name = rowidx_to_name.get(row_idx)
-                row_data = next((r for r in rows if str(r.get("행")) == str(row_name)), None)
-                if not row_data:
-                    continue
-                val = row_data.get(key)
-                if val is None:
-                    continue
-                if isinstance(widget, ctk.CTkCheckBox):
-                    # 체크박스 복원
-                    val_str = str(val)
-                    if val_str in ["True", "1", "true", "YES", "Yes", "y", "Y"]:
-                        widget.select()
-                    else:
-                        widget.deselect()
-                elif isinstance(widget, ctk.CTkComboBox):
-                    widget.set(str(val))
-                elif isinstance(widget, ctk.CTkEntry):
-                    widget.delete(0, tk.END)
-                    widget.insert(0, str(val))
-        except Exception:
-            pass
+            selected_type = self.bg_type_var.get()
+            if selected_type == "색상":
+                self.btn_browse.configure(state="disabled")
+                if hasattr(self, 'w_bg_value'): self.w_bg_value.configure(state="normal")
+                if hasattr(self, 'btn_bg_color_picker'): self.btn_bg_color_picker.configure(state="normal")
+            else: # 이미지 or 동영상
+                self.btn_browse.configure(state="normal")
+                if hasattr(self, 'w_bg_value'): self.w_bg_value.configure(state="disabled")
+                if hasattr(self, 'btn_bg_color_picker'): self.btn_bg_color_picker.configure(state="disabled")
+        except Exception: pass
+
+    def _update_common_states(self, event=None):
+        try:
+            state = "normal" if self.shadow_blur_enabled.get() else "disabled"
+            for w in [self.w_shadow_blur, self.w_shadow_offx, self.w_shadow_offy, self.w_shadow_alpha]:
+                if w: w.configure(state=state)
+        except Exception: pass

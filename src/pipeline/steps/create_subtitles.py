@@ -1,252 +1,265 @@
-"""
-Step 3: 자막 이미지 생성 (새로운 PNG 직접 생성 방식)
-
-Manifest와 UI 설정값을 바탕으로, PNGRenderer를 사용하여 각 장면에 맞는
-자막 이미지를 직접 생성합니다. 제작 사양서에 따라 각 타입별로 PNG 이미지를 생성합니다.
-"""
 import os
-import re
-from typing import List, Dict, Any, Tuple
-from PIL import Image
+import traceback
+from typing import Tuple, Dict, Any, List
 
 from ..core.context import PipelineContext
 from ..renderers import PNGRenderer
-from ..utils.file_naming import FileNamingManager
 
+# --- Helper Function ---
+def _log(context: PipelineContext, message: str, level: str = "INFO"):
+    if level.upper() != "INFO":
+        log_message = f"[{level.upper()}] {message}"
+    else:
+        log_message = message
+    context.log_callback(log_message)
 
-def run(context: PipelineContext):
-    """
-    자막 이미지 생성 파이프라인의 메인 실행 함수입니다.
-    각 타입별로 PNG 이미지를 직접 생성합니다.
-    """
-    print('--- Step 3: 자막 이미지 생성 시작 ---')
-    print(f"📁 프로젝트: {context.project_name}")
-    print(f"🆔 식별자: {context.identifier}")
+def _get_style_row_map(context: PipelineContext, tab_name: str) -> Dict[str, Dict]:
+    """UI 설정에서 특정 탭의 행(row)들을 가져와 '행' 레이블을 키로 하는 딕셔너리로 만듭니다."""
+    try:
+        settings_for_tab = context.settings.script_settings.get(tab_name, {})
+        rows = settings_for_tab.get('rows', [])
+        return {row.get('행'): row for row in rows if row.get('행')}
+    except Exception as e:
+        _log(context, f"'{tab_name}' 탭의 스타일 설정을 파싱하는 중 오류 발생: {e}", "ERROR")
+        return {}
+
+# --- Main Entry Point ---
+def run(context: PipelineContext) -> Dict[str, Any]:
+    print('🚀 [자막 생성] Step 3: 자막 이미지 생성 시작 ---')
+    print(f"🔍 [자막 생성] context.project_name: {context.project_name}")
+    print(f"🔍 [자막 생성] context.identifier: {context.identifier}")
+    print(f"🔍 [자막 생성] context.script_type: {context.script_type}")
+    context.log_callback(f"📁 프로젝트: {context.project_name}")
+    context.log_callback(f"🆔 식별자: {context.identifier}")
 
     if not context.manifest:
-        print("⚠️ Manifest가 없습니다. 이전 단계를 먼저 실행하세요.")
-        return
+        print("❌ [자막 생성] Manifest가 없습니다.")
+        _log(context, "Manifest가 없습니다. 이전 단계를 먼저 실행하세요.", "WARNING")
+        return {"success": False, "message": "Manifest가 없습니다."}
 
-    print(f"📄 매니페스트 타입: {type(context.manifest)}")
-    print(f"📄 매니페스트 내용: {context.manifest}")
-
-    # 1. 개선된 PNG 렌더러 초기화 (고품질 렌더링)
-    settings_dict = {
-        "common": context.settings.common,
-        "tabs": context.settings.tabs
-    }
+    print(f"✅ [자막 생성] Manifest 확인 완료: {len(context.manifest.scenes)}개 장면")
     
-    # 디버깅: 설정 데이터 확인
-    print(f"🔍 [DEBUG] PNGRenderer 초기화용 설정:")
-    print(f"   - common keys: {list(context.settings.common.keys())}")
-    if 'tab_backgrounds' in context.settings.common:
-        print(f"   - tab_backgrounds: {context.settings.common['tab_backgrounds']}")
+    settings = context.settings.script_settings
+    if not settings:
+        print("❌ [자막 생성] 스크립트 설정이 없습니다.")
+        _log(context, "스크립트 설정(script_settings)이 없습니다.", "ERROR")
+        return {"success": False, "message": "스크립트 설정이 없습니다."}
+
+    print(f"✅ [자막 생성] 스크립트 설정 확인 완료: {list(settings.keys())}")
+    print("🚀 [자막 생성] PNGRenderer 초기화 시작...")
+    png_renderer = PNGRenderer(settings)
+    print("✅ [자막 생성] PNGRenderer 초기화 완료")
+    context.log_callback("✅ PNGRenderer 초기화 완료")
+    
+    script_type = context.script_type
+    
+    base_subtitle_output_dir = os.path.join(context.paths.output_dir, "subtitles")
+    os.makedirs(base_subtitle_output_dir, exist_ok=True)
+
+    _log(context, f"지정된 스크립트 타입 '{script_type}'에 대한 이미지 생성을 시작합니다.")
+
+    if script_type == "conversation":
+        _create_conversation_images(context, png_renderer, base_subtitle_output_dir)
+    elif script_type == "intro":
+        _create_intro_images(context, png_renderer, base_subtitle_output_dir)
+    elif script_type == "ending":
+        _create_ending_images(context, png_renderer, base_subtitle_output_dir)
+    elif script_type == "thumbnail":
+        _create_thumbnail_images(context, png_renderer, base_subtitle_output_dir)
     else:
-        print(f"   - tab_backgrounds: 없음!")
-    
-    # 🔥 UI 연동 강화: PNGRenderer 초기화 및 설정 검증
-    print("🚀 [UI 연동] PNGRenderer 초기화 시작...")
-    png_renderer = PNGRenderer(settings_dict)
-    
-    # 렌더러 상태 확인
-    renderer_status = png_renderer.get_current_settings()
-    print(f"✅ [UI 연동] PNGRenderer 초기화 완료")
-    print(f"   - 사용 가능한 폰트: {renderer_status.get('fonts', [])}")
-    print(f"   - 공통 설정 키: {list(renderer_status.get('common', {}).keys())}")
-    print(f"   - 탭 설정 키: {list(renderer_status.get('tabs', {}).keys())}")
-    
-    # 2. 파일명 관리자 초기화
-    file_manager = FileNamingManager(base_output_dir="output")
-    
-    # 3. 해상도 파싱
-    width, height = map(int, context.manifest.resolution.split('x'))
-    resolution = (width, height)
-    print(f"🔍 렌더링 해상도: {width}x{height}")
-    
-    # 4. 선택된 스크립트 타입에 따라 고품질 이미지 생성 (개선된 PNG 렌더러 사용)
-    if context.script_type == "회화" or context.script_type == "conversation":
-        _create_conversation_images(context, png_renderer, resolution, file_manager)
-    elif context.script_type == "인트로" or context.script_type == "intro":
-        _create_intro_images(context, png_renderer, resolution, file_manager)
-    elif context.script_type == "엔딩" or context.script_type == "ending":
-        _create_ending_images(context, png_renderer, resolution, file_manager)
-    elif context.script_type == "썸네일" or context.script_type == "thumbnail":
-        _create_thumbnail_images(context, png_renderer, resolution, file_manager)
-    else:
-        print(f"⚠️ 알 수 없는 스크립트 타입: {context.script_type}")
-        print("    모든 타입의 이미지를 생성합니다.")
-        _create_conversation_images(context, png_renderer, resolution, file_manager)
-        _create_intro_images(context, png_renderer, resolution, file_manager)
-        _create_ending_images(context, png_renderer, resolution, file_manager)
-        _create_thumbnail_images(context, png_renderer, resolution, file_manager)
+        _log(context, f"지원하지 않거나, 단일 실행이 의미 없는 스크립트 타입입니다: {script_type}", "WARNING")
 
-    print("✅ 자막 이미지 생성 완료")
-
-
-def _log(context: PipelineContext, message: str, level: str = "INFO"):
-    """컨텍스트에 있는 콜백 함수로 로깅을 수행합니다."""
-    if context.log_callback:
-        context.log_callback(message, level)
-    else:
-        # 콜백이 없는 경우 콘솔에 직접 출력
-        print(f"[{level}] {message}")
-
+    context.log_callback("✅ 자막 이미지 생성 완료")
+    return {"success": True, "output_dir": base_subtitle_output_dir}
 
 def _create_conversation_images(context: PipelineContext, png_renderer: PNGRenderer, 
-                               resolution: Tuple[int, int], file_manager: FileNamingManager):
-    """
-    회화용 PNG 이미지 생성 (2개 독립 화면)
-    """
-    conversation_scenes = [scene for scene in context.manifest.scenes if scene.type == "conversation"]
-    conversation_scenes.sort(key=lambda x: x.sequence)
+                               base_output_dir: str):
+    _log(context, "--- 회화(Conversation) 이미지 생성 시작 ---")
     
+    output_dir = os.path.join(base_output_dir, "conversation")
+    os.makedirs(output_dir, exist_ok=True)
+
+    conversation_scenes = [s for s in context.manifest.scenes if s.type == "conversation"]
     if not conversation_scenes:
-        _log(context, "회화 씬이 없어 생성을 건너뜁니다.", "WARNING")
+        _log(context, "회화 장면(scene) 데이터가 없어 생성을 건너뜁니다.", "INFO")
         return
-    
-    _log(context, f"총 {len(conversation_scenes)}개의 회화 씬에 대한 이미지 생성을 시작합니다.")
-    
-    for i, scene in enumerate(conversation_scenes):
-        scene_info = f"씬 {scene.sequence}: {scene.native_script[:20]}..."
-        _log(context, f"{scene_info} 처리 중..." )
-        
-        # 🔥🔥🔥 [회화 이미지 2화면 생성] 제작 사양서에 따른 대화 데이터 구성 🔥🔥🔥
-        scene_data = {
-            'sequence': scene.sequence,
-            'native_script': scene.native_script,
-            'learning_script': scene.learning_script,
-            'reading_script': scene.reading_script
-        }
-        
-        # 🔥🔥🔥 [파일명 일련번호] 같은 디렉토리에 일련번호로 파일 생성 🔥🔥🔥
-        base_filename = f"{context.identifier}_{i+1:03d}"
-        
-        _log(context, f"  -> 화면 1 (순번+원어) 생성 시도: {base_filename}_screen1.png")
-        _log(context, f"  -> 화면 2 (순번+원어+학습어+읽기) 생성 시도: {base_filename}_screen2.png")
 
-        # 🔥🔥🔥 [새로운 메서드 호출] 2개 화면을 생성하는 메서드 호출 🔥🔥🔥
-        created_files = png_renderer.create_conversation_image(
-            scene_data, context.paths.conversation_dir, resolution, base_filename
-        )
-        
-        if created_files:
-            _log(context, f"✅ {scene_info} 이미지 생성 완료: {len(created_files)}개 파일", "SUCCESS")
-            for file_path in created_files:
-                _log(context, f"   - 생성된 파일: {os.path.basename(file_path)}")
-        else:
-            _log(context, f"❌ {scene_info} 이미지 생성 실패", "ERROR")
+    # 첫 장면의 설정을 기준으로 해상도 결정
+    resolution_str = conversation_scenes[0].settings.get('해상도', '1920x1080')
+    width, height = map(int, resolution_str.split('x'))
+    resolution = (width, height)
+    _log(context, f"[conversation] 렌더링 해상도: {width}x{height}")
 
+    style_map = _get_style_row_map(context, "conversation")
+    if not style_map:
+        _log(context, "'conversation' 탭에 대한 스타일이 정의되지 않았습니다. 생성을 건너뜁니다.", "WARNING")
+        return
+
+    # Semantic mapping for style settings
+    semantic_style_map = {}
+    for row_key, row_settings in style_map.items():
+        # 행 키의 값을 텍스트 라벨로 사용
+        text_label = row_settings.get('행', '')
+        
+        if text_label:
+            semantic_style_map[text_label] = row_settings
+
+    for i, scene_data in enumerate(conversation_scenes):
+        base_filename = f"{context.identifier}_conversation_{i+1:03d}"
+        
+        scenes_for_screen1 = []
+        if '순번' in semantic_style_map:
+            scenes_for_screen1.append({'text': str(scene_data.sequence), 'settings': semantic_style_map['순번']})
+        if '원어' in semantic_style_map:
+            scenes_for_screen1.append({'text': scene_data.native_script, 'settings': semantic_style_map['원어']})
+        
+        if scenes_for_screen1:
+            output_path1 = os.path.join(output_dir, f"{base_filename}_screen1.png")
+            png_renderer.render_image(scenes_for_screen1, output_path1, resolution, "conversation")
+
+        scenes_for_screen2 = []
+        if '순번' in semantic_style_map:
+            scenes_for_screen2.append({'text': str(scene_data.sequence), 'settings': semantic_style_map['순번']})
+        if '원어' in semantic_style_map:
+            scenes_for_screen2.append({'text': scene_data.native_script, 'settings': semantic_style_map['원어']})
+        if '학습어' in semantic_style_map:
+            scenes_for_screen2.append({'text': scene_data.learning_script, 'settings': semantic_style_map['학습어']})
+        if '읽기' in semantic_style_map:
+            scenes_for_screen2.append({'text': scene_data.reading_script, 'settings': semantic_style_map['읽기']})
+
+        if scenes_for_screen2:
+            output_path2 = os.path.join(output_dir, f"{base_filename}_screen2.png")
+            png_renderer.render_image(scenes_for_screen2, output_path2, resolution, "conversation")
 
 def _create_intro_images(context: PipelineContext, png_renderer: PNGRenderer,
-                        resolution: Tuple[int, int], file_manager: FileNamingManager):
-    """인트로용 PNG 이미지를 문장별로 생성합니다."""
-    intro_scenes = [scene for scene in context.manifest.scenes if scene.type == "intro"]
+                        base_output_dir: str):
+    _log(context, "--- 인트로(Intro) 이미지 생성 시작 ---")
     
+    output_dir = os.path.join(base_output_dir, "intro")
+    os.makedirs(output_dir, exist_ok=True)
+
+    intro_scenes = [s for s in context.manifest.scenes if s.type == "intro"]
     if not intro_scenes:
-        _log(context, "인트로 씬이 없어 생성을 건너뜁니다.", "WARNING")
+        _log(context, "인트로 장면(scene)이 없어 생성을 건너뜁니다.", "INFO")
         return
 
-    # 인트로 타입은 보통 씬이 하나라고 가정
-    full_script = intro_scenes[0].full_script if intro_scenes else ""
-    sentences = [s.strip() for s in full_script.split('\n') if s.strip()]
+    # 첫 장면의 설정을 기준으로 해상도 결정
+    resolution_str = intro_scenes[0].settings.get('해상도', '1920x1080')
+    width, height = map(int, resolution_str.split('x'))
+    resolution = (width, height)
+    _log(context, f"[intro] 렌더링 해상도: {width}x{height}")
 
-    if not sentences:
-        _log(context, "인트로 스크립트 내용이 없습니다.", "WARNING")
+    style_map = _get_style_row_map(context, "intro")
+    if not style_map:
+        _log(context, "'intro' 탭에 대한 스타일이 정의되지 않았습니다. 생성을 건너뜁니다.", "WARNING")
         return
 
-    _log(context, f"총 {len(sentences)}개의 인트로 문장에 대한 이미지 생성을 시작합니다.")
-
-    for i, sentence in enumerate(sentences):
-        sentence_info = f"인트로 문장 {i+1}: {sentence[:30]}..."
-        _log(context, f"{sentence_info} 처리 중...")
-
-        output_filename = f"{context.identifier}_intro_{i+1:03d}.png"
-        output_path = os.path.join(context.paths.intro_dir, output_filename)
-
-        _log(context, f"  -> '{output_filename}' 생성 시도")
-
-        print(f"🔍 [DEBUG] create_intro_ending_image 호출 전:")
-        print(f"   📝 문장: '{sentence}'")
-        print(f"   📁 출력 경로: {output_path}")
-        print(f"   📏 해상도: {resolution}")
-        print(f"   🏷️ 타입: '인트로'")
-        
-        success = png_renderer.create_intro_ending_image(
-            sentence, output_path, resolution, "인트로"
-        )
-        
-        print(f"🔍 [DEBUG] create_intro_ending_image 호출 후:")
-        print(f"   ✅ 성공: {success}")
-        
-        if success:
-            _log(context, f"✅ {sentence_info} 이미지 생성 완료", "SUCCESS")
-        else:
-            _log(context, f"❌ {sentence_info} 이미지 생성 실패", "ERROR")
-
+    # 첫 번째 스타일 사용 (인트로는 보통 하나의 스타일)
+    first_style_key = list(style_map.keys())[0] if style_map else None
+    if not first_style_key:
+        _log(context, "인트로 스타일을 찾을 수 없습니다.", "WARNING")
+        return
+    
+    style_to_use = style_map[first_style_key]
+    
+    # 각 intro scene의 text를 사용하여 이미지 생성
+    for i, scene in enumerate(intro_scenes):
+        sentence = scene.text
+        if not sentence or not sentence.strip():
+            continue
+            
+        output_path = os.path.join(output_dir, f"{context.identifier}_intro_{i+1:03d}.png")
+        scenes_to_render = [{'text': sentence, 'settings': style_to_use}]
+        png_renderer.render_image(scenes_to_render, output_path, resolution, "intro")
 
 def _create_ending_images(context: PipelineContext, png_renderer: PNGRenderer,
-                         resolution: Tuple[int, int], file_manager: FileNamingManager):
-    """엔딩용 PNG 이미지를 문장별로 생성합니다."""
-    ending_scenes = [scene for scene in context.manifest.scenes if scene.type == "ending"]
-    
+                         base_output_dir: str):
+    _log(context, "--- 엔딩(Ending) 이미지 생성 시작 ---")
+
+    output_dir = os.path.join(base_output_dir, "ending")
+    os.makedirs(output_dir, exist_ok=True)
+
+    ending_scenes = [s for s in context.manifest.scenes if s.type == "ending"]
     if not ending_scenes:
-        _log(context, "엔딩 씬이 없어 생성을 건너뜁니다.", "WARNING")
+        _log(context, "엔딩 장면(scene)이 없어 생성을 건너뜁니다.", "INFO")
         return
 
-    # 엔딩 타입은 보통 씬이 하나라고 가정
-    full_script = ending_scenes[0].full_script if ending_scenes else ""
-    sentences = [s.strip() for s in full_script.split('\n') if s.strip()]
+    # 첫 장면의 설정을 기준으로 해상도 결정
+    resolution_str = ending_scenes[0].settings.get('해상도', '1920x1080')
+    width, height = map(int, resolution_str.split('x'))
+    resolution = (width, height)
+    _log(context, f"[ending] 렌더링 해상도: {width}x{height}")
 
-    if not sentences:
-        _log(context, "엔딩 스크립트 내용이 없습니다.", "WARNING")
+    style_map = _get_style_row_map(context, "ending")
+    if not style_map:
+        _log(context, "'ending' 탭에 대한 스타일이 정의되지 않았습니다. 생성을 건너킵니다.", "WARNING")
         return
 
-    _log(context, f"총 {len(sentences)}개의 엔딩 문장에 대한 이미지 생성을 시작합니다.")
+    # 첫 번째 스타일 사용 (엔딩은 보통 하나의 스타일)
+    first_style_key = list(style_map.keys())[0] if style_map else None
+    if not first_style_key:
+        _log(context, "엔딩 스타일을 찾을 수 없습니다.", "WARNING")
+        return
+    
+    style_to_use = style_map[first_style_key]
 
-    for i, sentence in enumerate(sentences):
-        sentence_info = f"엔딩 문장 {i+1}: {sentence[:30]}..."
-        _log(context, f"{sentence_info} 처리 중...")
+    for i, scene in enumerate(ending_scenes):
+        sentence = scene.text
+        if not sentence or not sentence.strip():
+            continue
 
-        output_filename = f"{context.identifier}_ending_{i+1:03d}.png"
-        output_path = os.path.join(context.paths.ending_dir, output_filename)
-
-        _log(context, f"  -> '{output_filename}' 생성 시도")
-
-        success = png_renderer.create_intro_ending_image(
-            sentence, output_path, resolution, "엔딩"
-        )
-        
-        if success:
-            _log(context, f"✅ {sentence_info} 이미지 생성 완료", "SUCCESS")
-        else:
-            _log(context, f"❌ {sentence_info} 이미지 생성 실패", "ERROR")
-
-
+        output_path = os.path.join(output_dir, f"{context.identifier}_ending_{i+1:03d}.png")
+        scenes_to_render = [{'text': sentence, 'settings': style_to_use}]
+        png_renderer.render_image(scenes_to_render, output_path, resolution, "ending")
 
 def _create_thumbnail_images(context: PipelineContext, png_renderer: PNGRenderer,
-                            resolution: Tuple[int, int], file_manager: FileNamingManager):
-    """
-    썸네일용 PNG 이미지 생성 (AI JSON 파싱, 3세트, 터미널 출력)
-    """
-    # AI 데이터 로드 (실제 구현에서는 context에서 가져와야 함)
-    ai_data = getattr(context, 'ai_data', {})
+                           base_output_dir: str):
+    _log(context, "--- 썸네일(Thumbnail) 이미지 생성 시작 ---")
     
-    if not ai_data:
-        print("    - AI 데이터가 없습니다.")
+    output_dir = os.path.join(base_output_dir, "thumbnail")
+    os.makedirs(output_dir, exist_ok=True)
+
+    thumbnail_scenes = [s for s in context.manifest.scenes if s.type == "thumbnail"]
+    if not thumbnail_scenes:
+        _log(context, "썸네일 장면(scene) 데이터가 없어 생성을 건너뜁니다.", "INFO")
         return
-    
-    print(f"    [썸네일 이미지 생성]")
-    
-    # 출력 파일명 생성
-    output_filename = f"{context.identifier}_thumbnail.png"
-    output_path = os.path.join(context.paths.thumbnail_dir, output_filename)
-    
-    # 썸네일 이미지 생성
-    success = png_renderer.create_thumbnail_image(
-        ai_data, output_path, resolution
-    )
-    
-    if success:
-        print(f"        ✅ 썸네일 이미지 생성 완료: {output_filename}")
-    else:
-        print(f"        ❌ 썸네일 이미지 생성 실패: {output_filename}")
+
+    # 첫 장면의 설정을 기준으로 해상도 결정
+    resolution_str = thumbnail_scenes[0].settings.get('해상도', '1920x1080')
+    width, height = map(int, resolution_str.split('x'))
+    resolution = (width, height)
+    _log(context, f"[thumbnail] 렌더링 해상도: {width}x{height}")
+
+    try:
+        rows_styles = context.settings.script_settings.get("thumbnail", {}).get('rows', [])
+    except Exception:
+        rows_styles = []
+
+    if not rows_styles:
+        _log(context, "썸네일 탭에 정의된 행(row) 스타일이 없습니다.", "WARNING")
+        return
+
+    thumbnail_scenes = [s for s in context.manifest.scenes if s.type == "thumbnail"]
+    if not thumbnail_scenes:
+        _log(context, "썸네일 장면(scene) 데이터가 없어 생성을 건너뜁니다.", "INFO")
+        return
+
+    for i, scene in enumerate(thumbnail_scenes):
+        text_content = scene.text
+        if not text_content or not text_content.strip():
+            continue
+
+        lines = [line.strip() for line in text_content.split('\n')]
+        
+        scenes_to_render = []
+        for line_index, line_text in enumerate(lines):
+            if line_index < len(rows_styles):
+                style_to_use = rows_styles[line_index]
+                scenes_to_render.append({'text': line_text, 'settings': style_to_use})
+            else:
+                scenes_to_render.append({'text': line_text, 'settings': rows_styles[-1]})
+
+        if scenes_to_render:
+            output_path = os.path.join(output_dir, f"{context.identifier}_thumbnail_{i+1}.png")
+            png_renderer.render_image(scenes_to_render, output_path, resolution, "thumbnail")
+            _log(context, f"✅ 썸네일 이미지 생성: {os.path.basename(output_path)}")

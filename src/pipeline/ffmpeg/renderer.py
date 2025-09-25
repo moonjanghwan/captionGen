@@ -74,10 +74,8 @@ class FFmpegRenderer:
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             
             # 스무스 전환 여부에 따라 다른 방식 사용
-            if smooth_transition and len(existing_videos) > 1:
-                return self._create_smooth_merged_video(existing_videos, output_path)
-            else:
-                return self._create_simple_merged_video(existing_videos, output_path)
+            # 사용자 요청에 따라 항상 단순 병합을 사용하도록 수정
+            return self._create_simple_merged_video(existing_videos, output_path)
                 
         except Exception as e:
             print(f"🔥🔥🔥 [오류] 최종 병합 중 예상치 못한 오류: {e}")
@@ -219,7 +217,11 @@ class FFmpegRenderer:
                 '-f', 'concat',
                 '-safe', '0',
                 '-i', concat_list_path,
-                '-c', 'copy', # 재인코딩 없이 스트림 복사 (매우 빠름)
+                '-c:v', 'h264_videotoolbox',
+                '-b:v', '10000k', # 최종 병합이므로 품질을 위해 비트레이트를 약간 높게 설정
+                '-r', '25',
+                '-pix_fmt', 'yuv420p',
+                '-c:a', 'aac', '-ar', '44100', '-ac', '2',
                 output_path
             ]
             

@@ -2,7 +2,7 @@
 Manifest 파일의 데이터 구조를 정의하는 Pydantic 모델들
 """
 
-from typing import List, Optional, Union, Literal
+from typing import List, Optional, Union, Literal, Dict, Any, Dict, Any
 from pydantic import BaseModel, Field, field_validator
 import re
 
@@ -57,10 +57,11 @@ class DialogueScene(BaseModel):
 class Scene(BaseModel):
     """개별 장면을 나타내는 모델"""
     id: str = Field(..., description="장면 고유 식별자")
-    type: Literal["intro", "conversation", "dialogue", "ending"] = Field(..., description="장면 타입")
+    type: Literal["intro", "conversation", "dialogue", "ending", "thumbnail", "title", "keywords"] = Field(..., description="장면 타입")
+    settings: Optional[Dict[str, Any]] = Field(default_factory=dict, description="장면별 UI 설정")
     
     # 타입별 선택적 속성들
-    full_script: Optional[str] = Field(None, description="전체 스크립트 (intro/ending용)")
+    text: Optional[str] = Field(None, description="스크립트 텍스트 (intro/ending용)")
     sequence: Optional[int] = Field(None, description="순서 번호 (conversation용)")
     native_script: Optional[str] = Field(None, description="원어 스크립트 (conversation용)")
     learning_script: Optional[str] = Field(None, description="학습어 스크립트 (conversation용)")
@@ -77,8 +78,8 @@ class Scene(BaseModel):
         scene_type = v.get('type')
         
         if scene_type == "intro" or scene_type == "ending":
-            if not v.get('full_script'):
-                raise ValueError(f'{scene_type} 타입은 full_script가 필요합니다')
+            if not v.get('text'):
+                raise ValueError(f'{scene_type} 타입은 text가 필요합니다')
                 
         elif scene_type == "conversation":
             required_fields = ['sequence', 'native_script', 'learning_script', 'reading_script']
@@ -104,17 +105,7 @@ class Scene(BaseModel):
 class Manifest(BaseModel):
     """전체 Manifest 파일을 나타내는 모델"""
     project_name: str = Field(..., description="프로젝트 이름")
-    resolution: str = Field(default="1920x1080", description="해상도")
-    default_background: Optional[str] = Field(None, description="기본 배경 파일 경로")
     scenes: List[Scene] = Field(..., description="장면 리스트")
-    
-    @field_validator('resolution')
-    @classmethod
-    def validate_resolution(cls, v):
-        """해상도 형식 검증"""
-        if not re.match(r'^\d+x\d+$', v):
-            raise ValueError('해상도는 "가로x세로" 형식이어야 합니다 (예: 1920x1080)')
-        return v
     
     @field_validator('scenes')
     @classmethod

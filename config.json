@@ -1,4 +1,32 @@
 {
     "last_native_lang": "한국어",
-    "last_learning_lang": "중국어"
+    "last_learning_lang": "이탈리아어",
+    "fonts": {
+        "KoPubWorld돋움체 Light": "~/Library/Fonts/KoPubWorld Dotum Light.ttf",
+        "KoPubWorld돋움체 Medium": "~/Library/Fonts/KoPubWorld Dotum Medium.ttf",
+        "KoPubWorld돋움체 Bold": "~/Library/Fonts/KoPubWorld Dotum Bold.ttf",
+        "KoPubWorld바탕체 Light": "~/Library/Fonts/KoPubWorld Batang Light.ttf",
+        "KoPubWorld바탕체 Medium": "~/Library/Fonts/KoPubWorld Batang Medium.ttf",
+        "KoPubWorld바탕체 Bold": "~/Library/Fonts/KoPubWorld Batang Bold.ttf",
+        "Noto Sans KR Light": "~/Library/Fonts/NotoSansKR-Light.ttf",
+        "Noto Sans KR Regular": "~/Library/Fonts/NotoSansKR-Regular.ttf",
+        "Noto Sans KR Medium": "~/Library/Fonts/NotoSansKR-Medium.ttf",
+        "Noto Sans KR Bold": "~/Library/Fonts/NotoSansKR-Bold.ttf",
+        "Arial": "/System/Library/Fonts/Arial.ttf",
+        "Arial Bold": "/System/Library/Fonts/Arial Bold.ttf",
+        "Helvetica": "/System/Library/Fonts/Helvetica.ttc",
+        "AppleGothic": "/System/Library/Fonts/AppleGothic.ttf"
+    },
+    "audio_settings": {
+        "sample_rate": 24000,
+        "silence_duration_s": 1.0,
+        "api_retries": 3,
+        "api_retry_delay_s": 1.0,
+        "punctuation_pause_ms": {
+            ",": 1000,
+            "/": 1000,
+            "?": 1000,
+            "!": 1000
+        }
+    }
 }

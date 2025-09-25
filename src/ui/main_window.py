@@ -64,7 +64,7 @@ class MainWindow(ctk.CTk):
         # --- 페이지 생성 및 설정 ---
         self.pages = {}
         # MainWindow 인스턴스(self)를 root로 전달
-        self.data_page = DataTabView(self.main_frame, on_language_change=self._update_speaker_tab, root=self)
+        self.data_page = DataTabView(self.main_frame, root=self)
         self.speaker_page = SpeakerTabView(self.main_frame, root=self)
         self.image_page = ImageTabView(self.main_frame)
         self.pipeline_page = PipelineTabView(self.main_frame, root=self)
@@ -98,7 +98,7 @@ class MainWindow(ctk.CTk):
     def _set_window_geometry(self):
         """윈도우를 화면 중앙에 위치시키는 함수"""
         width = 1600
-        height = 900
+        height = 1100
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
         x = (screen_width - width) // 2
@@ -134,6 +134,10 @@ class MainWindow(ctk.CTk):
     def _show_page(self, page_name):
         if page_name == "speaker":
             self._update_speaker_tab()
+        elif page_name == "pipeline":
+            self.pages["pipeline"].activate() # 파이프라인 탭 활성화 시 activate 호출
+        elif page_name == "image":
+            self.pages["image"].activate() # 이미지 설정 탭 활성화 시 자동 로드 호출
         
         for name, page in self.pages.items():
             if name == page_name:
@@ -144,22 +148,36 @@ class MainWindow(ctk.CTk):
         self._update_menu_buttons_style(page_name)
 
     def _update_menu_buttons_style(self, selected: str):
+        # 선택된 탭과 선택되지 않은 탭의 색상을 명확하게 구분
         normal_fg = config.COLOR_THEME["button"]
         normal_hover = config.COLOR_THEME["button_hover"]
-        selected_fg = config.COLOR_THEME["button_hover"]
-        selected_hover = config.COLOR_THEME["button_hover"]
+        selected_fg = "#2B5A87"  # 선택된 탭을 위한 더 진한 파란색
+        selected_hover = "#1E3F5F"  # 선택된 탭 호버 색상
+        
         buttons = {
             "data": self.data_button,
             "speaker": self.speaker_button,
             "image": self.image_button,
+            "pipeline": self.pipeline_button,
         }
+        
         for key, btn in buttons.items():
             if not btn:
                 continue
             if key == selected:
-                btn.configure(fg_color=selected_fg, hover_color=selected_hover)
+                # 선택된 탭: 진한 파란색 배경, 흰색 텍스트
+                btn.configure(
+                    fg_color=selected_fg, 
+                    hover_color=selected_hover,
+                    text_color="white"
+                )
             else:
-                btn.configure(fg_color=normal_fg, hover_color=normal_hover)
+                # 선택되지 않은 탭: 기본 색상
+                btn.configure(
+                    fg_color=normal_fg, 
+                    hover_color=normal_hover,
+                    text_color=config.COLOR_THEME["text"]
+                )
 
     def _on_project_info_updated(self, native_lang, learning_lang, project_name, identifier):
         """DataTabView에서 프로젝트 정보가 변경되었을 때 호출되는 콜백입니다."""

@@ -154,7 +154,7 @@ class SettingMerger:
     def _get_default_script_type_settings(self) -> Dict[str, Dict[str, Any]]:
         """기본 스크립트 타입 설정 반환"""
         return {
-            '회화 설정': {
+            'conversation': {
                 '행수': 4,
                 '비율': '16:9',
                 '해상도': '1920x1080',
@@ -193,7 +193,7 @@ class SettingMerger:
                     }
                 ]
             },
-            '인트로 설정': {
+            'intro': {
                 '행수': 1,
                 '비율': '16:9',
                 '해상도': '1920x1080',
@@ -208,7 +208,7 @@ class SettingMerger:
                     }
                 ]
             },
-            '엔딩 설정': {
+            'ending': {
                 '행수': 1,
                 '비율': '16:9',
                 '해상도': '1920x1080',
@@ -223,7 +223,7 @@ class SettingMerger:
                     }
                 ]
             },
-            '썸네일 설정': {
+            'thumbnail': {
                 '행수': 4,
                 '비율': '16:9',
                 '해상도': '1920x1080',
@@ -259,6 +259,31 @@ class SettingMerger:
                         '색상': '#FFFFFF', '굵기': True,
                         '좌우 정렬': 'center', '상하 정렬': 'center',
                         '바탕': False, '쉐도우': True, '외곽선': True
+                    }
+                ]
+            },
+            'dialogue': {
+                '행수': 3,
+                '비율': '16:9',
+                '해상도': '1920x1080',
+                'rows': [
+                    {
+                        '행': '원어',
+                        'x': 50, 'y': 250, 'w': 1820,
+                        '크기(pt)': 100, '폰트(pt)': 'Times New Roman',
+                        '색상': '#FFFFFF', '굵기': 'Bold', '좌우 정렬': 'Left', '상하 정렬': 'Top'
+                    },
+                    {
+                        '행': '학습어1',
+                        'x': 50, 'y': 550, 'w': 1820,
+                        '크기(pt)': 100, '폰트(pt)': 'Georgia',
+                        '색상': '#FFFFFF', '굵기': 'Bold', '좌우 정렬': 'Left', '상하 정렬': 'Top'
+                    },
+                    {
+                        '행': '학습어2',
+                        'x': 50, 'y': 850, 'w': 1820,
+                        '크기(pt)': 100, '폰트(pt)': 'Arial Italic',
+                        '색상': '#FFFFFF', '굵기': 'Bold', '좌우 정렬': 'Left', '상하 정렬': 'Top'
                     }
                 ]
             }

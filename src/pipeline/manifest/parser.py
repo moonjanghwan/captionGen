@@ -135,7 +135,7 @@ class ManifestParser:
                 {
                     "id": "intro_01",
                     "type": "intro",
-                    "full_script": "프로젝트 소개 문구를 입력하세요."
+                    "text": "프로젝트 소개 문구를 입력하세요."
                 },
                 {
                     "id": "conversation_01",
@@ -148,7 +148,7 @@ class ManifestParser:
                 {
                     "id": "ending_01",
                     "type": "ending",
-                    "full_script": "마무리 문구를 입력하세요."
+                    "text": "마무리 문구를 입력하세요."
                 }
             ]
         }
@@ -206,7 +206,7 @@ class ManifestParser:
                 "scenes": []
             }
             
-            if script_type in ["conversation", "회화", "대화"]:
+            if script_type in ["conversation", "dialogue"]:
                 # 대화 스크립트 처리
                 scenes = script_data.get("scenes", [])
                 for i, scene_data in enumerate(scenes, 1):

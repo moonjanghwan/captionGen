@@ -46,10 +46,9 @@ class ScriptTypeManager:
         """스크립트 타입별 설정 초기화"""
         configs = {}
         
-        # 회화 설정
         configs[ScriptType.CONVERSATION] = ScriptTypeConfig(
             type=ScriptType.CONVERSATION,
-            ui_tab_name="회화 설정",
+            ui_tab_name="conversation",
             resolution="1920x1080",
             aspect_ratio="16:9",
             row_count=4,
@@ -59,41 +58,16 @@ class ScriptTypeManager:
             default_alignment="Center",
             default_effects={"shadow": True, "border": True, "background": False},
             row_configs=[
-                {
-                    "name": "순번",
-                    "x": 150, "y": 50, "w": 1820,
-                    "font_size": 100, "color": "#FFFFFF",
-                    "alignment": "Left", "vertical_alignment": "Top",
-                    "effects": {"shadow": False, "border": True, "background": False}
-                },
-                {
-                    "name": "원어",
-                    "x": 50, "y": 150, "w": 1820,
-                    "font_size": 120, "color": "#FFFFFF",
-                    "alignment": "Center", "vertical_alignment": "Top",
-                    "effects": {"shadow": True, "border": False, "background": False}
-                },
-                {
-                    "name": "학습어",
-                    "x": 50, "y": 450, "w": 1820,
-                    "font_size": 120, "color": "#FF00FF",
-                    "alignment": "Center", "vertical_alignment": "Top",
-                    "effects": {"shadow": True, "border": True, "background": False}
-                },
-                {
-                    "name": "읽기",
-                    "x": 50, "y": 750, "w": 1820,
-                    "font_size": 100, "color": "#FFFF00",
-                    "alignment": "Center", "vertical_alignment": "Top",
-                    "effects": {"shadow": False, "border": True, "background": True}
-                }
+                {"name": "순번", "x": 150, "y": 50, "w": 1820, "font_size": 100, "color": "#FFFFFF", "alignment": "Left", "vertical_alignment": "Top", "effects": {"shadow": False, "border": True, "background": False}},
+                {"name": "원어", "x": 50, "y": 150, "w": 1820, "font_size": 120, "color": "#FFFFFF", "alignment": "Center", "vertical_alignment": "Top", "effects": {"shadow": True, "border": False, "background": False}},
+                {"name": "학습어", "x": 50, "y": 450, "w": 1820, "font_size": 120, "color": "#FF00FF", "alignment": "Center", "vertical_alignment": "Top", "effects": {"shadow": True, "border": True, "background": False}},
+                {"name": "읽기", "x": 50, "y": 750, "w": 1820, "font_size": 100, "color": "#FFFF00", "alignment": "Center", "vertical_alignment": "Top", "effects": {"shadow": False, "border": True, "background": True}}
             ]
         )
         
-        # 썸네일 설정
         configs[ScriptType.THUMBNAIL] = ScriptTypeConfig(
             type=ScriptType.THUMBNAIL,
-            ui_tab_name="썸네일 설정",
+            ui_tab_name="thumbnail",
             resolution="1024x768",
             aspect_ratio="16:9",
             row_count=4,
@@ -103,41 +77,16 @@ class ScriptTypeManager:
             default_alignment="Center",
             default_effects={"shadow": True, "border": True, "background": False},
             row_configs=[
-                {
-                    "name": "1행",
-                    "x": 30, "y": 50, "w": 964,
-                    "font_size": 100, "color": "#FFFFFF",
-                    "alignment": "Center", "vertical_alignment": "Top",
-                    "effects": {"shadow": True, "border": True, "background": False}
-                },
-                {
-                    "name": "2행",
-                    "x": 30, "y": 230, "w": 964,
-                    "font_size": 100, "color": "#00FFFF",
-                    "alignment": "Center", "vertical_alignment": "Top",
-                    "effects": {"shadow": True, "border": True, "background": False}
-                },
-                {
-                    "name": "3행",
-                    "x": 30, "y": 410, "w": 964,
-                    "font_size": 100, "color": "#FF00FF",
-                    "alignment": "Center", "vertical_alignment": "Top",
-                    "effects": {"shadow": True, "border": True, "background": False}
-                },
-                {
-                    "name": "4행",
-                    "x": 30, "y": 590, "w": 964,
-                    "font_size": 100, "color": "#FFFF00",
-                    "alignment": "Center", "vertical_alignment": "Top",
-                    "effects": {"shadow": True, "border": True, "background": False}
-                }
+                {"name": "1행", "x": 30, "y": 50, "w": 964, "font_size": 100, "color": "#FFFFFF", "alignment": "Center", "vertical_alignment": "Top", "effects": {"shadow": True, "border": True, "background": False}},
+                {"name": "2행", "x": 30, "y": 230, "w": 964, "font_size": 100, "color": "#00FFFF", "alignment": "Center", "vertical_alignment": "Top", "effects": {"shadow": True, "border": True, "background": False}},
+                {"name": "3행", "x": 30, "y": 410, "w": 964, "font_size": 100, "color": "#FF00FF", "alignment": "Center", "vertical_alignment": "Top", "effects": {"shadow": True, "border": True, "background": False}},
+                {"name": "4행", "x": 30, "y": 590, "w": 964, "font_size": 100, "color": "#FFFF00", "alignment": "Center", "vertical_alignment": "Top", "effects": {"shadow": True, "border": True, "background": False}}
             ]
         )
         
-        # 인트로 설정
         configs[ScriptType.INTRO] = ScriptTypeConfig(
             type=ScriptType.INTRO,
-            ui_tab_name="인트로 설정",
+            ui_tab_name="intro",
             resolution="1920x1080",
             aspect_ratio="16:9",
             row_count=1,
@@ -147,20 +96,13 @@ class ScriptTypeManager:
             default_alignment="Center",
             default_effects={"shadow": True, "border": True, "background": True},
             row_configs=[
-                {
-                    "name": "1행",
-                    "x": 50, "y": 1000, "w": 1820,
-                    "font_size": 90, "color": "#FFFFFF",
-                    "alignment": "Center", "vertical_alignment": "Bottom",
-                    "effects": {"shadow": True, "border": True, "background": True}
-                }
+                {"name": "1행", "x": 50, "y": 1000, "w": 1820, "font_size": 90, "color": "#FFFFFF", "alignment": "Center", "vertical_alignment": "Bottom", "effects": {"shadow": True, "border": True, "background": True}}
             ]
         )
         
-        # 엔딩 설정
         configs[ScriptType.ENDING] = ScriptTypeConfig(
             type=ScriptType.ENDING,
-            ui_tab_name="엔딩 설정",
+            ui_tab_name="ending",
             resolution="1920x1080",
             aspect_ratio="16:9",
             row_count=1,
@@ -170,20 +112,13 @@ class ScriptTypeManager:
             default_alignment="Center",
             default_effects={"shadow": True, "border": True, "background": True},
             row_configs=[
-                {
-                    "name": "1행",
-                    "x": 50, "y": 50, "w": 1820,
-                    "font_size": 100, "color": "#FFFFFF",
-                    "alignment": "Center", "vertical_alignment": "Middle",
-                    "effects": {"shadow": True, "border": True, "background": True}
-                }
+                {"name": "1행", "x": 50, "y": 50, "w": 1820, "font_size": 100, "color": "#FFFFFF", "alignment": "Center", "vertical_alignment": "Middle", "effects": {"shadow": True, "border": True, "background": True}}
             ]
         )
         
-        # 대화 설정
         configs[ScriptType.DIALOGUE] = ScriptTypeConfig(
             type=ScriptType.DIALOGUE,
-            ui_tab_name="대화 설정",
+            ui_tab_name="dialogue",
             resolution="1920x1080",
             aspect_ratio="16:9",
             row_count=3,
@@ -193,27 +128,9 @@ class ScriptTypeManager:
             default_alignment="Left",
             default_effects={"shadow": False, "border": False, "background": False},
             row_configs=[
-                {
-                    "name": "원어",
-                    "x": 50, "y": 250, "w": 1820,
-                    "font_size": 100, "color": "#FFFFFF",
-                    "alignment": "Left", "vertical_alignment": "Top",
-                    "effects": {"shadow": False, "border": False, "background": False}
-                },
-                {
-                    "name": "학습어1",
-                    "x": 50, "y": 550, "w": 1820,
-                    "font_size": 100, "color": "#FFFFFF",
-                    "alignment": "Left", "vertical_alignment": "Top",
-                    "effects": {"shadow": False, "border": False, "background": False}
-                },
-                {
-                    "name": "학습어2",
-                    "x": 50, "y": 850, "w": 1820,
-                    "font_size": 100, "color": "#FFFFFF",
-                    "alignment": "Left", "vertical_alignment": "Top",
-                    "effects": {"shadow": False, "border": False, "background": False}
-                }
+                {"name": "원어", "x": 50, "y": 250, "w": 1820, "font_size": 100, "color": "#FFFFFF", "alignment": "Left", "vertical_alignment": "Top", "effects": {"shadow": False, "border": False, "background": False}},
+                {"name": "학습어1", "x": 50, "y": 550, "w": 1820, "font_size": 100, "color": "#FFFFFF", "alignment": "Left", "vertical_alignment": "Top", "effects": {"shadow": False, "border": False, "background": False}},
+                {"name": "학습어2", "x": 50, "y": 850, "w": 1820, "font_size": 100, "color": "#FFFFFF", "alignment": "Left", "vertical_alignment": "Top", "effects": {"shadow": False, "border": False, "background": False}}
             ]
         )
         

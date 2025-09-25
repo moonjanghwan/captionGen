@@ -1,5 +1,5 @@
 import google.generativeai as genai
-from google.cloud import texttospeech
+from google.cloud import texttospeech, texttospeech_v1
 from src import config
 import os
 import json
@@ -66,7 +66,7 @@ def get_tts_supported_languages():
         
         # 제작 사양서에 명시된 언어 형식과 유사하게 맞추기 위한 임시 매핑
         spec_languages = {
-            "ko-KR": "한국어", "en-US": "영어", "ja-JP": "일본어", "cmn-CN": "중국어",
+            "ko-KR": "한국어", "en-US": "영어", "ja-JP": "일본어", "zh-CN": "중국어",
             "vi-VN": "베트남어", "id-ID": "인도네시아어", "it-IT": "이탈리아어",
             "es-US": "스페인어", "fr-FR": "프랑스어", "de-DE": "독일어"
         }
@@ -80,7 +80,7 @@ def get_tts_supported_languages():
         # API에서 가져온 목록이 비어있을 경우 대비
         if not supported_languages:
             return {name: code.split('-')[0] for name, code in {
-                "한국어": "ko-KR", "영어": "en-US", "일본어": "ja-JP", "중국어": "cmn-CN",
+                "한국어": "ko-KR", "영어": "en-US", "일본어": "ja-JP", "중국어": "zh-CN",
                 "베트남어": "vi-VN", "인도네시아어": "id-ID", "이탈리아어": "it-IT",
                 "스페인어": "es-US", "프랑스어": "fr-FR", "독일어": "de-DE"
             }.items()}
@@ -91,7 +91,7 @@ def get_tts_supported_languages():
         print(f"Google TTS 언어 목록을 가져오는 중 오류 발생: {e}")
         # 오류 발생 시 기존의 하드코딩된 목록 반환
         return {name: code.split('-')[0] for name, code in {
-            "한국어": "ko-KR", "영어": "en-US", "일본어": "ja-JP", "중국어": "cmn-CN",
+            "한국어": "ko-KR", "영어": "en-US", "일본어": "ja-JP", "중국어": "zh-CN",
             "베트남어": "vi-VN", "인도네시아어": "id-ID", "이탈리아어": "it-IT",
             "스페인어": "es-US", "프랑스어": "fr-FR", "독일어": "de-DE"
         }.items()}
@@ -101,7 +101,18 @@ def get_voices_for_language(language_code):
     try:
         client = texttospeech.TextToSpeechClient()
         voices = client.list_voices(language_code=language_code).voices
-        return sorted([voice.name for voice in voices])
+        
+        voice_details = []
+        for voice in voices:
+            # Construct a more descriptive display name
+            display_name = f"{voice.name} ({voice.ssml_gender.name.lower()}, {', '.join(voice.language_codes)})"
+            voice_details.append({
+                "name": voice.name,
+                "display_name": display_name
+            })
+        
+        # Sort by display_name for better readability in UI
+        return sorted(voice_details, key=lambda x: x["display_name"])
     except Exception as e:
         print(f"'{language_code}'에 대한 음성 목록을 가져오는 중 오류 발생: {e}")
         return []
@@ -127,28 +138,18 @@ def synthesize_speech(text_or_ssml, language_code, voice_name, *, audio_encoding
             voice_params.model = "studio"
 
         encoding_enum = texttospeech.AudioEncoding.LINEAR16 if audio_encoding == "LINEAR16" else texttospeech.AudioEncoding.MP3
-        if sample_rate_hz:
-            audio_config = texttospeech.AudioConfig(audio_encoding=encoding_enum, sample_rate_hertz=sample_rate_hz)
-        else:
-            audio_config = texttospeech.AudioConfig(audio_encoding=encoding_enum)
+        
+        # WaveNet/Studio는 24000Hz에서 최적의 품질을 보여줌. 지정되지 않은 경우 24000을 기본값으로 사용.
+        final_sample_rate = sample_rate_hz if sample_rate_hz is not None else 24000
+        audio_config = texttospeech.AudioConfig(
+            audio_encoding=encoding_enum,
+            sample_rate_hertz=final_sample_rate
+        )
 
-        # timepoints 옵션이 있는 경우 request 객체로 호출 시도
-        if enable_timepoints and is_ssml:
-            try:
-                request = {
-                    "input": input_data,
-                    "voice": voice_params,
-                    "audio_config": audio_config,
-                    "enable_time_pointing": [getattr(texttospeech, "TimepointType").SSML_MARK]
-                }
-                response = client.synthesize_speech(request=request)
-            except Exception:
-                # 옵션 미지원 시 일반 호출로 폴백
-                response = client.synthesize_speech(input=input_data, voice=voice_params, audio_config=audio_config)
-        else:
-            response = client.synthesize_speech(
-                input=input_data, voice=voice_params, audio_config=audio_config
-            )
+        # 최신 API에서는 enable_time_pointing이 지원되지 않으므로 기본 호출만 사용
+        response = client.synthesize_speech(
+            input=input_data, voice=voice_params, audio_config=audio_config
+        )
         return response.audio_content
     except Exception as e:
         # SSML 미지원 음성인 경우 텍스트로 자동 폴백
@@ -190,10 +191,11 @@ def _read_master_prompt() -> str:
 
 
 def _build_prompt_with_params(master_prompt: str, params: dict) -> str:
-    """마스터 프롬프트 뒤에 입력 파라미터(JSON)를 덧붙여 최종 프롬프트를 생성합니다."""
-    # 프롬프트 하단에 명시적으로 입력 파라미터를 JSON으로 첨부
-    param_block = json.dumps(params, ensure_ascii=False, indent=2)
-    return f"{master_prompt}\n\n입력 파라미터(JSON):\n{param_block}\n"
+    """마스터 프롬프트의 플레이스홀더를 params 값으로 치환하여 최종 프롬프트를 생성합니다."""
+    prompt = master_prompt
+    for key, value in params.items():
+        prompt = prompt.replace(f"{{{key}}}", str(value))
+    return prompt
 
 
 def _parse_json_from_text(text: str) -> dict:
@@ -254,7 +256,14 @@ def generate_ai_data(params: dict, model_name: str, project_name: str, identifie
     if not text:
         raise RuntimeError("Gemini 응답에서 텍스트를 찾을 수 없습니다.")
 
-    data = _parse_json_from_text(text)
+    try:
+        data = _parse_json_from_text(text)
+    except json.JSONDecodeError:
+        print("--- [JSON 파싱 오류] ---")
+        print("AI가 반환한 원본 텍스트:")
+        print(text)
+        print("--------------------------")
+        raise RuntimeError("AI 응답을 JSON으로 파싱하는 데 실패했습니다. 콘솔 로그에서 원본 응답을 확인하세요.")
 
     # 결과 저장
     json_path = os.path.join(out_dir, f"{identifier}_ai.json")

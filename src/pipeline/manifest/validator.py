@@ -100,20 +100,11 @@ class ManifestValidator:
         elif len(manifest.project_name) > 100:
             result.add_error("project_name", "프로젝트 이름은 100자 이하여야 합니다")
         
-        # 해상도 검증
-        if manifest.resolution not in self.supported_resolutions:
-            result.add_warning("resolution", f"지원되지 않는 해상도입니다: {manifest.resolution}")
-        
         # 장면 수 검증
         if len(manifest.scenes) == 0:
             result.add_error("scenes", "최소 하나 이상의 장면이 필요합니다")
         elif len(manifest.scenes) > self.max_scene_count:
             result.add_error("scenes", f"장면 수가 너무 많습니다 (최대 {self.max_scene_count}개)")
-        
-        # 배경 파일 경로 검증
-        if manifest.default_background:
-            if not os.path.exists(manifest.default_background):
-                result.add_warning("default_background", f"배경 파일을 찾을 수 없습니다: {manifest.default_background}")
     
     def _validate_scene(self, scene: Scene, manifest: Manifest, result: ValidationResult):
         """개별 장면 검증"""
@@ -125,10 +116,10 @@ class ManifestValidator:
         
         # 타입별 필수 필드 검증
         if scene.type == "intro" or scene.type == "ending":
-            if not scene.full_script:
-                result.add_error("full_script", f"{scene.type} 타입은 full_script가 필요합니다", scene.id)
-            elif len(scene.full_script) > self.max_script_length:
-                result.add_warning("full_script", f"스크립트가 너무 깁니다 (최대 {self.max_script_length}자)", scene.id)
+            if not scene.text:
+                result.add_error("text", f"{scene.type} 타입은 text가 필요합니다", scene.id)
+            elif len(scene.text) > self.max_script_length:
+                result.add_warning("text", f"스크립트가 너무 깁니다 (최대 {self.max_script_length}자)", scene.id)
         
         elif scene.type == "conversation":
             required_fields = ["sequence", "native_script", "learning_script", "reading_script"]

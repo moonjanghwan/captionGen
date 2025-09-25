@@ -24,6 +24,15 @@ class VideoGenerator:
         except subprocess.CalledProcessError:
             raise RuntimeError("FFmpeg 실행 중 오류가 발생했습니다.")
     
+    def _get_accurate_audio_duration(self, audio_path: str) -> float:
+        try:
+            if not os.path.exists(audio_path): return 0.0
+            cmd = ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', audio_path]
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            return round(float(json.loads(result.stdout)['format']['duration']), 3)
+        except Exception:
+            return 0.0
+    
 
     
     
@@ -89,113 +98,136 @@ class VideoGenerator:
     def create_video_from_timing(self, timing_path: str, output_video_path: str, image_dir: str, script_type: str = None, background_color: str = "black") -> bool:
         """
         타이밍 JSON 파일을 직접 사용하여 오디오와 싱크가 맞는 비디오를 생성합니다.
-        (v2) FFmpeg concat demuxer와 이미지 전처리로 성능 및 안정성 최적화.
+        (v5) Concat 필터 방식으로 변경하여 정확도 향상
         """
-        print(f"--- 🎬 [타이밍 기반 비디오 렌더링] 시작 (Concat 방식 v2) - 스크립트 타입: {script_type} ---")
+        print(f"--- 🎬 [타이밍 기반 비디오 렌더링] 시작 (Concat 필터 방식 v5) - 스크립트 타입: {script_type} ---")
         temp_dir = None
-        concat_file_path = output_video_path + ".txt"
 
         try:
             with open(timing_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            print(f"✅ 타이밍 데이터 로드 완료: {timing_path}")
+                timing_entries = json.load(f)
+            print(f"✅ 타이밍 데이터 로드 완료: {len(timing_entries)}개 항목")
 
-            audio_input = data.get('final_audio_path')
-            if not audio_input or not os.path.exists(audio_input):
-                print(f"🔥🔥🔥 [오류] 오디오 파일을 찾을 수 없습니다: {audio_input}")
+            if not timing_entries:
+                print(f"🔥🔥🔥 [오류] 타이밍 파일에 내용이 없습니다: {timing_path}")
                 return False
 
-            # 1. 전처리 단계: 모든 이미지를 동일한 속성으로 만들기
-            target_resolution = tuple(map(int, data.get('resolution', '1920x1080').split('x')))
+            # 오디오 파일 경로 생성
+            filename = os.path.basename(output_video_path)
+            identifier = filename.replace(f"_{script_type}.mp4", "")
+            project_name = output_video_path.split(os.sep)[-4]
+            audio_input = os.path.join("output", project_name, identifier, "mp3", f"{identifier}_{script_type}.mp3")
+            
+            if not os.path.exists(audio_input):
+                print(f"🔥🔥🔥 [오류] 오디오 파일을 찾을 수 없습니다: {audio_input}")
+                return False
+            print(f"✅ 오디오 파일 확인: {audio_input}")
+
+            # 오디오 길이 측정
+            audio_duration = self._get_accurate_audio_duration(audio_input)
+            if not audio_duration or audio_duration == 0.0:
+                print(f"🔥🔥🔥 [오류] 오디오 파일의 길이를 측정할 수 없거나 길이가 0입니다: {audio_input}")
+                return False
+            print(f"✅ 오디오 길이 측정 완료: {audio_duration:.2f}초")
+
+            # 이미지 전처리 준비
+            target_resolution = (1920, 1080)
             temp_dir = os.path.join(os.path.dirname(output_video_path), "temp_images_for_concat")
             os.makedirs(temp_dir, exist_ok=True)
             print(f"⚙️ 이미지 전처리 시작... (목표 해상도: {target_resolution})")
 
-            # 배경 이미지 전처리
-            background_image_path = self._find_background_image(script_type, timing_path)
-            processed_bg_path = os.path.join(temp_dir, "bg.png")
-            try:
-                if background_image_path and os.path.exists(background_image_path):
-                    with Image.open(background_image_path) as img:
-                        img.resize(target_resolution, Image.Resampling.LANCZOS).save(processed_bg_path, 'PNG')
-                else:
-                    Image.new('RGBA', target_resolution, (0,0,0,255)).save(processed_bg_path, 'PNG')
-            except Exception as img_e:
-                print(f"⚠️ 배경 이미지 처리 실패, 검은색 배경으로 대체: {img_e}")
-                Image.new('RGBA', target_resolution, (0,0,0,255)).save(processed_bg_path, 'PNG')
+            input_images_args = []
+            filter_complex_video_streams = ""
+            valid_segments_count = 0
 
-            # 2. Concat 파일 내용 생성
-            padding_duration = 1.0
-            concat_content = f"file '{os.path.abspath(processed_bg_path)}'\nduration {padding_duration}\n"
-            
-            content_segments = [seg for seg in data.get('segments', []) if not seg.get('is_background', False)]
-            for i, segment in enumerate(content_segments):
-                image_path_from_timeline = segment.get("image_path")
-                if image_path_from_timeline and os.path.exists(image_path_from_timeline):
-                    image_path = image_path_from_timeline
-                else:
-                    image_path = os.path.join(image_dir, segment.get("name"))
+            # --- 로직 분기 ---
+            if script_type == "conversation":
+                from itertools import groupby
+                from operator import itemgetter
 
-                if not os.path.exists(image_path):
-                    print(f"  ⚠️ [경고] 이미지 파일을 찾을 수 없습니다: {image_path}, 이 세그먼트를 건너뜁니다.")
-                    continue
-                
-                processed_img_path = os.path.join(temp_dir, f"frame_{i:04d}.png")
-                try:
-                    with Image.open(image_path) as img:
-                        if img.size != target_resolution:
-                            img.resize(target_resolution, Image.Resampling.LANCZOS).save(processed_img_path, 'PNG')
-                        else:
-                            import shutil
-                            shutil.copy(image_path, processed_img_path)
-                except Exception as img_e:
-                    print(f"⚠️ 자막 이미지 처리 실패, 건너뜁니다: {img_e}")
-                    continue
+                timing_entries.sort(key=itemgetter('scene_id'))
+                grouped_scenes = {k: list(v) for k, v in groupby(timing_entries, key=itemgetter('scene_id'))}
+                print(f"🔄 'conversation' 타입 감지. {len(grouped_scenes)}개의 장면으로 그룹화합니다.")
 
-                duration = segment['end_time'] - segment['start_time']
-                if duration > 0:
-                    concat_content += f"file '{os.path.abspath(processed_img_path)}'\nduration {duration}\n"
+                for scene_id, segments in sorted(grouped_scenes.items()):
+                    # 1. 원어민 처리
+                    native_segment = next((s for s in segments if s['speaker'] == 'native'), None)
+                    if native_segment:
+                        duration = native_segment['end_time'] - native_segment['start_time']
+                        image_path = native_segment.get("image_filename")
+                        if duration > 0 and image_path and os.path.exists(image_path):
+                            processed_img_path = os.path.join(temp_dir, f"frame_{valid_segments_count:04d}.png")
+                            with Image.open(image_path) as img: img.resize(target_resolution, Image.Resampling.LANCZOS).save(processed_img_path, 'PNG')
+                            input_images_args.extend(['-loop', '1', '-t', str(duration), '-i', os.path.abspath(processed_img_path)])
+                            filter_complex_video_streams += f"[{valid_segments_count+1}:v]"
+                            valid_segments_count += 1
 
-            concat_content += f"file '{os.path.abspath(processed_bg_path)}'\nduration {padding_duration}\n"
+                    # 2. 학습자 그룹 처리
+                    learner_segments = [s for s in segments if s['speaker'].startswith('learner_')]
+                    if learner_segments:
+                        learner_segments.sort(key=lambda s: s['speaker'])
+                        duration = learner_segments[-1]['end_time'] - learner_segments[0]['start_time']
+                        image_path = learner_segments[0].get("image_filename")
+                        if duration > 0 and image_path and os.path.exists(image_path):
+                            processed_img_path = os.path.join(temp_dir, f"frame_{valid_segments_count:04d}.png")
+                            with Image.open(image_path) as img: img.resize(target_resolution, Image.Resampling.LANCZOS).save(processed_img_path, 'PNG')
+                            input_images_args.extend(['-loop', '1', '-t', str(duration), '-i', os.path.abspath(processed_img_path)])
+                            filter_complex_video_streams += f"[{valid_segments_count+1}:v]"
+                            valid_segments_count += 1
+            else:
+                print(f"🔄 '{script_type}' 타입 감지. 1:1로 이미지를 매칭합니다.")
+                for segment in timing_entries:
+                    duration = segment['end_time'] - segment['start_time']
+                    image_path = segment.get("image_filename")
+                    if duration > 0 and image_path and os.path.exists(image_path):
+                        processed_img_path = os.path.join(temp_dir, f"frame_{valid_segments_count:04d}.png")
+                        with Image.open(image_path) as img: img.resize(target_resolution, Image.Resampling.LANCZOS).save(processed_img_path, 'PNG')
+                        input_images_args.extend(['-loop', '1', '-t', str(duration), '-i', os.path.abspath(processed_img_path)])
+                        filter_complex_video_streams += f"[{valid_segments_count+1}:v]"
+                        valid_segments_count += 1
 
-            # 3. Concat 파일 저장
-            with open(concat_file_path, 'w', encoding='utf-8') as f:
-                f.write(concat_content)
-            print(f"✅ Concat 파일 생성 완료: {concat_file_path}")
+            if valid_segments_count == 0:
+                print(f"🔥🔥🔥 [오류] 처리할 유효한 이미지 세그먼트가 없습니다. FFmpeg을 실행할 수 없습니다.")
+                return False
 
-            # 4. 오디오 필터 생성 (패딩 처리)
-            audio_filter = f"adelay={int(padding_duration*1000)}|{int(padding_duration*1000)},apad=pad_len={int(44100*padding_duration)}"
+            filter_complex = f"{filter_complex_video_streams}concat=n={valid_segments_count}:v=1:a=0[v]"
 
-            # 5. 최종 FFmpeg 명령어 생성 및 실행
             command = [
                 'ffmpeg', '-y',
-                '-f', 'concat', '-safe', '0', '-i', concat_file_path,
                 '-i', audio_input,
-                '-filter_complex', f"[1:a]{audio_filter}[a]",
-                '-map', '0:v', '-map', '[a]',
-                '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
+                *input_images_args,
+                '-filter_complex', filter_complex,
+                '-map', '[v]',
+                '-map', '0:a',
+                '-t', str(audio_duration),
+                '-c:v', 'h264_videotoolbox',
+                '-b:v', '8000k',
+                '-r', '25',
+                '-pix_fmt', 'yuv420p',
                 '-c:a', 'aac', '-ar', '44100', '-ac', '2',
-                '-shortest',
                 output_video_path
             ]
             
-            print("🚀 [FFmpeg] 실행 명령어 (Concat 방식 v2):")
+            print("🚀 [FFmpeg] 실행 명령어 (Concat 필터 방식 v5):")
             print(" ".join(command))
             print("🔄 FFmpeg 실행 중...")
 
-            subprocess.run(command, check=True, capture_output=False)
+            subprocess.run(command, check=True, capture_output=True, text=True)
             print(f"✅ [성공] 비디오 생성 완료: {output_video_path}")
             return True
 
+        except subprocess.CalledProcessError as e:
+            print(f"🔥🔥🔥 [오류] FFmpeg 실행 중 오류 발생! 🔥🔥🔥")
+            print(f"  - FFmpeg stderr:\n{e.stderr}")
+            return False
         except Exception as e:
             print(f"🔥🔥🔥 [오류] 비디오 생성 중 예외 발생! 🔥🔥🔥")
             print(f"  - 오류 타입: {type(e).__name__}")
             print(f"  - 오류 메시지: {e}")
+            import traceback
+            traceback.print_exc()
             return False
         finally:
-            # 임시 파일 및 디렉토리 정리
-            if os.path.exists(concat_file_path):
-                os.remove(concat_file_path)
             if temp_dir and os.path.exists(temp_dir):
                 import shutil
                 shutil.rmtree(temp_dir)
@@ -216,23 +248,9 @@ class VideoGenerator:
                 print("⚠️ UI 배경 설정을 찾을 수 없습니다.")
                 return None
             
-            # 스크립트 타입별 매핑
-            script_type_mapping = {
-                'intro': '인트로 설정',
-                'conversation': '회화 설정', 
-                'ending': '엔딩 설정'
-            }
-            
-            # 스크립트 타입이 지정되지 않은 경우, 파일명에서 추출 시도
-            if not script_type:
-                # 현재 처리 중인 파일에서 스크립트 타입 추출
-                # 이는 create_video_from_timing에서 호출할 때 전달받아야 함
-                print("⚠️ 스크립트 타입이 지정되지 않았습니다.")
-                return None
-            
-            # 해당 스크립트 타입의 배경 설정 가져오기
-            tab_name = script_type_mapping.get(script_type)
-            print(f"🔍 탭 이름: {tab_name}")
+            # 스크립트 타입이 이제 설정의 키와 동일하므로 직접 사용합니다.
+            tab_name = script_type
+            print(f"🔍 설정 탭 이름: {tab_name}")
             
             if not tab_name or tab_name not in tab_backgrounds:
                 print(f"⚠️ {script_type}에 해당하는 배경 설정을 찾을 수 없습니다.")

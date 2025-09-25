@@ -6,7 +6,7 @@
 
 import os
 from typing import Dict, Any, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from ..manifest.models import Manifest
 
 
@@ -45,8 +45,7 @@ class PipelinePaths:
 @dataclass
 class PipelineSettings:
     """파이프라인 설정"""
-    common: Dict[str, Any]
-    tabs: Dict[str, Any]
+    script_settings: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
